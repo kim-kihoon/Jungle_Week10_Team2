@@ -465,3 +465,14 @@ vcpkg_installed/
 NipsEngine/Asset/Mesh/I_*/
 
 NipsEngine/Asset/Mesh/Bin/**
+
+# Keep the vendored FBX SDK, including lib/debug and lib/release.
+!NipsEngine/ThirdParty/
+!NipsEngine/ThirdParty/FBX SDK/
+!NipsEngine/ThirdParty/FBX SDK/**
+!NipsEngine/ThirdParty/FBX SDK/lib/
+!NipsEngine/ThirdParty/FBX SDK/lib/**
+!NipsEngine/ThirdParty/FBX SDK/lib/debug/
+!NipsEngine/ThirdParty/FBX SDK/lib/debug/**
+!NipsEngine/ThirdParty/FBX SDK/lib/release/
+!NipsEngine/ThirdParty/FBX SDK/lib/release/**

@@ -26,8 +26,6 @@ SOLUTION_GUID = "{4EBC5DD2-CECA-4722-9D19-87C7CB5F481B}"
 VS_PROJECT_TYPE = "{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}"
 
 CONFIGURATIONS = [
-    ("Debug", "Win32"),
-    ("Release", "Win32"),
     ("Debug", "x64"),
     ("Release", "x64"),
     ("Game", "x64"),
@@ -35,11 +33,8 @@ CONFIGURATIONS = [
 
 SOLUTION_CONFIGURATIONS = [
     ("Debug", "x64", "Debug", "x64"),
-    ("Debug", "x86", "Debug", "Win32"),
     ("Game", "x64", "Game", "x64"),
-    ("Game", "x86", "Game", "x64"),
     ("Release", "x64", "Release", "x64"),
-    ("Release", "x86", "Release", "Win32"),
 ]
 
 # Directories to recursively scan for source files.
@@ -72,6 +67,11 @@ INCLUDE_PATHS = [
     f"$(ProjectDir)..\\vcpkg_installed\\{VCPKG_TRIPLET}\\include\\luajit",
 ]
 
+FBX_INCLUDE_PATHS = [
+    "ThirdParty\\FBX SDK\\include",
+    "ThirdParty\\FBX SDK\\include\\libxml2",
+]
+
 GAME_EXCLUDED_PREFIXES = (
     "Source\\Editor\\",
 )
@@ -86,6 +86,10 @@ VCPKG_DEBUG_LIBRARY_PATHS = [
 VCPKG_RELEASE_LIBRARY_PATHS = [
     f"$(ProjectDir)..\\vcpkg_installed\\{VCPKG_TRIPLET}\\lib",
 ]
+
+FBX_DEBUG_LIBRARY_PATH = "ThirdParty\\FBX SDK\\lib\\debug"
+FBX_RELEASE_LIBRARY_PATH = "ThirdParty\\FBX SDK\\lib\\release"
+FBX_ADDITIONAL_DEPENDENCIES = "alembic.lib;libfbxsdk.lib;libxml2.lib;zlib.lib"
 
 # NuGet packages (id, version) — restored via packages.config
 NUGET_PACKAGES = [
@@ -177,9 +181,12 @@ def collect_all_filters(files: dict[str, list[str]]) -> set[str]:
 
 def include_paths_for_config(cfg: str) -> list[str]:
     """Return include paths for a configuration."""
+    paths = list(INCLUDE_PATHS)
     if cfg == "Game":
-        return ["Source\\Game"] + [path for path in INCLUDE_PATHS if path != "Source\\Editor"]
-    return INCLUDE_PATHS
+        return ["Source\\Game"] + [path for path in paths if path != "Source\\Editor"]
+    third_party_index = paths.index("ThirdParty") + 1
+    paths[third_party_index:third_party_index] = FBX_INCLUDE_PATHS
+    return paths
 
 
 def should_exclude_from_config(rel_path: str, cfg: str) -> bool:
@@ -201,6 +208,15 @@ def library_paths_for_config(cfg: str, plat: str) -> list[str]:
         else:
             paths += VCPKG_RELEASE_LIBRARY_PATHS
     return paths
+
+
+def fbx_library_path_for_config(cfg: str) -> str | None:
+    """Return the FBX SDK library path for editor configurations."""
+    if cfg == "Debug":
+        return FBX_DEBUG_LIBRARY_PATH
+    if cfg == "Release":
+        return FBX_RELEASE_LIBRARY_PATH
+    return None
 
 
 def add_source_exclusions(elem, rel_path: str):
@@ -342,12 +358,15 @@ def generate_vcxproj(files: dict[str, list[str]]):
             defs += "JPH_FLOATING_POINT_EXCEPTIONS_ENABLED;JPH_OBJECT_STREAM;"
 
         defs += "RMLUI_FONT_ENGINE_FREETYPE;_CRT_SECURE_NO_WARNINGS;"
-        defs += "NOMINMAX;%(PreprocessorDefinitions);"
+        defs += "NOMINMAX;"
+        if is_x64 and not is_game:
+            defs += "FBXSDK_SHARED;"
+        defs += "%(PreprocessorDefinitions);"
         ET.SubElement(cl, "PreprocessorDefinitions").text = defs
 
         ET.SubElement(cl, "MultiProcessorCompilation").text = "true"
         ET.SubElement(cl, "ConformanceMode").text = "true"
-        ET.SubElement(cl, "AdditionalOptions").text = "/utf-8 %(AdditionalOptions)"
+        ET.SubElement(cl, "AdditionalOptions").text = "/utf-8 /bigobj %(AdditionalOptions)"
         ET.SubElement(cl, "ExceptionHandling").text = "Async"
 
         if is_x64:
@@ -357,7 +376,16 @@ def generate_vcxproj(files: dict[str, list[str]]):
         ET.SubElement(link, "SubSystem").text = "Windows" if is_x64 else "Console"
         ET.SubElement(link, "GenerateDebugInformation").text = "true"
         if is_x64:
-            ET.SubElement(link, "AdditionalDependencies").text = "lua51.lib;Jolt.lib;rmlui.lib;%(AdditionalDependencies)"
+            additional_dependencies = "lua51.lib;Jolt.lib;rmlui.lib;"
+            fbx_library_path = fbx_library_path_for_config(cfg)
+            if fbx_library_path:
+                additional_dependencies += f"{FBX_ADDITIONAL_DEPENDENCIES};"
+            additional_dependencies += "%(AdditionalDependencies)"
+            ET.SubElement(link, "AdditionalDependencies").text = additional_dependencies
+            if fbx_library_path:
+                ET.SubElement(link, "AdditionalLibraryDirectories").text = (
+                    f"{fbx_library_path};%(AdditionalLibraryDirectories)"
+                )
 
         if is_game:
             pre_build = ET.SubElement(idg, "PreBuildEvent")
@@ -371,9 +399,15 @@ def generate_vcxproj(files: dict[str, list[str]]):
                 if cfg == "Debug"
                 else f"$(ProjectDir)..\\vcpkg_installed\\{VCPKG_TRIPLET}\\bin"
             )
+            fbx_runtime_dll = (
+                "$(ProjectDir)ThirdParty\\FBX SDK\\lib\\debug\\libfbxsdk.dll"
+                if cfg == "Debug"
+                else "$(ProjectDir)ThirdParty\\FBX SDK\\lib\\release\\libfbxsdk.dll"
+            )
             post_build = ET.SubElement(idg, "PostBuildEvent")
             ET.SubElement(post_build, "Command").text = (
-                f'if exist "{runtime_bin}\\*.dll" xcopy /Y /D "{runtime_bin}\\*.dll" "$(OutDir)"'
+                f'if exist "{runtime_bin}\\*.dll" xcopy /Y /D "{runtime_bin}\\*.dll" "$(OutDir)"\n'
+                f'if exist "{fbx_runtime_dll}" xcopy /Y /D "{fbx_runtime_dll}" "$(OutDir)"'
             )
 
     # ClCompile items

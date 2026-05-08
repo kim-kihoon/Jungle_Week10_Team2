@@ -1,14 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
-    <ProjectConfiguration Include="Debug|Win32">
-      <Configuration>Debug</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Release|Win32">
-      <Configuration>Release</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
@@ -32,19 +24,6 @@
     <VcpkgTriplet>x64-windows</VcpkgTriplet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
-    <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
-    <CharacterSet>Unicode</CharacterSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
-    <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>Unicode</CharacterSet>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
@@ -68,12 +47,6 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings" />
   <ImportGroup Label="Shared" />
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
@@ -84,31 +57,17 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <OutDir>$(ProjectDir)Bin\$(Configuration)\</OutDir>
-    <IntDir>$(ProjectDir)Build\$(Configuration)\</IntDir>
-    <IncludePath>Source\Engine;Source;ThirdParty;ThirdParty\ImGui;Source\Editor;.;$(ProjectDir)..\vcpkg_installed\x64-windows\include;$(ProjectDir)..\vcpkg_installed\x64-windows\include\luajit;$(IncludePath)</IncludePath>
-    <LibraryPath>$(LibraryPath)</LibraryPath>
-    <LocalDebuggerWorkingDirectory>$(ProjectDir)</LocalDebuggerWorkingDirectory>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <OutDir>$(ProjectDir)Bin\$(Configuration)\</OutDir>
-    <IntDir>$(ProjectDir)Build\$(Configuration)\</IntDir>
-    <IncludePath>Source\Engine;Source;ThirdParty;ThirdParty\ImGui;Source\Editor;.;$(ProjectDir)..\vcpkg_installed\x64-windows\include;$(ProjectDir)..\vcpkg_installed\x64-windows\include\luajit;$(IncludePath)</IncludePath>
-    <LibraryPath>$(LibraryPath)</LibraryPath>
-    <LocalDebuggerWorkingDirectory>$(ProjectDir)</LocalDebuggerWorkingDirectory>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(ProjectDir)Bin\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)Build\$(Configuration)\</IntDir>
-    <IncludePath>Source\Engine;Source;ThirdParty;ThirdParty\ImGui;Source\Editor;.;$(ProjectDir)..\vcpkg_installed\x64-windows\include;$(ProjectDir)..\vcpkg_installed\x64-windows\include\luajit;$(IncludePath)</IncludePath>
+    <IncludePath>Source\Engine;Source;ThirdParty;ThirdParty\FBX SDK\include;ThirdParty\FBX SDK\include\libxml2;ThirdParty\ImGui;Source\Editor;.;$(ProjectDir)..\vcpkg_installed\x64-windows\include;$(ProjectDir)..\vcpkg_installed\x64-windows\include\luajit;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir)..\vcpkg_installed\x64-windows\debug\lib;$(LibraryPath)</LibraryPath>
     <LocalDebuggerWorkingDirectory>$(ProjectDir)</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(ProjectDir)Bin\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)Build\$(Configuration)\</IntDir>
-    <IncludePath>Source\Engine;Source;ThirdParty;ThirdParty\ImGui;Source\Editor;.;$(ProjectDir)..\vcpkg_installed\x64-windows\include;$(ProjectDir)..\vcpkg_installed\x64-windows\include\luajit;$(IncludePath)</IncludePath>
+    <IncludePath>Source\Engine;Source;ThirdParty;ThirdParty\FBX SDK\include;ThirdParty\FBX SDK\include\libxml2;ThirdParty\ImGui;Source\Editor;.;$(ProjectDir)..\vcpkg_installed\x64-windows\include;$(ProjectDir)..\vcpkg_installed\x64-windows\include\luajit;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir)..\vcpkg_installed\x64-windows\lib;$(LibraryPath)</LibraryPath>
     <LocalDebuggerWorkingDirectory>$(ProjectDir)</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
@@ -119,43 +78,11 @@
     <LibraryPath>$(ProjectDir)..\vcpkg_installed\x64-windows\lib;$(LibraryPath)</LibraryPath>
     <LocalDebuggerWorkingDirectory>$(ProjectDir)</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
-      <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;WITH_EDITOR=1;RMLUI_FONT_ENGINE_FREETYPE;_CRT_SECURE_NO_WARNINGS;NOMINMAX;%(PreprocessorDefinitions);</PreprocessorDefinitions>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <ConformanceMode>true</ConformanceMode>
-      <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
-      <ExceptionHandling>Async</ExceptionHandling>
-    </ClCompile>
-    <Link>
-      <SubSystem>Console</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
-    </Link>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
-      <FunctionLevelLinking>true</FunctionLevelLinking>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
-      <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;WITH_EDITOR=1;RMLUI_FONT_ENGINE_FREETYPE;_CRT_SECURE_NO_WARNINGS;NOMINMAX;%(PreprocessorDefinitions);</PreprocessorDefinitions>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <ConformanceMode>true</ConformanceMode>
-      <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
-      <ExceptionHandling>Async</ExceptionHandling>
-    </ClCompile>
-    <Link>
-      <SubSystem>Console</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
-    </Link>
-  </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;WITH_EDITOR=1;WITH_LUA=1;JPH_FLOATING_POINT_EXCEPTIONS_ENABLED;JPH_OBJECT_STREAM;RMLUI_FONT_ENGINE_FREETYPE;_CRT_SECURE_NO_WARNINGS;NOMINMAX;%(PreprocessorDefinitions);</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;WITH_EDITOR=1;WITH_LUA=1;JPH_FLOATING_POINT_EXCEPTIONS_ENABLED;JPH_OBJECT_STREAM;RMLUI_FONT_ENGINE_FREETYPE;_CRT_SECURE_NO_WARNINGS;NOMINMAX;FBXSDK_SHARED;%(PreprocessorDefinitions);</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
@@ -165,10 +92,12 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>lua51.lib;Jolt.lib;rmlui.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>lua51.lib;Jolt.lib;rmlui.lib;alembic.lib;libfbxsdk.lib;libxml2.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>ThirdParty\FBX SDK\lib\debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>if exist "$(ProjectDir)..\vcpkg_installed\x64-windows\debug\bin\*.dll" xcopy /Y /D "$(ProjectDir)..\vcpkg_installed\x64-windows\debug\bin\*.dll" "$(OutDir)"</Command>
+      <Command>if exist "$(ProjectDir)..\vcpkg_installed\x64-windows\debug\bin\*.dll" xcopy /Y /D "$(ProjectDir)..\vcpkg_installed\x64-windows\debug\bin\*.dll" "$(OutDir)"
+if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\debug\libfbxsdk.dll" xcopy /Y /D "$(ProjectDir)ThirdParty\FBX SDK\lib\debug\libfbxsdk.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -177,7 +106,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;WITH_EDITOR=1;WITH_LUA=1;JPH_FLOATING_POINT_EXCEPTIONS_ENABLED;JPH_OBJECT_STREAM;RMLUI_FONT_ENGINE_FREETYPE;_CRT_SECURE_NO_WARNINGS;NOMINMAX;%(PreprocessorDefinitions);</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;WITH_EDITOR=1;WITH_LUA=1;JPH_FLOATING_POINT_EXCEPTIONS_ENABLED;JPH_OBJECT_STREAM;RMLUI_FONT_ENGINE_FREETYPE;_CRT_SECURE_NO_WARNINGS;NOMINMAX;FBXSDK_SHARED;%(PreprocessorDefinitions);</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
@@ -187,10 +116,12 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>lua51.lib;Jolt.lib;rmlui.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>lua51.lib;Jolt.lib;rmlui.lib;alembic.lib;libfbxsdk.lib;libxml2.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>ThirdParty\FBX SDK\lib\release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>if exist "$(ProjectDir)..\vcpkg_installed\x64-windows\bin\*.dll" xcopy /Y /D "$(ProjectDir)..\vcpkg_installed\x64-windows\bin\*.dll" "$(OutDir)"</Command>
+      <Command>if exist "$(ProjectDir)..\vcpkg_installed\x64-windows\bin\*.dll" xcopy /Y /D "$(ProjectDir)..\vcpkg_installed\x64-windows\bin\*.dll" "$(OutDir)"
+if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" xcopy /Y /D "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Game|x64'">
@@ -215,7 +146,8 @@
       <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "..\Scripts\CheckDependencyBoundaries.ps1"</Command>
     </PreBuildEvent>
     <PostBuildEvent>
-      <Command>if exist "$(ProjectDir)..\vcpkg_installed\x64-windows\bin\*.dll" xcopy /Y /D "$(ProjectDir)..\vcpkg_installed\x64-windows\bin\*.dll" "$(OutDir)"</Command>
+      <Command>if exist "$(ProjectDir)..\vcpkg_installed\x64-windows\bin\*.dll" xcopy /Y /D "$(ProjectDir)..\vcpkg_installed\x64-windows\bin\*.dll" "$(OutDir)"
+if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" xcopy /Y /D "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
