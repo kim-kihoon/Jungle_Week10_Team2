@@ -41,11 +41,11 @@ struct FVertexKey
     int32 ControlPointIndex = -1;
     int32 NormalIndex = -1;
     int32 UVIndex = -1;
-    int32 MaterialIndex = -1;
+    int32 MaterialSlotIndex = -1;
 
     bool operator==(const FVertexKey& Other) const
     {
-        return ControlPointIndex == Other.ControlPointIndex && NormalIndex == Other.NormalIndex && UVIndex == Other.UVIndex && MaterialIndex == Other.MaterialIndex;
+        return ControlPointIndex == Other.ControlPointIndex && NormalIndex == Other.NormalIndex && UVIndex == Other.UVIndex && MaterialSlotIndex == Other.MaterialSlotIndex;
     }
 };
 
@@ -56,7 +56,7 @@ struct FVertexKeyHash
         size_t Hash = static_cast<size_t>(Key.ControlPointIndex);
         Hash = Hash * 16777619u ^ static_cast<size_t>(Key.NormalIndex);
         Hash = Hash * 16777619u ^ static_cast<size_t>(Key.UVIndex);
-        Hash = Hash * 16777619u ^ static_cast<size_t>(Key.MaterialIndex);
+        Hash = Hash * 16777619u ^ static_cast<size_t>(Key.MaterialSlotIndex);
         return Hash;
     }
 };
@@ -212,11 +212,11 @@ int32 AddBoneRecursive(FbxNode* BoneNode, FSkeletalMesh& OutMesh)
     BoneInfo.ParentIndex = ParentIndex;
     const int32 BoneIndex = OutMesh.RefSkeleton.Add(BoneInfo, FTransform(ConvertFbxMatrixToEngineMatrix(LocalMatrix)));
 
-    if (BoneIndex >= static_cast<int32>(OutMesh.InverseBindPoseMatrices.size()))
+    if (BoneIndex >= static_cast<int32>(OutMesh.InverseRefPoseMatrices.size()))
     {
-        OutMesh.InverseBindPoseMatrices.resize(BoneIndex + 1, FMatrix::Identity);
+        OutMesh.InverseRefPoseMatrices.resize(BoneIndex + 1, FMatrix::Identity);
     }
-    OutMesh.InverseBindPoseMatrices[BoneIndex] = ConvertFbxMatrixToEngineMatrix(BoneNode->EvaluateGlobalTransform()).GetInverse();
+    OutMesh.InverseRefPoseMatrices[BoneIndex] = ConvertFbxMatrixToEngineMatrix(BoneNode->EvaluateGlobalTransform()).GetInverse();
 
     return BoneIndex;
 }
@@ -262,7 +262,7 @@ int32 GetOrAddMaterial(FSkeletalMesh& OutMesh, FbxSurfaceMaterial* Material)
     return static_cast<int32>(OutMesh.Materials.size() - 1);
 }
 
-int32 GetPolygonMaterialIndex(FbxMesh* Mesh, FbxNode* Node, int32 PolygonIndex, FSkeletalMesh& OutMesh)
+int32 GetPolygonMaterialSlotIndex(FbxMesh* Mesh, FbxNode* Node, int32 PolygonIndex, FSkeletalMesh& OutMesh)
 {
     int32 NodeMaterialIndex = 0;
     FbxLayerElementMaterial* MaterialElement = Mesh->GetElementMaterial();
@@ -323,7 +323,7 @@ FVector2 GetPolygonUV(FbxMesh* Mesh, int32 PolygonIndex, int32 VertexInPolygon, 
     return FVector2(0.0f, 0.0f);
 }
 
-void NormalizeAndAssignInfluences(
+void AssignTopNormalizedBoneInfluences(
     FSkeletalMeshVertex& Vertex,
     const TArray<FControlPointInfluence>& Influences,
     bool bNormalizeWeights)
@@ -376,7 +376,7 @@ void NormalizeAndAssignInfluences(
     }
 }
 
-void BuildControlPointInfluences(
+void BuildControlPointBoneInfluences(
     FbxMesh* Mesh,
     FSkeletalMesh& OutMesh,
     TArray<TArray<FControlPointInfluence>>& OutInfluences)
@@ -408,11 +408,11 @@ void BuildControlPointInfluences(
 
             FbxAMatrix TransformLinkMatrix;
             Cluster->GetTransformLinkMatrix(TransformLinkMatrix);
-            if (BoneIndex >= static_cast<int32>(OutMesh.InverseBindPoseMatrices.size()))
+            if (BoneIndex >= static_cast<int32>(OutMesh.InverseRefPoseMatrices.size()))
             {
-                OutMesh.InverseBindPoseMatrices.resize(BoneIndex + 1, FMatrix::Identity);
+                OutMesh.InverseRefPoseMatrices.resize(BoneIndex + 1, FMatrix::Identity);
             }
-            OutMesh.InverseBindPoseMatrices[BoneIndex] = ConvertFbxMatrixToEngineMatrix(TransformLinkMatrix).GetInverse();
+            OutMesh.InverseRefPoseMatrices[BoneIndex] = ConvertFbxMatrixToEngineMatrix(TransformLinkMatrix).GetInverse();
 
             const int32* ControlPointIndices = Cluster->GetControlPointIndices();
             const double* ControlPointWeights = Cluster->GetControlPointWeights();
@@ -435,7 +435,7 @@ void BuildControlPointInfluences(
     }
 }
 
-void BuildTangentsAndBounds(FSkeletalMeshLODRenderData& LODData)
+void BuildBoundsAndFallbackTangents(FSkeletalMeshLODRenderData& LODData)
 {
     LODData.Bounds.Reset();
     for (FSkeletalMeshVertex& Vertex : LODData.Vertices)
@@ -446,7 +446,7 @@ void BuildTangentsAndBounds(FSkeletalMeshLODRenderData& LODData)
     }
 }
 
-void ImportMeshNode(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh, const FSkeletalMeshImportOptions& ImportOptions)
+void ImportSkeletalMeshNode(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh, const FSkeletalMeshImportOptions& ImportOptions)
 {
     if (Node == nullptr || Mesh == nullptr)
     {
@@ -460,7 +460,7 @@ void ImportMeshNode(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh, const 
 
     FSkeletalMeshLODRenderData& LODData = OutMesh.RenderData.LODRenderData[0];
     TArray<TArray<FControlPointInfluence>> ControlPointInfluences;
-    BuildControlPointInfluences(Mesh, OutMesh, ControlPointInfluences);
+    BuildControlPointBoneInfluences(Mesh, OutMesh, ControlPointInfluences);
 
     const FMatrix FbxGeometricTransformMatrix = GetFbxGeometricTransformMatrix(Node);
     FbxVector4* ControlPoints = Mesh->GetControlPoints();
@@ -476,10 +476,10 @@ void ImportMeshNode(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh, const 
             continue;
         }
 
-        const int32 MaterialIndex = GetPolygonMaterialIndex(Mesh, Node, PolygonIndex, OutMesh);
-        if (MaterialIndex >= static_cast<int32>(IndicesByMaterial.size()))
+        const int32 MaterialSlotIndex = GetPolygonMaterialSlotIndex(Mesh, Node, PolygonIndex, OutMesh);
+        if (MaterialSlotIndex >= static_cast<int32>(IndicesByMaterial.size()))
         {
-            IndicesByMaterial.resize(MaterialIndex + 1);
+            IndicesByMaterial.resize(MaterialSlotIndex + 1);
         }
 
         for (int32 VertexInPolygon = 0; VertexInPolygon < 3; ++VertexInPolygon)
@@ -499,12 +499,12 @@ void ImportMeshNode(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh, const 
             Key.ControlPointIndex = ControlPointIndex;
             Key.NormalIndex = NormalIndex;
             Key.UVIndex = UVIndex;
-            Key.MaterialIndex = MaterialIndex;
+            Key.MaterialSlotIndex = MaterialSlotIndex;
 
             auto Found = VertexMap.find(Key);
             if (Found != VertexMap.end())
             {
-                IndicesByMaterial[MaterialIndex].push_back(Found->second);
+                IndicesByMaterial[MaterialSlotIndex].push_back(Found->second);
                 continue;
             }
 
@@ -515,19 +515,19 @@ void ImportMeshNode(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh, const 
             Vertex.Color = FColor::White();
             if (ControlPointIndex < static_cast<int32>(ControlPointInfluences.size()))
             {
-                NormalizeAndAssignInfluences(Vertex, ControlPointInfluences[ControlPointIndex], ImportOptions.bNormalizeWeights);
+                AssignTopNormalizedBoneInfluences(Vertex, ControlPointInfluences[ControlPointIndex], ImportOptions.bNormalizeWeights);
             }
 
             const uint32 NewVertexIndex = static_cast<uint32>(LODData.Vertices.size());
             LODData.Vertices.push_back(Vertex);
             VertexMap.emplace(Key, NewVertexIndex);
-            IndicesByMaterial[MaterialIndex].push_back(NewVertexIndex);
+            IndicesByMaterial[MaterialSlotIndex].push_back(NewVertexIndex);
         }
     }
 
-    for (int32 MaterialIndex = 0; MaterialIndex < static_cast<int32>(IndicesByMaterial.size()); ++MaterialIndex)
+    for (int32 MaterialSlotIndex = 0; MaterialSlotIndex < static_cast<int32>(IndicesByMaterial.size()); ++MaterialSlotIndex)
     {
-        TArray<uint32>& SectionIndices = IndicesByMaterial[MaterialIndex];
+        TArray<uint32>& SectionIndices = IndicesByMaterial[MaterialSlotIndex];
         if (SectionIndices.empty())
         {
             continue;
@@ -536,16 +536,16 @@ void ImportMeshNode(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh, const 
         FSkeletalMeshSection Section;
         Section.StartIndex = static_cast<uint32>(LODData.Indices.size());
         Section.IndexCount = static_cast<uint32>(SectionIndices.size());
-        Section.MaterialIndex = MaterialIndex;
+        Section.MaterialSlotIndex = MaterialSlotIndex;
 
         LODData.Indices.insert(LODData.Indices.end(), SectionIndices.begin(), SectionIndices.end());
         LODData.Sections.push_back(Section);
     }
 
-    BuildTangentsAndBounds(LODData);
+    BuildBoundsAndFallbackTangents(LODData);
 }
 
-void ImportMeshesRecursive(FbxNode* Node, FSkeletalMesh& OutMesh, const FSkeletalMeshImportOptions& ImportOptions)
+void ImportSkeletalMeshNodesRecursive(FbxNode* Node, FSkeletalMesh& OutMesh, const FSkeletalMeshImportOptions& ImportOptions)
 {
     if (Node == nullptr)
     {
@@ -555,12 +555,12 @@ void ImportMeshesRecursive(FbxNode* Node, FSkeletalMesh& OutMesh, const FSkeleta
     FbxMesh* Mesh = Node->GetMesh();
     if (Mesh != nullptr)
     {
-        ImportMeshNode(Node, Mesh, OutMesh, ImportOptions);
+        ImportSkeletalMeshNode(Node, Mesh, OutMesh, ImportOptions);
     }
 
     for (int32 ChildIndex = 0; ChildIndex < Node->GetChildCount(); ++ChildIndex)
     {
-        ImportMeshesRecursive(Node->GetChild(ChildIndex), OutMesh, ImportOptions);
+        ImportSkeletalMeshNodesRecursive(Node->GetChild(ChildIndex), OutMesh, ImportOptions);
     }
 }
 } // namespace
@@ -587,7 +587,7 @@ USkeletalMesh* FFbxImporter::ImportSkeletalMesh(const FString& Path, const FSkel
             Importer->Destroy();
         }
         Manager->Destroy();
-        return nullptr;   
+        return nullptr;
     }
 
     FbxScene* Scene = FbxScene::Create(Manager, "ImportedScene");
@@ -609,7 +609,7 @@ USkeletalMesh* FFbxImporter::ImportSkeletalMesh(const FString& Path, const FSkel
 
     FbxNode* RootNode = Scene->GetRootNode();
     CollectSkeletonNodes(RootNode, *ImportedMesh);
-    ImportMeshesRecursive(RootNode, *ImportedMesh, ImportOptions);
+    ImportSkeletalMeshNodesRecursive(RootNode, *ImportedMesh, ImportOptions);
 
     if (ImportedMesh->RefSkeleton.GetNum() == 0)
     {
@@ -617,12 +617,12 @@ USkeletalMesh* FFbxImporter::ImportSkeletalMesh(const FString& Path, const FSkel
         RootBone.Name = "Root";
         RootBone.ParentIndex = -1;
         ImportedMesh->RefSkeleton.Add(RootBone, FTransform::Identity);
-        ImportedMesh->InverseBindPoseMatrices.push_back(FMatrix::Identity);
+        ImportedMesh->InverseRefPoseMatrices.push_back(FMatrix::Identity);
     }
 
-    if (ImportedMesh->InverseBindPoseMatrices.size() < ImportedMesh->RefSkeleton.BoneInfo.size())
+    if (ImportedMesh->InverseRefPoseMatrices.size() < ImportedMesh->RefSkeleton.BoneInfo.size())
     {
-        ImportedMesh->InverseBindPoseMatrices.resize(ImportedMesh->RefSkeleton.BoneInfo.size(), FMatrix::Identity);
+        ImportedMesh->InverseRefPoseMatrices.resize(ImportedMesh->RefSkeleton.BoneInfo.size(), FMatrix::Identity);
     }
 
     const FSkeletalMeshLODRenderData& LODData = ImportedMesh->RenderData.LODRenderData[0];

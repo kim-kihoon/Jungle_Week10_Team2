@@ -37,7 +37,7 @@ void USkeletalMeshComponent::PostDuplicate(UObject* Original)
 	SkeletalMesh = Origin->SkeletalMesh;
 	SkeletalMeshAssetPath = Origin->SkeletalMeshAssetPath;
 	CurrentLocalTransforms = Origin->CurrentLocalTransforms;
-	CurrentComponentSpaceTransforms = Origin->CurrentComponentSpaceTransforms;
+	CurrentComponentSpaceMatrices = Origin->CurrentComponentSpaceMatrices;
 	SkinningMatrices = Origin->SkinningMatrices;
 	SkinnedVertices = Origin->SkinnedVertices;
 	SkinnedLocalBounds = Origin->SkinnedLocalBounds;
@@ -52,7 +52,7 @@ void USkeletalMeshComponent::SetSkeletalMesh(USkeletalMesh* InSkeletalMesh)
 	USkinnedMeshComponent::SetSkeletalMesh(InSkeletalMesh);
 }
 
-void USkeletalMeshComponent::SkinVerticesCPU()
+void USkeletalMeshComponent::UpdateCPUSkinnedVertices()
 {
 	RefreshBoneTransforms();
 	SkinnedVertices.clear();
@@ -207,7 +207,7 @@ void USkeletalMeshComponent::EnsureSkinnedVerticesUpdated() const
 		return;
 	}
 
-	const_cast<USkeletalMeshComponent*>(this)->SkinVerticesCPU();
+	const_cast<USkeletalMeshComponent*>(this)->UpdateCPUSkinnedVertices();
 }
 
 void USkeletalMeshComponent::MarkBoundsDirty()

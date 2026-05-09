@@ -13,7 +13,7 @@ public:
 
 	void SetSkeletalMesh(USkeletalMesh* InSkeletalMesh);
 
-	void SkinVerticesCPU();
+	void UpdateCPUSkinnedVertices();
 	const TArray<FNormalVertex>& GetSkinnedVertices() const;
 	const TArray<uint32>& GetSkinnedIndices() const;
 	const TArray<FSkeletalMeshSection>& GetSections() const;
