@@ -15,7 +15,9 @@ public:
 	USkinnedMeshComponent() = default;
 	~USkinnedMeshComponent() override = default;
 
+	//bone hierarchy의 local transform을 누적해 component-space transform을 갱신
 	virtual void RefreshBoneTransforms();
+
 	void ComputeSkinningMatrices();
 	void ComputeSkinnedVertices();
 
@@ -34,7 +36,8 @@ public:
 
 	bool ConsumeRenderStateDirty();
 
-protected:
+private:
+	// 상속받은 skeletal mesh componen에서도 접근
 	void MarkBoneTransformsDirty();
 	void MarkSkinningDirty();
 	void MarkBoundsDirty();
@@ -58,5 +61,5 @@ protected:
 	mutable bool bSkinningDirty = true;
 	mutable bool bBoundsDirty = true;
 	bool bRenderStateDirty = true;
-	bool bConsumedRenderStateDirty = false;
+	bool bConsumedRenderStateDirty = false; //렌더 상태 변경 플래그
 };

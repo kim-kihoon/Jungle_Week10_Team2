@@ -1,6 +1,8 @@
 ﻿#include "MeshBufferManager.h"
 
 #include "Asset/StaticMesh.h"
+#include "Asset/SkeletalMesh.h"
+#include "Component/SkinnedMeshComponent.h"
 
 void FMeshBufferManager::Create(ID3D11Device* InDevice)
 {
@@ -46,6 +48,12 @@ void FMeshBufferManager::Release()
         }
         StaticMeshBufferMap[i].clear();
     }
+
+    for (auto& pair : SkeletalMeshBufferMap)
+    {
+        pair.second.Release();
+    }
+    SkeletalMeshBufferMap.clear();
     
     Device = nullptr;
 }
@@ -105,4 +113,44 @@ FMeshBuffer* FMeshBufferManager::GetStaticMeshBuffer(const UStaticMesh* StaticMe
     NewBuffer.Create(Device, Vertices, Indices);
 
     return &NewBuffer;
+}
+
+FMeshBuffer* FMeshBufferManager::GetSkeletalMeshBuffer(USkinnedMeshComponent* SkinnedMeshComponent)
+{
+    if (!Device || !SkinnedMeshComponent || !SkinnedMeshComponent->HasValidMesh())
+    {
+        return nullptr;
+    }
+
+    USkeletalMesh* SkeletalMeshAsset = SkinnedMeshComponent->GetSkeletalMesh();
+    if (!SkeletalMeshAsset || !SkeletalMeshAsset->HasValidMeshData())
+    {
+        return nullptr;
+    }
+
+    // CPU skinning 결과는 component instance마다 달라질 수 있으므로
+    // UStaticMesh처럼 asset 포인터 기준으로 공유하면 안 된다.
+    SkinnedMeshComponent->ComputeSkinnedVertices();
+
+    const TArray<FNormalVertex>& Vertices = SkinnedMeshComponent->GetSkinnedVertices();
+    const TArray<uint32>& Indices = SkeletalMeshAsset->GetIndices();
+
+    if (Vertices.empty() || Indices.empty())
+    {
+        return nullptr;
+    }
+
+    FMeshBuffer& Buffer = SkeletalMeshBufferMap[SkinnedMeshComponent];
+    const bool bRenderStateDirty = SkinnedMeshComponent->ConsumeRenderStateDirty();
+
+    // 현재 FVertexBuffer::Create()는 immutable buffer를 생성한다.
+    // 우선은 dirty일 때 재생성하고, 애니메이션이 붙어서 매 프레임 변하면
+    // D3D11_USAGE_DYNAMIC + Map/Unmap 업데이트 방식으로 바꾸면 된다.
+    if (!Buffer.IsValid() || bRenderStateDirty)
+    {
+        Buffer.Release();
+        Buffer.Create(Device, Vertices, Indices);
+    }
+
+    return Buffer.IsValid() ? &Buffer : nullptr;
 }

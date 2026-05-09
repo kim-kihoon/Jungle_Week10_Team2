@@ -89,6 +89,7 @@ void USkinnedMeshComponent::RefreshBoneTransforms()
         return;
     }
 
+	//Bone들은 결국 FName,Index,FTransform 으로 구성.
     const TArray<FSkeletalBone>& Bones = SkeletalMesh->GetBones();
     const int32 BoneCount = static_cast<int32>(Bones.size());
 
@@ -102,11 +103,12 @@ void USkinnedMeshComponent::RefreshBoneTransforms()
 
         if (ParentIndex >= 0 && ParentIndex < BoneIndex)
         {
-            ComponentSpaceBoneTransforms[BoneIndex] =
-                Bone.ReferenceLocalTransform * ComponentSpaceBoneTransforms[ParentIndex];
+			//현재 bone에 부모 bone의 transform을 반영.
+            ComponentSpaceBoneTransforms[BoneIndex] = Bone.ReferenceLocalTransform * ComponentSpaceBoneTransforms[ParentIndex];
         }
         else
         {
+			//루트 이거나 데이터가 잘못 들어와서 현재 본보다 부모의 인덱스가 뒤에 있을 때
             ComponentSpaceBoneTransforms[BoneIndex] = Bone.ReferenceLocalTransform;
         }
     }
@@ -141,10 +143,9 @@ void USkinnedMeshComponent::ComputeSkinningMatrices()
 
         if (BoneIndex < static_cast<int32>(InverseBindPoseMatrices.size()))
         {
-            // DirectX row-vector 기준:
+			// 보통 vertex들이 bind pose 기준으로 저장되니 현재 pose로 변환해줌.
             // Vertex * InverseBindPose * CurrentBone
-            SkinningMatrices[BoneIndex] =
-                InverseBindPoseMatrices[BoneIndex] * CurrentBoneMatrix;
+            SkinningMatrices[BoneIndex] = InverseBindPoseMatrices[BoneIndex] * CurrentBoneMatrix;
         }
         else
         {

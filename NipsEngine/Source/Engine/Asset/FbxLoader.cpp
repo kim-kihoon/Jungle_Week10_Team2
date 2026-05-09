@@ -1,7 +1,7 @@
 ﻿#include "FbxLoader.h"
 #include "SkeletalMesh.h"
 
-#include <String>
+#include <string>
 
 namespace
 {
@@ -14,6 +14,7 @@ namespace
 		return Value;
 	}
 }
+
 USkeletalMesh* FFbxLoader::Load(const FString& Path)
 {
 	return nullptr;
