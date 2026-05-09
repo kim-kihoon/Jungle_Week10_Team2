@@ -33,6 +33,15 @@ public:
 	void InitDefaultComponents();
 };
 
+class ASkeletalMeshActor : public AActor
+{
+public:
+	DECLARE_CLASS(ASkeletalMeshActor, AActor)
+	ASkeletalMeshActor() = default;
+
+	void InitDefaultComponents();
+};
+
 class ASubUVActor : public AActor
 {
 public:

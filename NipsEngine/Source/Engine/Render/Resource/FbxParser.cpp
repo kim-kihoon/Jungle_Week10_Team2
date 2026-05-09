@@ -2,6 +2,7 @@
 #include "fbxsdk.h"
 #include "Asset/DynamicMeshTypes.h"
 #include "Core/Logger.h"
+#include <filesystem>
 
 namespace
 {
@@ -34,7 +35,9 @@ FDynamicMesh* FbxParser::ParseFbx(const std::string& FilePath)
 	FbxImporter* Importer = FbxImporter::Create(SdkManager, "");
 	if (!Importer->Initialize(FilePath.c_str(), -1, SdkManager->GetIOSettings()))
 	{
-		UE_LOG("Fbx Parser  로드 실패 %s", Importer->GetStatus().GetErrorString());
+		UE_LOG("Fbx Parser 로드 실패 경로: %s", FilePath.c_str());
+		UE_LOG("Fbx Parser 파일 존재 여부: %s", std::filesystem::exists(FilePath) ? "true" : "false");
+		UE_LOG("Fbx Parser 로드 실패 사유: %s", Importer->GetStatus().GetErrorString());
 		SdkManager->Destroy();
 		return OutMesh;
 	}
