@@ -587,7 +587,7 @@ USkeletalMesh* FFbxImporter::ImportSkeletalMesh(const FString& Path, const FSkel
             Importer->Destroy();
         }
         Manager->Destroy();
-        return nullptr;
+        return nullptr;   
     }
 
     FbxScene* Scene = FbxScene::Create(Manager, "ImportedScene");
