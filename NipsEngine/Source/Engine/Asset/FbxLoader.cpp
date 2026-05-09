@@ -139,7 +139,7 @@ FFbxImportPath BuildImportPathForFbxSdk(const FString& SourcePath)
     return Result;
 }
 
-FMatrix ToEngineMatrix(const FbxAMatrix& Matrix)
+FMatrix ConvertFbxMatrixToEngineMatrix(const FbxAMatrix& Matrix)
 {
     return FMatrix(
         static_cast<float>(Matrix.Get(0, 0)), static_cast<float>(Matrix.Get(0, 1)), static_cast<float>(Matrix.Get(0, 2)), static_cast<float>(Matrix.Get(0, 3)),
@@ -163,7 +163,7 @@ FVector2 ToEngineVector2(const FbxVector2& Vector)
         1.0f - static_cast<float>(Vector[1]));
 }
 
-FMatrix GetGeometryMatrix(FbxNode* Node)
+FMatrix GetFbxGeometricTransformMatrix(FbxNode* Node)
 {
     if (Node == nullptr)
     {
@@ -178,7 +178,7 @@ FMatrix GetGeometryMatrix(FbxNode* Node)
     Matrix.SetT(Translation);
     Matrix.SetR(Rotation);
     Matrix.SetS(Scale);
-    return ToEngineMatrix(Matrix);
+    return ConvertFbxMatrixToEngineMatrix(Matrix);
 }
 
 int32 AddBoneRecursive(FbxNode* BoneNode, FSkeletalMesh& OutMesh)
@@ -210,13 +210,13 @@ int32 AddBoneRecursive(FbxNode* BoneNode, FSkeletalMesh& OutMesh)
     FBoneInfo BoneInfo;
     BoneInfo.Name = BoneName;
     BoneInfo.ParentIndex = ParentIndex;
-    const int32 BoneIndex = OutMesh.RefSkeleton.Add(BoneInfo, FTransform(ToEngineMatrix(LocalMatrix)));
+    const int32 BoneIndex = OutMesh.RefSkeleton.Add(BoneInfo, FTransform(ConvertFbxMatrixToEngineMatrix(LocalMatrix)));
 
-    if (BoneIndex >= static_cast<int32>(OutMesh.RefBasesInvMatrix.size()))
+    if (BoneIndex >= static_cast<int32>(OutMesh.InverseBindPoseMatrices.size()))
     {
-        OutMesh.RefBasesInvMatrix.resize(BoneIndex + 1, FMatrix::Identity);
+        OutMesh.InverseBindPoseMatrices.resize(BoneIndex + 1, FMatrix::Identity);
     }
-    OutMesh.RefBasesInvMatrix[BoneIndex] = ToEngineMatrix(BoneNode->EvaluateGlobalTransform()).GetInverse();
+    OutMesh.InverseBindPoseMatrices[BoneIndex] = ConvertFbxMatrixToEngineMatrix(BoneNode->EvaluateGlobalTransform()).GetInverse();
 
     return BoneIndex;
 }
@@ -408,11 +408,11 @@ void BuildControlPointInfluences(
 
             FbxAMatrix TransformLinkMatrix;
             Cluster->GetTransformLinkMatrix(TransformLinkMatrix);
-            if (BoneIndex >= static_cast<int32>(OutMesh.RefBasesInvMatrix.size()))
+            if (BoneIndex >= static_cast<int32>(OutMesh.InverseBindPoseMatrices.size()))
             {
-                OutMesh.RefBasesInvMatrix.resize(BoneIndex + 1, FMatrix::Identity);
+                OutMesh.InverseBindPoseMatrices.resize(BoneIndex + 1, FMatrix::Identity);
             }
-            OutMesh.RefBasesInvMatrix[BoneIndex] = ToEngineMatrix(TransformLinkMatrix).GetInverse();
+            OutMesh.InverseBindPoseMatrices[BoneIndex] = ConvertFbxMatrixToEngineMatrix(TransformLinkMatrix).GetInverse();
 
             const int32* ControlPointIndices = Cluster->GetControlPointIndices();
             const double* ControlPointWeights = Cluster->GetControlPointWeights();
@@ -462,7 +462,7 @@ void ImportMeshNode(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh, const 
     TArray<TArray<FControlPointInfluence>> ControlPointInfluences;
     BuildControlPointInfluences(Mesh, OutMesh, ControlPointInfluences);
 
-    const FMatrix GeometryMatrix = GetGeometryMatrix(Node);
+    const FMatrix FbxGeometricTransformMatrix = GetFbxGeometricTransformMatrix(Node);
     FbxVector4* ControlPoints = Mesh->GetControlPoints();
     std::unordered_map<FVertexKey, uint32, FVertexKeyHash> VertexMap;
     TArray<TArray<uint32>> IndicesByMaterial;
@@ -492,7 +492,7 @@ void ImportMeshNode(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh, const 
 
             int32 NormalIndex = -1;
             int32 UVIndex = -1;
-            const FVector Normal = GeometryMatrix.TransformVector(GetPolygonNormal(Mesh, PolygonIndex, VertexInPolygon, NormalIndex)).GetSafeNormal();
+            const FVector Normal = FbxGeometricTransformMatrix.TransformVector(GetPolygonNormal(Mesh, PolygonIndex, VertexInPolygon, NormalIndex)).GetSafeNormal();
             const FVector2 UV = GetPolygonUV(Mesh, PolygonIndex, VertexInPolygon, UVIndex);
 
             FVertexKey Key;
@@ -509,7 +509,7 @@ void ImportMeshNode(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh, const 
             }
 
             FSkeletalMeshVertex Vertex;
-            Vertex.Position = GeometryMatrix.TransformPosition(ToEngineVector(ControlPoints[ControlPointIndex]));
+            Vertex.Position = FbxGeometricTransformMatrix.TransformPosition(ToEngineVector(ControlPoints[ControlPointIndex]));
             Vertex.Normal = Normal;
             Vertex.UVs = UV;
             Vertex.Color = FColor::White();
@@ -617,12 +617,12 @@ USkeletalMesh* FFbxImporter::ImportSkeletalMesh(const FString& Path, const FSkel
         RootBone.Name = "Root";
         RootBone.ParentIndex = -1;
         ImportedMesh->RefSkeleton.Add(RootBone, FTransform::Identity);
-        ImportedMesh->RefBasesInvMatrix.push_back(FMatrix::Identity);
+        ImportedMesh->InverseBindPoseMatrices.push_back(FMatrix::Identity);
     }
 
-    if (ImportedMesh->RefBasesInvMatrix.size() < ImportedMesh->RefSkeleton.BoneInfo.size())
+    if (ImportedMesh->InverseBindPoseMatrices.size() < ImportedMesh->RefSkeleton.BoneInfo.size())
     {
-        ImportedMesh->RefBasesInvMatrix.resize(ImportedMesh->RefSkeleton.BoneInfo.size(), FMatrix::Identity);
+        ImportedMesh->InverseBindPoseMatrices.resize(ImportedMesh->RefSkeleton.BoneInfo.size(), FMatrix::Identity);
     }
 
     const FSkeletalMeshLODRenderData& LODData = ImportedMesh->RenderData.LODRenderData[0];

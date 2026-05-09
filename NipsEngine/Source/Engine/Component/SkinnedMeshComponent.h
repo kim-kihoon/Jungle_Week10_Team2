@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Component/MeshComponent.h"
 #include "Asset/SkeletalMesh.h"
@@ -12,8 +12,8 @@ public:
 	USkeletalMesh* GetSkeletalMesh() const { return SkeletalMesh; }
 	bool HasValidMesh() const;
 
-	const TArray<FTransform>& GetBoneSpaceTransforms() const { return BoneSpaceTransforms; }
-	const TArray<FMatrix>& GetComponentSpaceTransforms() const { return ComponentSpaceTransforms; }
+	const TArray<FTransform>& GetCurrentLocalTransforms() const { return CurrentLocalTransforms; }
+	const TArray<FMatrix>& GetCurrentComponentSpaceTransforms() const { return CurrentComponentSpaceTransforms; }
 	const TArray<FMatrix>& GetSkinningMatrices() const { return SkinningMatrices; }
 
 	void RefreshBoneTransforms();
@@ -29,8 +29,8 @@ protected:
 	USkeletalMesh* SkeletalMesh = nullptr;
 	FString SkeletalMeshAssetPath;
 
-	TArray<FTransform> BoneSpaceTransforms;
-	TArray<FMatrix> ComponentSpaceTransforms;
+	TArray<FTransform> CurrentLocalTransforms;
+	TArray<FMatrix> CurrentComponentSpaceTransforms;
 	TArray<FMatrix> SkinningMatrices;
 
 	bool bBoneTransformsDirty = true;

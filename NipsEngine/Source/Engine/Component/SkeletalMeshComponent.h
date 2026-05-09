@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Component/SkinnedMeshComponent.h"
 #include "Render/Resource/VertexTypes.h"

@@ -1,4 +1,4 @@
-#include "SkinnedMeshComponent.h"
+﻿#include "SkinnedMeshComponent.h"
 
 #include "Render/Resource/Material.h"
 
@@ -45,7 +45,7 @@ void USkinnedMeshComponent::RefreshBoneTransforms()
 {
 	if (!HasValidMesh())
 	{
-		ComponentSpaceTransforms.clear();
+		CurrentComponentSpaceTransforms.clear();
 		SkinningMatrices.clear();
 		bBoneTransformsDirty = false;
 		return;
@@ -59,25 +59,25 @@ void USkinnedMeshComponent::RefreshBoneTransforms()
 	const FReferenceSkeleton& RefSkeleton = SkeletalMesh->GetRefSkeleton();
 	const int32 BoneCount = RefSkeleton.GetNum();
 
-	if (static_cast<int32>(BoneSpaceTransforms.size()) != BoneCount)
+	if (static_cast<int32>(CurrentLocalTransforms.size()) != BoneCount)
 	{
 		InitializeReferencePose();
 	}
 
-	ComponentSpaceTransforms.resize(BoneCount, FMatrix::Identity);
+	CurrentComponentSpaceTransforms.resize(BoneCount, FMatrix::Identity);
 	for (int32 BoneIndex = 0; BoneIndex < BoneCount; ++BoneIndex)
 	{
-		const FMatrix LocalMatrix = BoneSpaceTransforms[BoneIndex].ToMatrixWithScale();
+		const FMatrix LocalMatrix = CurrentLocalTransforms[BoneIndex].ToMatrixWithScale();
 		const int32 ParentIndex = RefSkeleton.BoneInfo[BoneIndex].ParentIndex;
 
 		// The engine uses row-vector transforms. Local * Parent accumulates into component space.
 		if (ParentIndex >= 0 && ParentIndex < BoneIndex)
 		{
-			ComponentSpaceTransforms[BoneIndex] = LocalMatrix * ComponentSpaceTransforms[ParentIndex];
+			CurrentComponentSpaceTransforms[BoneIndex] = LocalMatrix * CurrentComponentSpaceTransforms[ParentIndex];
 		}
 		else
 		{
-			ComponentSpaceTransforms[BoneIndex] = LocalMatrix;
+			CurrentComponentSpaceTransforms[BoneIndex] = LocalMatrix;
 		}
 	}
 
@@ -105,8 +105,8 @@ void USkinnedMeshComponent::OnSkeletalMeshChanged()
 
 void USkinnedMeshComponent::InitializeReferencePose()
 {
-	BoneSpaceTransforms.clear();
-	ComponentSpaceTransforms.clear();
+	CurrentLocalTransforms.clear();
+	CurrentComponentSpaceTransforms.clear();
 	SkinningMatrices.clear();
 
 	if (SkeletalMesh == nullptr)
@@ -115,8 +115,8 @@ void USkinnedMeshComponent::InitializeReferencePose()
 	}
 
 	const FReferenceSkeleton& RefSkeleton = SkeletalMesh->GetRefSkeleton();
-	BoneSpaceTransforms = RefSkeleton.RefBonePose;
-	ComponentSpaceTransforms.resize(RefSkeleton.GetNum(), FMatrix::Identity);
+	CurrentLocalTransforms = RefSkeleton.LocalBindPoseTransforms;
+	CurrentComponentSpaceTransforms.resize(RefSkeleton.GetNum(), FMatrix::Identity);
 	SkinningMatrices.resize(RefSkeleton.GetNum(), FMatrix::Identity);
 }
 
@@ -127,17 +127,17 @@ void USkinnedMeshComponent::UpdateSkinningMatrices()
 		return;
 	}
 
-	const TArray<FMatrix>& RefBasesInvMatrix = SkeletalMesh->GetRefBasesInvMatrix();
-	const int32 BoneCount = static_cast<int32>(ComponentSpaceTransforms.size());
+	const TArray<FMatrix>& InverseBindPoseMatrices = SkeletalMesh->GetInverseBindPoseMatrices();
+	const int32 BoneCount = static_cast<int32>(CurrentComponentSpaceTransforms.size());
 	SkinningMatrices.resize(BoneCount, FMatrix::Identity);
 
 	for (int32 BoneIndex = 0; BoneIndex < BoneCount; ++BoneIndex)
 	{
-		const FMatrix& InvBind = BoneIndex < static_cast<int32>(RefBasesInvMatrix.size())
-			? RefBasesInvMatrix[BoneIndex]
+		const FMatrix& InvBind = BoneIndex < static_cast<int32>(InverseBindPoseMatrices.size())
+			? InverseBindPoseMatrices[BoneIndex]
 			: FMatrix::Identity;
 
 		// Row-vector convention: Position * InvBind * CurrentComponentSpace.
-		SkinningMatrices[BoneIndex] = InvBind * ComponentSpaceTransforms[BoneIndex];
+		SkinningMatrices[BoneIndex] = InvBind * CurrentComponentSpaceTransforms[BoneIndex];
 	}
 }

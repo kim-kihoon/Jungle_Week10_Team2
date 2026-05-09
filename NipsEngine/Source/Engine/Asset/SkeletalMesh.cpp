@@ -17,7 +17,7 @@ int32 FReferenceSkeleton::FindBoneIndex(const FString& BoneName) const
 void FReferenceSkeleton::Reset()
 {
     BoneInfo.clear();
-    RefBonePose.clear();
+    LocalBindPoseTransforms.clear();
 }
 
 int32 FReferenceSkeleton::Add(const FBoneInfo& InBoneInfo, const FTransform& InRefPose)
@@ -29,7 +29,7 @@ int32 FReferenceSkeleton::Add(const FBoneInfo& InBoneInfo, const FTransform& InR
     }
 
     BoneInfo.push_back(InBoneInfo);
-    RefBonePose.push_back(InRefPose);
+    LocalBindPoseTransforms.push_back(InRefPose);
     return static_cast<int32>(BoneInfo.size() - 1);
 }
 
@@ -72,10 +72,10 @@ const FReferenceSkeleton& USkeletalMesh::GetRefSkeleton() const
     return MeshData ? MeshData->RefSkeleton : Empty;
 }
 
-const TArray<FMatrix>& USkeletalMesh::GetRefBasesInvMatrix() const
+const TArray<FMatrix>& USkeletalMesh::GetInverseBindPoseMatrices() const
 {
     static const TArray<FMatrix> Empty;
-    return MeshData ? MeshData->RefBasesInvMatrix : Empty;
+    return MeshData ? MeshData->InverseBindPoseMatrices : Empty;
 }
 
 const FSkeletalMeshLODRenderData* USkeletalMesh::GetLODRenderData(int32 LODIndex) const

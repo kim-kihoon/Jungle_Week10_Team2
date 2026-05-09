@@ -17,7 +17,7 @@ struct FBoneInfo
 struct FReferenceSkeleton
 {
     TArray<FBoneInfo> BoneInfo;
-    TArray<FTransform> RefBonePose;
+    TArray<FTransform> LocalBindPoseTransforms;
 
     int32 FindBoneIndex(const FString& BoneName) const;
     void Reset();
@@ -68,7 +68,7 @@ struct FSkeletalMesh
 {
     FString PathFileName;
     FReferenceSkeleton RefSkeleton;
-    TArray<FMatrix> RefBasesInvMatrix;
+    TArray<FMatrix> InverseBindPoseMatrices;
     TArray<FSkeletalMaterial> Materials;
     FSkeletalMeshRenderData RenderData;
 };
