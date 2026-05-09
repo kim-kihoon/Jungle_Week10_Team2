@@ -446,7 +446,7 @@ void BuildBoundsAndFallbackTangents(FSkeletalMeshLODRenderData& LODData)
     }
 }
 
-void ImportSkeletalMeshNode(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh, const FSkeletalMeshImportOptions& ImportOptions)
+void ImportSkeletalMeshData(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh, const FSkeletalMeshImportOptions& ImportOptions)
 {
     if (Node == nullptr || Mesh == nullptr)
     {
@@ -545,22 +545,22 @@ void ImportSkeletalMeshNode(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh
     BuildBoundsAndFallbackTangents(LODData);
 }
 
-void ImportSkeletalMeshNodesRecursive(FbxNode* Node, FSkeletalMesh& OutMesh, const FSkeletalMeshImportOptions& ImportOptions)
+void ImportSkeletalMeshDataRecursive(FbxNode* Node, FSkeletalMesh& OutMesh, const FSkeletalMeshImportOptions& ImportOptions)
 {
     if (Node == nullptr)
     {
         return;
     }
 
-    FbxMesh* Mesh = Node->GetMesh();
+    FbxMesh* Mesh = Node->GetMesh();  
     if (Mesh != nullptr)
     {
-        ImportSkeletalMeshNode(Node, Mesh, OutMesh, ImportOptions);
+        ImportSkeletalMeshData(Node, Mesh, OutMesh, ImportOptions);
     }
 
     for (int32 ChildIndex = 0; ChildIndex < Node->GetChildCount(); ++ChildIndex)
     {
-        ImportSkeletalMeshNodesRecursive(Node->GetChild(ChildIndex), OutMesh, ImportOptions);
+        ImportSkeletalMeshDataRecursive(Node->GetChild(ChildIndex), OutMesh, ImportOptions);
     }
 }
 } // namespace
@@ -578,6 +578,7 @@ USkeletalMesh* FFbxImporter::ImportSkeletalMesh(const FString& Path, const FSkel
     Manager->SetIOSettings(IOSettings);
 
     FbxImporter* Importer = FbxImporter::Create(Manager, "");
+    // FbxImporter only exposes a narrow char path API in this SDK. Creates an ASCII temp copy if needed.
     FFbxImportPath ImportPath = BuildImportPathForFbxSdk(Path);
     if (Importer == nullptr || !Importer->Initialize(ImportPath.ImportPath.c_str(), -1, Manager->GetIOSettings()))
     {
@@ -601,7 +602,7 @@ USkeletalMesh* FFbxImporter::ImportSkeletalMesh(const FString& Path, const FSkel
     Importer->Destroy();
 
     FbxGeometryConverter GeometryConverter(Manager);
-    GeometryConverter.Triangulate(Scene, true);
+    GeometryConverter.Triangulate(Scene, true);    
 
     FSkeletalMesh* ImportedMesh = new FSkeletalMesh();
     ImportedMesh->PathFileName = Path;
@@ -609,7 +610,7 @@ USkeletalMesh* FFbxImporter::ImportSkeletalMesh(const FString& Path, const FSkel
 
     FbxNode* RootNode = Scene->GetRootNode();
     CollectSkeletonNodes(RootNode, *ImportedMesh);
-    ImportSkeletalMeshNodesRecursive(RootNode, *ImportedMesh, ImportOptions);
+    ImportSkeletalMeshDataRecursive(RootNode, *ImportedMesh, ImportOptions);
 
     if (ImportedMesh->RefSkeleton.GetNum() == 0)
     {
