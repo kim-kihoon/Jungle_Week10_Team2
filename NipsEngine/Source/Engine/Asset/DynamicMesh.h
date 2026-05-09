@@ -19,36 +19,25 @@ public:
 
 	const FString& GetAssetPathFileName() const;
 	const TArray<FDynamicMeshVertex>& GetVertices() const;
+	const TArray<FNormalVertex>& GetRenderVertices() const;
 	const TArray<uint32>& GetIndices() const;
 	const TArray<FDynamicMeshSection>& GetSections() const;
 	const TArray<FSkeletalBone>& GetBones() const;
 	const TArray<FMatrix>& GetReferencePoseMatrices() const;
 	const FAABB& GetLocalBounds() const;
+	FDynamicMeshBuffer* GetDynamicMeshBuffer();
+	void UpdateRenderVertices(ID3D11DeviceContext* InContext, const TArray<FNormalVertex>& InVertices);
 
 	bool HasValidMeshData() const;
 
 private:
-	FDynamicMesh* MeshData = nullptr;
-};
-
-class FDynamicMeshBuffer
-{
-public:
-	void Create(ID3D11Device* InDevice, const FDynamicMesh* InMeshData);
-	void Release();
-
-	void UpdateBoneMatrices(ID3D11DeviceContext* InDeviceContext, const TArray<FMatrix>& InBoneMatrices);
-	void UpdateReferencePose(ID3D11DeviceContext* InDeviceContext, const FDynamicMesh* InMeshData);
-
-	FMeshBuffer& GetMeshBuffer() { return MeshBuffer; }
-	const FMeshBuffer& GetMeshBuffer() const { return MeshBuffer; }
-	FStructuredBuffer& GetBoneMatrixBuffer() { return BoneMatrixBuffer; }
-	const FStructuredBuffer& GetBoneMatrixBuffer() const { return BoneMatrixBuffer; }
-
-	bool IsValid() const { return MeshBuffer.IsValid(); }
+	void RebuildRenderVertices();
+	void RebuildMeshBuffer();
+	void MarkRenderBufferDirty();
 
 private:
-	FMeshBuffer MeshBuffer;
-	FStructuredBuffer BoneMatrixBuffer;
-	uint32 BoneCapacity = 0;
+	FDynamicMesh* MeshData = nullptr;
+	TArray<FNormalVertex> RenderVertices;
+	FDynamicMeshBuffer MeshBuffer;
+	bool bRenderBufferDirty = true;
 };

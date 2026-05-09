@@ -1,11 +1,13 @@
 #include "DynamicMesh.h"
 
+#include "Core/ResourceManager.h"
 #include "Render/Resource/FbxParser.h"
 
 DEFINE_CLASS(UDynamicMesh, UObject)
 
 UDynamicMesh::~UDynamicMesh()
 {
+	MeshBuffer.Release();
 	delete MeshData;
 	MeshData = nullptr;
 }
@@ -33,6 +35,10 @@ void UDynamicMesh::SetMeshData(FDynamicMesh* InMeshData)
 		MeshData->EnsureReferencePoseMatrices();
 		MeshData->CacheBounds();
 	}
+
+	RebuildRenderVertices();
+	MarkRenderBufferDirty();
+	RebuildMeshBuffer();
 }
 
 FDynamicMesh* UDynamicMesh::GetMeshData()
@@ -55,6 +61,11 @@ const TArray<FDynamicMeshVertex>& UDynamicMesh::GetVertices() const
 {
 	static const TArray<FDynamicMeshVertex> Empty;
 	return MeshData ? MeshData->Vertices : Empty;
+}
+
+const TArray<FNormalVertex>& UDynamicMesh::GetRenderVertices() const
+{
+	return RenderVertices;
 }
 
 const TArray<uint32>& UDynamicMesh::GetIndices() const
@@ -87,52 +98,80 @@ const FAABB& UDynamicMesh::GetLocalBounds() const
 	return MeshData ? MeshData->LocalBounds : Empty;
 }
 
+FDynamicMeshBuffer* UDynamicMesh::GetDynamicMeshBuffer()
+{
+	if (bRenderBufferDirty)
+	{
+		RebuildMeshBuffer();
+	}
+
+	return MeshBuffer.IsValid() ? &MeshBuffer : nullptr;
+}
+
+void UDynamicMesh::UpdateRenderVertices(ID3D11DeviceContext* InContext, const TArray<FNormalVertex>& InVertices)
+{
+	RenderVertices = InVertices;
+
+	if (bRenderBufferDirty || !MeshBuffer.IsValid())
+	{
+		RebuildMeshBuffer();
+		return;
+	}
+
+	MeshBuffer.Update(InContext, RenderVertices);
+}
+
 bool UDynamicMesh::HasValidMeshData() const
 {
 	return MeshData != nullptr && MeshData->HasValidRenderData();
 }
 
-void FDynamicMeshBuffer::Create(ID3D11Device* InDevice, const FDynamicMesh* InMeshData)
+void UDynamicMesh::RebuildRenderVertices()
 {
-	Release();
+	RenderVertices.clear();
 
-	if (InDevice == nullptr || InMeshData == nullptr || !InMeshData->HasValidRenderData())
+	if (!HasValidMeshData())
 	{
 		return;
 	}
 
-	MeshBuffer.Create(InDevice, InMeshData->Vertices, InMeshData->Indices);
+	RenderVertices.reserve(MeshData->Vertices.size());
 
-	BoneCapacity = static_cast<uint32>(InMeshData->Bones.size());
-	if (BoneCapacity > 0)
+	for (const FDynamicMeshVertex& SourceVertex : MeshData->Vertices)
 	{
-		BoneMatrixBuffer.Create(InDevice, sizeof(FMatrix), BoneCapacity);
+		FNormalVertex RenderVertex;
+		RenderVertex.Position = SourceVertex.Position;
+		RenderVertex.Color = FColor(SourceVertex.Color.X, SourceVertex.Color.Y, SourceVertex.Color.Z, SourceVertex.Color.W);
+		RenderVertex.Normal = SourceVertex.Normal;
+		RenderVertex.UVs = SourceVertex.UV;
+		RenderVertex.Tangent = FVector(SourceVertex.Tangent.X, SourceVertex.Tangent.Y, SourceVertex.Tangent.Z);
+		RenderVertex.Bitangent = FVector::CrossProduct(RenderVertex.Normal, RenderVertex.Tangent).GetSafeNormal();
+		RenderVertices.push_back(RenderVertex);
 	}
 }
 
-void FDynamicMeshBuffer::Release()
+void UDynamicMesh::RebuildMeshBuffer()
 {
 	MeshBuffer.Release();
-	BoneMatrixBuffer.Release();
-	BoneCapacity = 0;
-}
 
-void FDynamicMeshBuffer::UpdateBoneMatrices(ID3D11DeviceContext* InDeviceContext, const TArray<FMatrix>& InBoneMatrices)
-{
-	if (BoneCapacity == 0)
+	if (!HasValidMeshData() || RenderVertices.empty() || MeshData->Indices.empty())
 	{
+		bRenderBufferDirty = false;
 		return;
 	}
 
-	BoneMatrixBuffer.Update(InDeviceContext, InBoneMatrices.data(), static_cast<uint32>(InBoneMatrices.size()));
-}
-
-void FDynamicMeshBuffer::UpdateReferencePose(ID3D11DeviceContext* InDeviceContext, const FDynamicMesh* InMeshData)
-{
-	if (InMeshData == nullptr)
+	ID3D11Device* Device = FResourceManager::Get().GetCachedDevice();
+	if (Device == nullptr)
 	{
+		bRenderBufferDirty = true;
 		return;
 	}
 
-	UpdateBoneMatrices(InDeviceContext, InMeshData->ReferencePoseMatrices);
+	MeshBuffer.Create(Device, RenderVertices, MeshData->Indices);
+	bRenderBufferDirty = false;
+}
+
+void UDynamicMesh::MarkRenderBufferDirty()
+{
+	bRenderBufferDirty = true;
 }

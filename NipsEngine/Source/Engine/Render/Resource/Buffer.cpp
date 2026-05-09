@@ -30,6 +30,25 @@ ID3D11Buffer* FVertexBuffer::GetBuffer() const
 	return Buffer.Get();
 }
 
+void FDynamicVertexBuffer::SetRaw(ID3D11Buffer* InBuffer, uint32 InVertexCount, uint32 InStride)
+{
+	Release();
+	Buffer.Attach(InBuffer);
+	VertexCount = InVertexCount;
+	MaxVertexCount = InVertexCount;
+	Stride = InStride;
+}
+
+void FDynamicVertexBuffer::Release()
+{
+	Buffer.Reset();
+}
+
+ID3D11Buffer* FDynamicVertexBuffer::GetBuffer() const
+{
+	return Buffer.Get();
+}
+
 #pragma endregion
 
 #pragma region __FCONSTANTBUFFER__
@@ -106,6 +125,12 @@ void FIndexBuffer::Release()
 ID3D11Buffer* FIndexBuffer::GetBuffer() const
 {
 	return Buffer.Get();
+}
+
+void FDynamicMeshBuffer::Release()
+{
+	DynamicVertexBuffer.Release();
+	IndexBuffer.Release();
 }
 
 void FStructuredBuffer::Create(ID3D11Device* InDevice, uint32 InElementSize, uint32 InMaxElements)
