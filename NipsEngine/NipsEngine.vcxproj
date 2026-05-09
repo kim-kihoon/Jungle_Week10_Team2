@@ -265,6 +265,9 @@ if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" xcopy /Y /D
     <ClCompile Include="Source\Engine\Asset\ParticleAtlasLoader.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="Source\Engine\Asset\SkeletalMesh.cpp">
+      <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="Source\Engine\Asset\StaticMesh.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
@@ -861,6 +864,7 @@ if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" xcopy /Y /D
     <ClInclude Include="Source\Engine\Asset\ObjRawTypes.h" />
     <ClInclude Include="Source\Engine\Asset\ParticleAtlasLoader.h" />
     <ClInclude Include="Source\Engine\Asset\SkeletalMesh.h" />
+    <ClInclude Include="Source\Engine\Asset\SkeletalMeshTypes.h" />
     <ClInclude Include="Source\Engine\Asset\StaticMesh.h" />
     <ClInclude Include="Source\Engine\Asset\StaticMeshSimplifier.h" />
     <ClInclude Include="Source\Engine\Asset\StaticMeshTypes.h" />

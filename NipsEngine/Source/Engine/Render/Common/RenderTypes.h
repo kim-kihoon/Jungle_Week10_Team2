@@ -34,6 +34,7 @@ enum class EPrimitiveType
 	EPT_SKY,
 	EPT_FOG,
 	EPT_Decal,
+	EPT_SkeletalMesh,
     MAX
 };
 

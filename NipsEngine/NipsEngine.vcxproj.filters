@@ -374,6 +374,9 @@
     <ClCompile Include="Source\Engine\Asset\ParticleAtlasLoader.cpp">
       <Filter>Source\Engine\Asset</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Engine\Asset\SkeletalMesh.cpp">
+      <Filter>Source\Engine\Asset</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Engine\Asset\StaticMesh.cpp">
       <Filter>Source\Engine\Asset</Filter>
     </ClCompile>
@@ -1038,6 +1041,9 @@
       <Filter>Source\Engine\Asset</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Asset\SkeletalMesh.h">
+      <Filter>Source\Engine\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Asset\SkeletalMeshTypes.h">
       <Filter>Source\Engine\Asset</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Asset\StaticMesh.h">
