@@ -67,6 +67,8 @@ class FEditorWorldController : public IBaseEditorController
 	void ClearStartPIECallback() { OnRequestStartPIE = nullptr; }
 	void SetFocusSelectionCallback(std::function<void()> Callback) { OnRequestFocusSelection = std::move(Callback); }
 	void ClearFocusSelectionCallback() { OnRequestFocusSelection = nullptr; }
+	void SetBeforeDeleteSelectionCallback(std::function<void()> Callback) { OnBeforeDeleteSelection = std::move(Callback); }
+	void ClearBeforeDeleteSelectionCallback() { OnBeforeDeleteSelection = nullptr; }
 
 	bool  IsActiveOperation() const;
 	bool  IsBoxSelecting() const { return bBoxSelecting; }
@@ -95,6 +97,7 @@ class FEditorWorldController : public IBaseEditorController
 	bool    bTargetLocationInitialized = false;
 	std::function<void()> OnRequestStartPIE;
 	std::function<void()> OnRequestFocusSelection;
+	std::function<void()> OnBeforeDeleteSelection;
 
 	bool  bBoxSelecting = false;
 	POINT BoxSelectStart = { 0, 0 };
