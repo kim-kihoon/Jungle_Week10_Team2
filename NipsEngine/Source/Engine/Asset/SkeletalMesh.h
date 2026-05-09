@@ -18,7 +18,7 @@ public:
 
     const FString& GetAssetPathFileName() const;
     const FReferenceSkeleton& GetRefSkeleton() const;
-    const TArray<FMatrix>& GetInverseRefPoseMatrices() const;
+    const TArray<FMatrix>& GetInverseRefMatrices() const;
     const FSkeletalMeshLODRenderData* GetLODRenderData(int32 LODIndex = 0) const;
     const TArray<FSkeletalMaterial>& GetMaterials() const;
 

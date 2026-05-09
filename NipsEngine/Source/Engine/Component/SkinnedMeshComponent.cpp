@@ -67,17 +67,17 @@ void USkinnedMeshComponent::RefreshBoneTransforms()
 	CurrentComponentSpaceMatrices.resize(BoneCount, FMatrix::Identity);
 	for (int32 BoneIndex = 0; BoneIndex < BoneCount; ++BoneIndex)
 	{
-		const FMatrix LocalMatrix = CurrentLocalTransforms[BoneIndex].ToMatrixWithScale();
+		const FMatrix CurrentLocalMatrix = CurrentLocalTransforms[BoneIndex].ToMatrixWithScale();
 		const int32 ParentIndex = RefSkeleton.BoneInfo[BoneIndex].ParentIndex;
 
 		// The engine uses row-vector transforms. Local * Parent accumulates into component space.
 		if (ParentIndex >= 0 && ParentIndex < BoneIndex)
 		{
-			CurrentComponentSpaceMatrices[BoneIndex] = LocalMatrix * CurrentComponentSpaceMatrices[ParentIndex];
+			CurrentComponentSpaceMatrices[BoneIndex] = CurrentLocalMatrix * CurrentComponentSpaceMatrices[ParentIndex];
 		}
 		else
 		{
-			CurrentComponentSpaceMatrices[BoneIndex] = LocalMatrix;
+			CurrentComponentSpaceMatrices[BoneIndex] = CurrentLocalMatrix;
 		}
 	}
 
@@ -115,7 +115,7 @@ void USkinnedMeshComponent::ResetToRefPose()
 	}
 
 	const FReferenceSkeleton& RefSkeleton = SkeletalMesh->GetRefSkeleton();
-	CurrentLocalTransforms = RefSkeleton.LocalRefPoseTransforms;
+	CurrentLocalTransforms = RefSkeleton.LocalRefTransforms;
 	CurrentComponentSpaceMatrices.resize(RefSkeleton.GetNum(), FMatrix::Identity);
 	SkinningMatrices.resize(RefSkeleton.GetNum(), FMatrix::Identity);
 }
@@ -127,14 +127,14 @@ void USkinnedMeshComponent::UpdateSkinningMatrices()
 		return;
 	}
 
-	const TArray<FMatrix>& InverseRefPoseMatrices = SkeletalMesh->GetInverseRefPoseMatrices();
+	const TArray<FMatrix>& InverseRefMatrices = SkeletalMesh->GetInverseRefMatrices();
 	const int32 BoneCount = static_cast<int32>(CurrentComponentSpaceMatrices.size());
 	SkinningMatrices.resize(BoneCount, FMatrix::Identity);
 
 	for (int32 BoneIndex = 0; BoneIndex < BoneCount; ++BoneIndex)
 	{
-		const FMatrix& InvRef = BoneIndex < static_cast<int32>(InverseRefPoseMatrices.size())
-			? InverseRefPoseMatrices[BoneIndex]
+		const FMatrix& InvRef = BoneIndex < static_cast<int32>(InverseRefMatrices.size())
+			? InverseRefMatrices[BoneIndex]
 			: FMatrix::Identity;
 
 		// Row-vector convention: Position * InvRef * CurrentComponentSpace.

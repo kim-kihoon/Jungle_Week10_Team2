@@ -206,17 +206,17 @@ int32 AddBoneRecursive(FbxNode* BoneNode, FSkeletalMesh& OutMesh)
         }
     }
 
-    FbxAMatrix LocalMatrix = BoneNode->EvaluateLocalTransform();
+    FbxAMatrix RefLocalMatrix = BoneNode->EvaluateLocalTransform();
     FBoneInfo BoneInfo;
     BoneInfo.Name = BoneName;
     BoneInfo.ParentIndex = ParentIndex;
-    const int32 BoneIndex = OutMesh.RefSkeleton.Add(BoneInfo, FTransform(ConvertFbxMatrixToEngineMatrix(LocalMatrix)));
+    const int32 BoneIndex = OutMesh.RefSkeleton.Add(BoneInfo, FTransform(ConvertFbxMatrixToEngineMatrix(RefLocalMatrix)));
 
-    if (BoneIndex >= static_cast<int32>(OutMesh.InverseRefPoseMatrices.size()))
+    if (BoneIndex >= static_cast<int32>(OutMesh.InverseRefMatrices.size()))
     {
-        OutMesh.InverseRefPoseMatrices.resize(BoneIndex + 1, FMatrix::Identity);
+        OutMesh.InverseRefMatrices.resize(BoneIndex + 1, FMatrix::Identity);
     }
-    OutMesh.InverseRefPoseMatrices[BoneIndex] = ConvertFbxMatrixToEngineMatrix(BoneNode->EvaluateGlobalTransform()).GetInverse();
+    OutMesh.InverseRefMatrices[BoneIndex] = ConvertFbxMatrixToEngineMatrix(BoneNode->EvaluateGlobalTransform()).GetInverse();
 
     return BoneIndex;
 }
@@ -408,11 +408,11 @@ void BuildControlPointBoneInfluences(
 
             FbxAMatrix TransformLinkMatrix;
             Cluster->GetTransformLinkMatrix(TransformLinkMatrix);
-            if (BoneIndex >= static_cast<int32>(OutMesh.InverseRefPoseMatrices.size()))
+            if (BoneIndex >= static_cast<int32>(OutMesh.InverseRefMatrices.size()))
             {
-                OutMesh.InverseRefPoseMatrices.resize(BoneIndex + 1, FMatrix::Identity);
+                OutMesh.InverseRefMatrices.resize(BoneIndex + 1, FMatrix::Identity);
             }
-            OutMesh.InverseRefPoseMatrices[BoneIndex] = ConvertFbxMatrixToEngineMatrix(TransformLinkMatrix).GetInverse();
+            OutMesh.InverseRefMatrices[BoneIndex] = ConvertFbxMatrixToEngineMatrix(TransformLinkMatrix).GetInverse();
 
             const int32* ControlPointIndices = Cluster->GetControlPointIndices();
             const double* ControlPointWeights = Cluster->GetControlPointWeights();
@@ -618,12 +618,12 @@ USkeletalMesh* FFbxImporter::ImportSkeletalMesh(const FString& Path, const FSkel
         RootBone.Name = "Root";
         RootBone.ParentIndex = -1;
         ImportedMesh->RefSkeleton.Add(RootBone, FTransform::Identity);
-        ImportedMesh->InverseRefPoseMatrices.push_back(FMatrix::Identity);
+        ImportedMesh->InverseRefMatrices.push_back(FMatrix::Identity);
     }
 
-    if (ImportedMesh->InverseRefPoseMatrices.size() < ImportedMesh->RefSkeleton.BoneInfo.size())
+    if (ImportedMesh->InverseRefMatrices.size() < ImportedMesh->RefSkeleton.BoneInfo.size())
     {
-        ImportedMesh->InverseRefPoseMatrices.resize(ImportedMesh->RefSkeleton.BoneInfo.size(), FMatrix::Identity);
+        ImportedMesh->InverseRefMatrices.resize(ImportedMesh->RefSkeleton.BoneInfo.size(), FMatrix::Identity);
     }
 
     const FSkeletalMeshLODRenderData& LODData = ImportedMesh->RenderData.LODRenderData[0];
