@@ -5,15 +5,17 @@
 #include <cstring>
 
 #include "Asset/SkeletalMesh.h"
+#include "Core/Logger.h"
 #include "Core/ResourceManager.h"
 #include "Object/Object.h"
+#include "Runtime/Engine.h"
 
 DEFINE_CLASS(USkeletalMeshComponent, UMeshComponent)
 REGISTER_FACTORY(USkeletalMeshComponent)
 
 USkeletalMeshComponent::~USkeletalMeshComponent()
 {
-	ReleaseOwnedSkeletalMesh();
+	
 }
 
 void USkeletalMeshComponent::PostDuplicate(UObject* Original)
@@ -61,7 +63,7 @@ void USkeletalMeshComponent::Serialize(FArchive& Ar)
 		TArray<UMaterialInterface*> SavedMaterials = Materials;
 		if (!SkeletalMeshAssetPath.empty())
 		{
-			LoadSkeletalMesh(SkeletalMeshAssetPath);
+			SetSkeletalMesh(FResourceManager::Get().LoadSkeletalMesh(SkeletalMeshAssetPath));
 		}
 		else
 		{
@@ -79,38 +81,14 @@ void USkeletalMeshComponent::Serialize(FArchive& Ar)
 	}
 }
 
-bool USkeletalMeshComponent::InitializeSkeletalMesh(const FString& FilePath)
-{
-	return LoadSkeletalMesh(FilePath);
-}
-
-bool USkeletalMeshComponent::LoadSkeletalMesh(const FString& FilePath)
-{
-	USkeletalMesh* LoadedMesh = UObjectManager::Get().CreateObject<USkeletalMesh>();
-	if (!LoadedMesh->LoadFromFbx(FilePath))
-	{
-		UObjectManager::Get().DestroyObject(LoadedMesh);
-		SetSkeletalMesh(nullptr);
-		SkeletalMeshAssetPath = FilePath;
-		return false;
-	}
-
-	SetSkeletalMesh(LoadedMesh, true);
-	SkeletalMeshAssetPath = FilePath;
-	return true;
-}
-
-void USkeletalMeshComponent::SetSkeletalMesh(USkeletalMesh* InSkeletalMesh, bool bTakeOwnership)
+void USkeletalMeshComponent::SetSkeletalMesh(USkeletalMesh* InSkeletalMesh)
 {
 	if (SkeletalMeshAsset == InSkeletalMesh)
 	{
-		bOwnsSkeletalMesh = bTakeOwnership;
 		return;
 	}
 
-	ReleaseOwnedSkeletalMesh();
 	SkeletalMeshAsset = InSkeletalMesh;
-	bOwnsSkeletalMesh = bTakeOwnership;
 	ReleaseOwnedMaterialInstances();
 	Materials.clear();
 
@@ -147,6 +125,21 @@ void USkeletalMeshComponent::SetSkeletalMesh(USkeletalMesh* InSkeletalMesh, bool
 
 	MarkBoundsDirty();
 	MarkRenderBufferDirty();
+
+	if (HasValidMesh())
+	{
+		RebuildRenderVertices();
+		RebuildMeshBuffer();
+
+		InitializeBonePoses();
+
+		PerformCPUSkinning();
+	}
+
+	/*LocalBoneTransforms[3].SetRotation(FQuat::MakeFromEuler(FVector(0, 0, 45.0f)));
+	UpdateBoneMatrices();
+
+	PerformCPUSkinning();*/
 }
 
 USkeletalMesh* USkeletalMeshComponent::GetSkeletalMesh() const
@@ -168,6 +161,56 @@ FDynamicMeshBuffer* USkeletalMeshComponent::GetRenderBuffer()
 	}
 
 	return MeshBuffer.IsValid() ? &MeshBuffer : nullptr;
+}
+
+void USkeletalMeshComponent::TestReferencePoseSkinning()
+{
+	if (!SkeletalMeshAsset || !SkeletalMeshAsset->GetMeshData()) return;
+
+	const FSkeletalMesh* MeshData = SkeletalMeshAsset->GetMeshData();
+	const TArray<FSkeletalMeshVertex>& SourceVertices = SkeletalMeshAsset->GetVertices();
+	const TArray<FSkeletalBone>& Bones = SkeletalMeshAsset->GetBones();
+
+	float MaxPosError = 0.0f;
+
+	for (int32 i = 0; i < SourceVertices.size(); i++)
+	{
+		const FSkeletalMeshVertex& V = SourceVertices[i];
+		FVector SkinnedPos = FVector::Zero();
+
+		for (int32 w = 0; w < 4; w++)
+		{
+			float Weight = V.BoneWeights[w];
+			if (Weight > 0.0f)
+			{
+				int32 BoneIndex = V.BoneIndices[w];
+				const FSkeletalBone& Bone = Bones[BoneIndex];
+
+				FMatrix SkinningMatrix = Bone.InverseBindPose * Bone.RefGlobalMatrix;
+				
+				FVector TransformPos = SkinningMatrix.TransformPosition(V.Position);
+
+				SkinnedPos += TransformPos * Weight;
+			}
+		}
+
+		float Error = (SkinnedPos - V.Position).Size();
+		if (Error > MaxPosError)
+		{
+			MaxPosError = Error;
+		}
+	}
+	UE_LOG("=== [Reference Pose Skinning Test] ===");
+	UE_LOG("- Max Position Error: %f", MaxPosError);
+
+	if (MaxPosError < 0.01f)
+	{
+		UE_LOG("[SUCCESS] 완벽합니다! 스키닝 연산 후에도 A-Pose가 정확히 유지됩니다.");
+	}
+	else
+	{
+		UE_LOG("[ERROR] 위치가 틀어집니다. 행렬 곱셈 순서나 TransformPosition 로직을 확인하세요.");
+	}
 }
 
 const TArray<FNormalVertex>& USkeletalMeshComponent::GetRenderVertices() const
@@ -205,7 +248,7 @@ void USkeletalMeshComponent::PostEditProperty(const char* PropertyName)
 			return;
 		}
 
-		LoadSkeletalMesh(SkeletalMeshAssetPath);
+		SetSkeletalMesh(FResourceManager::Get().LoadSkeletalMesh(SkeletalMeshAssetPath));
 	}
 	else if (std::strcmp(PropertyName, "Materials") == 0)
 	{
@@ -336,16 +379,6 @@ const FAABB& USkeletalMeshComponent::GetWorldAABB() const
 	return WorldAABB;
 }
 
-void USkeletalMeshComponent::ReleaseOwnedSkeletalMesh()
-{
-	if (bOwnsSkeletalMesh && SkeletalMeshAsset != nullptr)
-	{
-		UObjectManager::Get().DestroyObject(SkeletalMeshAsset);
-	}
-	SkeletalMeshAsset = nullptr;
-	bOwnsSkeletalMesh = false;
-}
-
 void USkeletalMeshComponent::RebuildRenderVertices()
 {
 	RenderVertices.clear();
@@ -382,6 +415,87 @@ void USkeletalMeshComponent::UpdateRenderVertices(ID3D11DeviceContext* InContext
 	}
 
 	MeshBuffer.Update(InContext, RenderVertices);
+}
+
+void USkeletalMeshComponent::InitializeBonePoses()
+{
+	if (!HasValidMesh()) return;
+
+	const TArray<FSkeletalBone>& Bones = SkeletalMeshAsset->GetBones();
+	int32 BoneCount = Bones.size();
+
+	LocalBoneTransforms.resize(BoneCount);
+	GlobalBoneMatrices.resize(BoneCount);
+	SkinningMatrices.resize(BoneCount);
+
+	for (int32 i = 0; i < BoneCount; ++i)
+	{
+		LocalBoneTransforms[i] = Bones[i].RefLocalTransform;
+	}
+
+	UpdateBoneMatrices();
+}
+
+void USkeletalMeshComponent::UpdateBoneMatrices()
+{
+	if (!HasValidMesh()) return;
+
+	const TArray<FSkeletalBone>& Bones = SkeletalMeshAsset->GetBones();
+
+	for (int32 i = 0; i < Bones.size(); ++i)
+	{
+		const FSkeletalBone& Bone = Bones[i];
+
+		FMatrix LocalMatrix = LocalBoneTransforms[i].ToMatrix();
+
+		if (Bone.ParentIndex == -1)
+		{
+			GlobalBoneMatrices[i] = LocalMatrix;
+		}
+		else
+		{
+			GlobalBoneMatrices[i] = LocalMatrix * GlobalBoneMatrices[Bone.ParentIndex];
+		}
+
+		SkinningMatrices[i] = Bone.InverseBindPose * GlobalBoneMatrices[i];
+	}
+}
+
+void USkeletalMeshComponent::PerformCPUSkinning()
+{
+	if (!HasValidMesh() || RenderVertices.empty()) return;
+
+	const TArray<FSkeletalMeshVertex>& SourceVertices = SkeletalMeshAsset->GetVertices();
+
+	for (int32 i = 0; i < SourceVertices.size(); ++i)
+	{
+		const FSkeletalMeshVertex& SrcV = SourceVertices[i];
+		FNormalVertex& DestV = RenderVertices[i];
+
+		FVector SkinnedPos = FVector::ZeroVector;
+		FVector SkinnedNormal = FVector::ZeroVector;
+
+		for (int32 w = 0; w < 4; ++w)
+		{
+			float Weight = SrcV.BoneWeights[w];
+			if (Weight > 0.0f)
+			{
+				int32 BoneIdx = SrcV.BoneIndices[w];
+				const FMatrix& SkinMat = SkinningMatrices[BoneIdx];
+
+				SkinnedPos += SkinMat.TransformPosition(SrcV.Position) * Weight;
+
+				SkinnedNormal += SkinMat.TransformVector(SrcV.Normal) * Weight;
+			}
+		}
+
+		DestV.Position = SkinnedPos;
+		DestV.Normal = SkinnedNormal.GetSafeNormal();
+
+	}
+
+	ID3D11DeviceContext* Context = GEngine->GetRenderer().GetFD3DDevice().GetDeviceContext();
+	UpdateRenderVertices(Context, RenderVertices);
 }
 
 void USkeletalMeshComponent::RebuildMeshBuffer()

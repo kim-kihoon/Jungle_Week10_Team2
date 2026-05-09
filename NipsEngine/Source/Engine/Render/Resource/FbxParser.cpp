@@ -97,7 +97,7 @@ void FbxParser::ProcessMesh(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh* OutMesh
 	struct FTempWeight
 	{
 		int32 BoneIndices[4] = { 0, 0, 0, 0 };
-		float BoneWeights[4] = { 0.0f, 0.0f, 0.0f ,0.0f };
+		float BoneWeights[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
 		int32 Count = 0;
 		void Add(int32 Index, float Weight)
 		{

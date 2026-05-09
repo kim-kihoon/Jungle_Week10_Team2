@@ -15,6 +15,8 @@
 #include "Render/Resource/RenderResources.h"
 #include <d3d11.h>
 
+#include "Asset/SkeletalMesh.h"
+
 // 리소스를 관리하는 싱글턴.
 // Resource.ini에서 리소스 경로/그리드 정보를 읽고, GPU 리소스를 로드/캐싱합니다.
 // 컴포넌트는 소유하지 않고 포인터로 공유 데이터를 참조합니다.
@@ -134,10 +136,16 @@ public:
 	void RegisterParticle(const FName& ParticleName, const FString& InPath, uint32 Columns = 1, uint32 Rows = 1);
 	TArray<FString> GetParticleNames() const;
 
+	// StaticMesh
 	UStaticMesh* LoadStaticMesh(const FString& Path);
 	UStaticMesh* LoadStaticMesh(const FString& Path, bool bNormalizeToUnitCube);
 	UStaticMesh* FindStaticMesh(const FString& Path) const;
 	TArray<FString> GetStaticMeshPaths() const;
+
+	//SkeletalMesh
+	USkeletalMesh* LoadSkeletalMesh(const FString& Path);
+	USkeletalMesh* FindSkeletalMesh(const FString& Path) const;
+	TArray<FString> GetSkeletalMeshPaths() const;
 
 	ID3D11SamplerState* GetOrCreateSamplerState(ESamplerType Type, ID3D11Device* Device = nullptr);
 	ID3D11DepthStencilState* GetOrCreateDepthStencilState(EDepthStencilType Type, ID3D11Device* Device = nullptr);
@@ -191,6 +199,7 @@ private:
 	TMap<EDepthStencilType, TComPtr<ID3D11DepthStencilState>> DepthStencilStates;
 	TMap<EBlendType, TComPtr<ID3D11BlendState>> BlendStates;
 	TMap<ERasterizerType, TComPtr<ID3D11RasterizerState>> RasterizerStates;
+	TMap<FString, USkeletalMesh*> SkeletalMeshes;
 
 	/* Paths */
 	TArray<FString> ObjFilePaths;
@@ -198,4 +207,5 @@ private:
 	TArray<FString> ParticleFilePaths;
 	TArray<FString> FontFilePaths;
 	TArray<FString> TextureFilePaths;
+	TArray<FString> SkeletalMeshFilePaths;
 };

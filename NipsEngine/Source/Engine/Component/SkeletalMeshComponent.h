@@ -14,12 +14,11 @@ public:
 	void PostDuplicate(UObject* Original) override;
 	void Serialize(FArchive& Ar) override;
 
-	bool InitializeSkeletalMesh(const FString& FilePath);
-	bool LoadSkeletalMesh(const FString& FilePath);
-	void SetSkeletalMesh(USkeletalMesh* InSkeletalMesh, bool bTakeOwnership = false);
+	void SetSkeletalMesh(USkeletalMesh* InSkeletalMesh);
 	USkeletalMesh* GetSkeletalMesh() const;
 	bool HasValidMesh() const;
 	FDynamicMeshBuffer* GetRenderBuffer();
+	void TestReferencePoseSkinning();
 
 	const TArray<FNormalVertex>& GetRenderVertices() const;
 	const TArray<uint32>& GetRenderIndices() const;
@@ -36,18 +35,25 @@ public:
 
 	void UpdateRenderVertices(ID3D11DeviceContext* InContext, const TArray<FNormalVertex>& InVertices);
 
+	void InitializeBonePoses();
+	void UpdateBoneMatrices();
+	void PerformCPUSkinning();
+
 private:
-	void ReleaseOwnedSkeletalMesh();
 	void RebuildRenderVertices();
 	void RebuildMeshBuffer();
 	void MarkBoundsDirty();
 	void MarkRenderBufferDirty();
 	void EnsureBoundsUpdated() const;
 
+protected:
+	TArray<FTransform> LocalBoneTransforms;
+	TArray<FMatrix> GlobalBoneMatrices;
+	TArray<FMatrix> SkinningMatrices;
+
 private:
 	USkeletalMesh* SkeletalMeshAsset = nullptr;
 	FString SkeletalMeshAssetPath;
-	bool bOwnsSkeletalMesh = false;
 
 	TArray<FNormalVertex> RenderVertices;
 	FDynamicMeshBuffer MeshBuffer;
