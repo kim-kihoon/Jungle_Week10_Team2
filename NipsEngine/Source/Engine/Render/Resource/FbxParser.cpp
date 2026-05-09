@@ -1,6 +1,6 @@
 ﻿#include "FbxParser.h"
 #include "fbxsdk.h"
-#include "Asset/DynamicMeshTypes.h"
+#include "Asset/SkeletalMeshTypes.h"
 #include "Core/Logger.h"
 #include <filesystem>
 
@@ -20,9 +20,9 @@ namespace
 	}
 }
 
-FDynamicMesh* FbxParser::ParseFbx(const std::string& FilePath)
+FSkeletalMesh* FbxParser::ParseFbx(const std::string& FilePath)
 {
-	FDynamicMesh* OutMesh = new FDynamicMesh();
+	FSkeletalMesh* OutMesh = new FSkeletalMesh();
 	OutMesh->PathFileName = FilePath.c_str();
 
 	UE_LOG("Fbx Parser파싱 시작: %s", FilePath.c_str());
@@ -68,7 +68,7 @@ FDynamicMesh* FbxParser::ParseFbx(const std::string& FilePath)
 	return OutMesh;
 }
 
-void FbxParser::ProcessNode(FbxNode* Node, FDynamicMesh* OutMesh, TMap<std::string, int32>& BoneMap)
+void FbxParser::ProcessNode(FbxNode* Node, FSkeletalMesh* OutMesh, TMap<std::string, int32>& BoneMap)
 {
 	if (!Node) return;
 
@@ -88,7 +88,7 @@ void FbxParser::ProcessNode(FbxNode* Node, FDynamicMesh* OutMesh, TMap<std::stri
 	}
 }
 
-void FbxParser::ProcessMesh(FbxNode* Node, FbxMesh* Mesh, FDynamicMesh* OutMesh, TMap<FString, int32>& BoneMap)
+void FbxParser::ProcessMesh(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh* OutMesh, TMap<FString, int32>& BoneMap)
 {
 	int32 VertexOffset = static_cast<int32>(OutMesh->Vertices.size());
 	int32 IndexOffset = static_cast<int32>(OutMesh->Indices.size());
@@ -177,7 +177,7 @@ void FbxParser::ProcessMesh(FbxNode* Node, FbxMesh* Mesh, FDynamicMesh* OutMesh,
 		for (int32 v = 0; v < 3; v++)
 		{
 			int32 CtrlPointIndex = Mesh->GetPolygonVertex(p, v);
-			FDynamicMeshVertex NewVert;
+			FSkeletalMeshVertex NewVert;
 
 			// Position
 			FbxVector4 Pos = ControlPoints[CtrlPointIndex];
@@ -246,13 +246,13 @@ void FbxParser::ProcessMesh(FbxNode* Node, FbxMesh* Mesh, FDynamicMesh* OutMesh,
 
 	if (MaterialSlotIndex < 0)
 	{
-		FDynamicMeshMaterialSlot NewSlot;
+		FSkeletalMeshMaterialSlot NewSlot;
 		NewSlot.SlotName = MaterialSlotName;
 		OutMesh->Slots.push_back(NewSlot);
 		MaterialSlotIndex = static_cast<int32>(OutMesh->Slots.size()) - 1;
 	}
 
-	FDynamicMeshSection NewSection;
+	FSkeletalMeshSection NewSection;
 	NewSection.MaterialIndex = MaterialSlotIndex;
 	NewSection.FirstIndex = IndexOffset;
 	NewSection.NumTriangles = VertexCounter / 3;
@@ -261,7 +261,7 @@ void FbxParser::ProcessMesh(FbxNode* Node, FbxMesh* Mesh, FDynamicMesh* OutMesh,
 	OutMesh->Sections.push_back(NewSection);
 }
 
-void FbxParser::BuildBoneHierarchy(FbxScene* Scene, FDynamicMesh* OutMesh, const TMap<std::string, int32>& BoneMap)
+void FbxParser::BuildBoneHierarchy(FbxScene* Scene, FSkeletalMesh* OutMesh, const TMap<std::string, int32>& BoneMap)
 {
 	for (int32 i = 0; i < static_cast<int32>(OutMesh->Bones.size()); i++)
 	{

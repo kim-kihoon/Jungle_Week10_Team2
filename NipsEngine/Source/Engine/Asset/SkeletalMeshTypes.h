@@ -1,12 +1,11 @@
-#pragma once
+﻿#pragma once
 
 #include "Core/CoreMinimal.h"
 #include "Engine/Geometry/AABB.h"
 #include "Engine/Geometry/Transform.h"
 #include "Render/Resource/Material.h"
-#include "Render/Resource/VertexTypes.h"
 
-struct FDynamicMeshVertex
+struct FSkeletalMeshVertex
 {
 	FVector Position = FVector::ZeroVector;
 	FVector Normal = FVector::UpVector;
@@ -26,7 +25,7 @@ struct FSkeletalBone
 	FMatrix InverseBindPose = FMatrix::Identity;
 };
 
-struct FDynamicMeshSection
+struct FSkeletalMeshSection
 {
 	uint32 FirstIndex = 0;
 	uint32 NumTriangles = 0;
@@ -36,19 +35,19 @@ struct FDynamicMeshSection
 	uint32 GetIndexCount() const { return NumTriangles * 3; }
 };
 
-struct FDynamicMeshMaterialSlot
+struct FSkeletalMeshMaterialSlot
 {
 	FString SlotName;
 	UMaterialInterface* Material = nullptr;
 };
 
-struct FDynamicMesh
+struct FSkeletalMesh
 {
 	FString PathFileName;
-	TArray<FDynamicMeshVertex> Vertices;
+	TArray<FSkeletalMeshVertex> Vertices;
 	TArray<uint32> Indices;
-	TArray<FDynamicMeshSection> Sections;
-	TArray<FDynamicMeshMaterialSlot> Slots;
+	TArray<FSkeletalMeshSection> Sections;
+	TArray<FSkeletalMeshMaterialSlot> Slots;
 	TArray<FSkeletalBone> Bones;
 	TArray<FMatrix> ReferencePoseMatrices;
 	FAABB LocalBounds;
@@ -57,4 +56,5 @@ struct FDynamicMesh
 	void NormalizeVertexWeights();
 	void EnsureReferencePoseMatrices();
 	bool HasValidRenderData() const;
+	bool ValidateSkinningData() const;
 };

@@ -200,23 +200,23 @@ void FPrimitiveRenderCollector::CollectFromComponent(
 		break;
 	}
 
-	case EPrimitiveType::EPT_DynamicMesh:
+	case EPrimitiveType::EPT_SkeletalMesh:
 	{
 		if (!ShowFlags.bPrimitives) return;
 
 		USkeletalMeshComponent* SkeletalMeshComp = static_cast<USkeletalMeshComponent*>(Primitive);
 		if (!SkeletalMeshComp->HasValidMesh()) return;
 
-		FMeshBuffer* MeshBuffer = SkeletalMeshComp->GetDynamicMeshBuffer();
+		FMeshBuffer* MeshBuffer = SkeletalMeshComp->GetRenderBuffer();
 		if (!MeshBuffer) return;
 
-		const TArray<FDynamicMeshSection>& Sections = SkeletalMeshComp->GetSections();
+		const TArray<FSkeletalMeshSection>& Sections = SkeletalMeshComp->GetSections();
 		const bool bDebugCollisionHighlight = ShouldHighlightDebugCollision(Primitive, ViewMode);
 		const FVector4 PrimitiveColor = FColor::White().ToVector4();
 
 		for (int32 SectionIdx = 0; SectionIdx < static_cast<int32>(Sections.size()); ++SectionIdx)
 		{
-			const FDynamicMeshSection& Section = Sections[SectionIdx];
+			const FSkeletalMeshSection& Section = Sections[SectionIdx];
 			UMaterialInterface* Material = bDebugCollisionHighlight
 				? FResourceManager::Get().GetMaterial("DefaultRed")
 				: Cast<UMaterialInterface>(SkeletalMeshComp->GetMaterial(SectionIdx));

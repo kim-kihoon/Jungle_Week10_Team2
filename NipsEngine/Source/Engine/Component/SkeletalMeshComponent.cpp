@@ -1,9 +1,10 @@
-#include "SkeletalMeshComponent.h"
+﻿#include "SkeletalMeshComponent.h"
 
 #include <algorithm>
 #include <cfloat>
 #include <cstring>
 
+#include "Asset/SkeletalMesh.h"
 #include "Core/ResourceManager.h"
 #include "Object/Object.h"
 
@@ -12,7 +13,7 @@ REGISTER_FACTORY(USkeletalMeshComponent)
 
 USkeletalMeshComponent::~USkeletalMeshComponent()
 {
-	ReleaseOwnedDynamicMesh();
+	ReleaseOwnedSkeletalMesh();
 }
 
 void USkeletalMeshComponent::PostDuplicate(UObject* Original)
@@ -20,12 +21,11 @@ void USkeletalMeshComponent::PostDuplicate(UObject* Original)
 	UMeshComponent::PostDuplicate(Original);
 
 	const USkeletalMeshComponent* Orig = Cast<USkeletalMeshComponent>(Original);
-	DynamicMeshAsset = Orig->DynamicMeshAsset;
-	bOwnsDynamicMesh = false;
-	DynamicMeshAssetPath = Orig->DynamicMeshAssetPath;
+	SkeletalMeshAsset = Orig->SkeletalMeshAsset;
+	SkeletalMeshAssetPath = Orig->SkeletalMeshAssetPath;
 	RenderVertices = Orig->RenderVertices;
 	bBoundsDirty = true;
-	bRenderStateDirty = true;
+	bRenderBufferDirty = true;
 
 	Materials = TArray<UMaterialInterface*>(Orig->Materials.size());
 	for (int32 i = 0; i < static_cast<int32>(Orig->Materials.size()); ++i)
@@ -54,18 +54,18 @@ void USkeletalMeshComponent::PostDuplicate(UObject* Original)
 void USkeletalMeshComponent::Serialize(FArchive& Ar)
 {
 	UMeshComponent::Serialize(Ar);
-	Ar << "SkeletalMeshAsset" << DynamicMeshAssetPath;
+	Ar << "SkeletalMeshAsset" << SkeletalMeshAssetPath;
 
 	if (Ar.IsLoading())
 	{
 		TArray<UMaterialInterface*> SavedMaterials = Materials;
-		if (!DynamicMeshAssetPath.empty())
+		if (!SkeletalMeshAssetPath.empty())
 		{
-			LoadSkeletalMesh(DynamicMeshAssetPath);
+			LoadSkeletalMesh(SkeletalMeshAssetPath);
 		}
 		else
 		{
-			SetDynamicMesh(nullptr);
+			SetSkeletalMesh(nullptr);
 		}
 
 		const int32 RestoreCount = static_cast<int32>(std::min(SavedMaterials.size(), Materials.size()));
@@ -86,42 +86,42 @@ bool USkeletalMeshComponent::InitializeSkeletalMesh(const FString& FilePath)
 
 bool USkeletalMeshComponent::LoadSkeletalMesh(const FString& FilePath)
 {
-	UDynamicMesh* LoadedMesh = UObjectManager::Get().CreateObject<UDynamicMesh>();
+	USkeletalMesh* LoadedMesh = UObjectManager::Get().CreateObject<USkeletalMesh>();
 	if (!LoadedMesh->LoadFromFbx(FilePath))
 	{
 		UObjectManager::Get().DestroyObject(LoadedMesh);
-		SetDynamicMesh(nullptr);
-		DynamicMeshAssetPath = FilePath;
+		SetSkeletalMesh(nullptr);
+		SkeletalMeshAssetPath = FilePath;
 		return false;
 	}
 
-	SetDynamicMesh(LoadedMesh, true);
-	DynamicMeshAssetPath = FilePath;
+	SetSkeletalMesh(LoadedMesh, true);
+	SkeletalMeshAssetPath = FilePath;
 	return true;
 }
 
-void USkeletalMeshComponent::SetDynamicMesh(UDynamicMesh* InDynamicMesh, bool bTakeOwnership)
+void USkeletalMeshComponent::SetSkeletalMesh(USkeletalMesh* InSkeletalMesh, bool bTakeOwnership)
 {
-	if (DynamicMeshAsset == InDynamicMesh)
+	if (SkeletalMeshAsset == InSkeletalMesh)
 	{
-		bOwnsDynamicMesh = bTakeOwnership;
+		bOwnsSkeletalMesh = bTakeOwnership;
 		return;
 	}
 
-	ReleaseOwnedDynamicMesh();
-	DynamicMeshAsset = InDynamicMesh;
-	bOwnsDynamicMesh = bTakeOwnership;
+	ReleaseOwnedSkeletalMesh();
+	SkeletalMeshAsset = InSkeletalMesh;
+	bOwnsSkeletalMesh = bTakeOwnership;
 	ReleaseOwnedMaterialInstances();
 	Materials.clear();
 
-	if (DynamicMeshAsset != nullptr)
+	if (SkeletalMeshAsset != nullptr)
 	{
-		DynamicMeshAssetPath = DynamicMeshAsset->GetAssetPathFileName();
-		const FDynamicMesh* MeshData = DynamicMeshAsset->GetMeshData();
+		SkeletalMeshAssetPath = SkeletalMeshAsset->GetAssetPathFileName();
+		const FSkeletalMesh* MeshData = SkeletalMeshAsset->GetMeshData();
 		if (MeshData != nullptr)
 		{
 			Materials.reserve(MeshData->Sections.size());
-			for (const FDynamicMeshSection& Section : MeshData->Sections)
+			for (const FSkeletalMeshSection& Section : MeshData->Sections)
 			{
 				UMaterialInterface* Material = nullptr;
 				if (Section.MaterialIndex >= 0 && Section.MaterialIndex < static_cast<int32>(MeshData->Slots.size()))
@@ -142,32 +142,32 @@ void USkeletalMeshComponent::SetDynamicMesh(UDynamicMesh* InDynamicMesh, bool bT
 	}
 	else
 	{
-		DynamicMeshAssetPath.clear();
+		SkeletalMeshAssetPath.clear();
 	}
 
-	RebuildRenderVertices();
 	MarkBoundsDirty();
-	MarkRenderStateDirty();
+	MarkRenderBufferDirty();
 }
 
-UDynamicMesh* USkeletalMeshComponent::GetDynamicMesh() const
+USkeletalMesh* USkeletalMeshComponent::GetSkeletalMesh() const
 {
-	return DynamicMeshAsset;
+	return SkeletalMeshAsset;
 }
 
 bool USkeletalMeshComponent::HasValidMesh() const
 {
-	return DynamicMeshAsset != nullptr && DynamicMeshAsset->HasValidMeshData();
+	return SkeletalMeshAsset != nullptr && SkeletalMeshAsset->HasValidMeshData();
 }
 
-FDynamicMeshBuffer* USkeletalMeshComponent::GetDynamicMeshBuffer()
+FDynamicMeshBuffer* USkeletalMeshComponent::GetRenderBuffer()
 {
-	if (DynamicMeshAsset == nullptr)
+	if (bRenderBufferDirty)
 	{
-		return nullptr;
+		RebuildRenderVertices();
+		RebuildMeshBuffer();
 	}
 
-	return DynamicMeshAsset->GetDynamicMeshBuffer();
+	return MeshBuffer.IsValid() ? &MeshBuffer : nullptr;
 }
 
 const TArray<FNormalVertex>& USkeletalMeshComponent::GetRenderVertices() const
@@ -178,19 +178,19 @@ const TArray<FNormalVertex>& USkeletalMeshComponent::GetRenderVertices() const
 const TArray<uint32>& USkeletalMeshComponent::GetRenderIndices() const
 {
 	static const TArray<uint32> Empty;
-	return DynamicMeshAsset ? DynamicMeshAsset->GetIndices() : Empty;
+	return SkeletalMeshAsset ? SkeletalMeshAsset->GetIndices() : Empty;
 }
 
-const TArray<FDynamicMeshSection>& USkeletalMeshComponent::GetSections() const
+const TArray<FSkeletalMeshSection>& USkeletalMeshComponent::GetSections() const
 {
-	static const TArray<FDynamicMeshSection> Empty;
-	return DynamicMeshAsset ? DynamicMeshAsset->GetSections() : Empty;
+	static const TArray<FSkeletalMeshSection> Empty;
+	return SkeletalMeshAsset ? SkeletalMeshAsset->GetSections() : Empty;
 }
 
 void USkeletalMeshComponent::GetEditableProperties(TArray<FPropertyDescriptor>& OutProps)
 {
 	UMeshComponent::GetEditableProperties(OutProps);
-	OutProps.push_back({ "SkeletalMesh", EPropertyType::String, &DynamicMeshAssetPath });
+	OutProps.push_back({ "SkeletalMesh", EPropertyType::String, &SkeletalMeshAssetPath });
 }
 
 void USkeletalMeshComponent::PostEditProperty(const char* PropertyName)
@@ -199,13 +199,13 @@ void USkeletalMeshComponent::PostEditProperty(const char* PropertyName)
 
 	if (std::strcmp(PropertyName, "SkeletalMesh") == 0)
 	{
-		if (DynamicMeshAssetPath.empty())
+		if (SkeletalMeshAssetPath.empty())
 		{
-			SetDynamicMesh(nullptr);
+			SetSkeletalMesh(nullptr);
 			return;
 		}
 
-		LoadSkeletalMesh(DynamicMeshAssetPath);
+		LoadSkeletalMesh(SkeletalMeshAssetPath);
 	}
 	else if (std::strcmp(PropertyName, "Materials") == 0)
 	{
@@ -226,7 +226,7 @@ void USkeletalMeshComponent::UpdateWorldAABB() const
 		return;
 	}
 
-	const FAABB& LocalBounds = DynamicMeshAsset->GetLocalBounds();
+	const FAABB& LocalBounds = SkeletalMeshAsset->GetLocalBounds();
 	if (!LocalBounds.IsValid())
 	{
 		bBoundsDirty = false;
@@ -336,14 +336,14 @@ const FAABB& USkeletalMeshComponent::GetWorldAABB() const
 	return WorldAABB;
 }
 
-void USkeletalMeshComponent::ReleaseOwnedDynamicMesh()
+void USkeletalMeshComponent::ReleaseOwnedSkeletalMesh()
 {
-	if (bOwnsDynamicMesh && DynamicMeshAsset != nullptr)
+	if (bOwnsSkeletalMesh && SkeletalMeshAsset != nullptr)
 	{
-		UObjectManager::Get().DestroyObject(DynamicMeshAsset);
+		UObjectManager::Get().DestroyObject(SkeletalMeshAsset);
 	}
-	DynamicMeshAsset = nullptr;
-	bOwnsDynamicMesh = false;
+	SkeletalMeshAsset = nullptr;
+	bOwnsSkeletalMesh = false;
 }
 
 void USkeletalMeshComponent::RebuildRenderVertices()
@@ -355,10 +355,10 @@ void USkeletalMeshComponent::RebuildRenderVertices()
 		return;
 	}
 
-	const TArray<FDynamicMeshVertex>& SourceVertices = DynamicMeshAsset->GetVertices();
+	const TArray<FSkeletalMeshVertex>& SourceVertices = SkeletalMeshAsset->GetVertices();
 	RenderVertices.reserve(SourceVertices.size());
 
-	for (const FDynamicMeshVertex& SourceVertex : SourceVertices)
+	for (const FSkeletalMeshVertex& SourceVertex : SourceVertices)
 	{
 		FNormalVertex RenderVertex;
 		RenderVertex.Position = SourceVertex.Position;
@@ -371,14 +371,49 @@ void USkeletalMeshComponent::RebuildRenderVertices()
 	}
 }
 
+void USkeletalMeshComponent::UpdateRenderVertices(ID3D11DeviceContext* InContext, const TArray<FNormalVertex>& InVertices)
+{
+	RenderVertices = InVertices;
+
+	if (bRenderBufferDirty || !MeshBuffer.IsValid())
+	{
+		RebuildMeshBuffer();
+		return;
+	}
+
+	MeshBuffer.Update(InContext, RenderVertices);
+}
+
+void USkeletalMeshComponent::RebuildMeshBuffer()
+{
+	MeshBuffer.Release();
+
+	if (!HasValidMesh())
+	{
+		bRenderBufferDirty = false;
+		return;
+	}
+
+	ID3D11Device* Device = FResourceManager::Get().GetCachedDevice();
+	if (Device == nullptr)
+	{
+		bRenderBufferDirty = true;
+		return;
+	}
+
+	MeshBuffer.Create(Device, RenderVertices, SkeletalMeshAsset->GetMeshData()->Indices);
+	bRenderBufferDirty = false;
+}
+
+void USkeletalMeshComponent::MarkRenderBufferDirty()
+{
+	bRenderBufferDirty = true;
+}
+
+
 void USkeletalMeshComponent::MarkBoundsDirty()
 {
 	bBoundsDirty = true;
-}
-
-void USkeletalMeshComponent::MarkRenderStateDirty()
-{
-	bRenderStateDirty = true;
 }
 
 void USkeletalMeshComponent::EnsureBoundsUpdated() const

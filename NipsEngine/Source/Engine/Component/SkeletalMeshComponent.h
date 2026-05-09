@@ -1,7 +1,7 @@
-#pragma once
+﻿#pragma once
 
 #include "MeshComponent.h"
-#include "Asset/DynamicMesh.h"
+#include "Asset/SkeletalMesh.h"
 #include "Render/Resource/Material.h"
 
 class USkeletalMeshComponent : public UMeshComponent
@@ -16,37 +16,41 @@ public:
 
 	bool InitializeSkeletalMesh(const FString& FilePath);
 	bool LoadSkeletalMesh(const FString& FilePath);
-	void SetDynamicMesh(UDynamicMesh* InDynamicMesh, bool bTakeOwnership = false);
-	UDynamicMesh* GetDynamicMesh() const;
+	void SetSkeletalMesh(USkeletalMesh* InSkeletalMesh, bool bTakeOwnership = false);
+	USkeletalMesh* GetSkeletalMesh() const;
 	bool HasValidMesh() const;
-	FDynamicMeshBuffer* GetDynamicMeshBuffer();
+	FDynamicMeshBuffer* GetRenderBuffer();
 
 	const TArray<FNormalVertex>& GetRenderVertices() const;
 	const TArray<uint32>& GetRenderIndices() const;
-	const TArray<FDynamicMeshSection>& GetSections() const;
+	const TArray<FSkeletalMeshSection>& GetSections() const;
 
 	void GetEditableProperties(TArray<FPropertyDescriptor>& OutProps) override;
 	void PostEditProperty(const char* PropertyName) override;
 
 	void UpdateWorldAABB() const override;
 	bool RaycastMesh(const FRay& Ray, FHitResult& OutHitResult) override;
-	EPrimitiveType GetPrimitiveType() const override { return EPrimitiveType::EPT_DynamicMesh; }
+	EPrimitiveType GetPrimitiveType() const override { return EPrimitiveType::EPT_SkeletalMesh; }
 
 	const FAABB& GetWorldAABB() const override;
 
+	void UpdateRenderVertices(ID3D11DeviceContext* InContext, const TArray<FNormalVertex>& InVertices);
+
 private:
-	void ReleaseOwnedDynamicMesh();
+	void ReleaseOwnedSkeletalMesh();
 	void RebuildRenderVertices();
+	void RebuildMeshBuffer();
 	void MarkBoundsDirty();
-	void MarkRenderStateDirty();
+	void MarkRenderBufferDirty();
 	void EnsureBoundsUpdated() const;
 
 private:
-	UDynamicMesh* DynamicMeshAsset = nullptr;
-	bool bOwnsDynamicMesh = false;
-	FString DynamicMeshAssetPath;
+	USkeletalMesh* SkeletalMeshAsset = nullptr;
+	FString SkeletalMeshAssetPath;
+	bool bOwnsSkeletalMesh = false;
 
 	TArray<FNormalVertex> RenderVertices;
+	FDynamicMeshBuffer MeshBuffer;
 	mutable bool bBoundsDirty = true;
-	bool bRenderStateDirty = true;
+	bool bRenderBufferDirty = true;
 };

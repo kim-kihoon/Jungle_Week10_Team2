@@ -5,15 +5,15 @@
 #include "Core/CoreTypes.h"
 #include "Core/Containers/Map.h"
 
-struct FDynamicMesh;
+struct FSkeletalMesh;
 
 class FbxParser
 {
 public:
-	static FDynamicMesh* ParseFbx(const std::string& FilePath);
+	static FSkeletalMesh* ParseFbx(const std::string& FilePath);
 
 private:
-	static void ProcessNode(FbxNode* Node, FDynamicMesh* OutMesh, TMap<std::string, int32>& BoneMap);
-	static void ProcessMesh(FbxNode* Node, FbxMesh* Mesh, FDynamicMesh* OutMesh, TMap<std::string, int32>& BoneMap);
-	static void BuildBoneHierarchy(FbxScene* Scene, FDynamicMesh* OutMesh, const TMap<std::string, int32>& BoneMap);
+	static void ProcessNode(FbxNode* Node, FSkeletalMesh* OutMesh, TMap<std::string, int32>& BoneMap);
+	static void ProcessMesh(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh* OutMesh, TMap<std::string, int32>& BoneMap);
+	static void BuildBoneHierarchy(FbxScene* Scene, FSkeletalMesh* OutMesh, const TMap<std::string, int32>& BoneMap);
 };
