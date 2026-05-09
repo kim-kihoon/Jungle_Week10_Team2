@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include "Asset/ObjRawTypes.h"
-#include "Asset/StaticMeshTypes.h"
+#include "Asset/MeshTypes.h"
 #include "Asset/IAssetLoader.h"
 #include <Core/ResourceTypes.h>
 

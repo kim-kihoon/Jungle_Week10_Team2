@@ -1,6 +1,6 @@
 ﻿#include "ObjLoader.h"
 #include "FileUtils.h"
-#include "Asset/StaticMeshTypes.h"
+#include "Asset/MeshTypes.h"
 #include "Math/Utils.h"
 #include "Core/Logger.h"
 #include "Core/PlatformTime.h"
@@ -288,7 +288,7 @@ bool FObjLoader::BuildStaticMesh(const FString& Path, FStaticMesh* InStaticMesh,
 
 	for (const FString& SlotName : BuiltMaterialSlotName)
 	{
-		FStaticMeshMaterialSlot NewSlot;
+		FMeshMaterialSlot NewSlot;
 		NewSlot.SlotName = SlotName;
 		NewSlot.Material = nullptr;
 		InStaticMesh->Slots.push_back(NewSlot);
@@ -299,7 +299,7 @@ bool FObjLoader::BuildStaticMesh(const FString& Path, FStaticMesh* InStaticMesh,
 		TArray<uint32>& IndicesPerSlot = SlotIndices[SlotIdx];
 		if (IndicesPerSlot.empty()) continue;
 
-		FStaticMeshSection NewSection;
+		FMeshSection NewSection;
 		NewSection.StartIndex = static_cast<int32>(InStaticMesh->Indices.size());
 		NewSection.IndexCount = static_cast<uint32>(IndicesPerSlot.size());
 		NewSection.MaterialSlotIndex = SlotIdx;
@@ -523,7 +523,7 @@ bool FObjLoader::ParseFaceVertexToken(const FString& Token, FObjRawIndex& OutInd
 // 		}
 // 	}
 //
-// 	FStaticMeshMaterialSlot NewSlot = {};
+// 	FMeshMaterialSlot NewSlot = {};
 // 	NewSlot.SlotName = SlotName;
 //
 // 	StaticMeshAsset.MaterialSlots.push_back(NewSlot);

@@ -11,6 +11,7 @@
 #include "Component/Collision/SphereComponent.h"
 #include "Component/GizmoComponent.h"
 #include "Component/PrimitiveComponent.h"
+#include "Component/SkinnedMeshComponent.h"
 #include "Component/StaticMeshComponent.h"
 #include "Component/SubUVComponent.h"
 #include "Component/TextRenderComponent.h"
@@ -232,6 +233,30 @@ namespace
 			AudioZoneComponent->GetWorldMatrix().GetRotationMatrix());
 		LineBatcher->AddOBB(Box, FColor(80, 255, 180));
 	}
+
+	FMeshBuffer* GetOverlayMeshBuffer(UPrimitiveComponent* PrimitiveComponent, FMeshBufferManager* MeshBufferManager)
+	{
+		if (PrimitiveComponent == nullptr || MeshBufferManager == nullptr)
+		{
+			return nullptr;
+		}
+
+		switch (PrimitiveComponent->GetPrimitiveType())
+		{
+		case EPrimitiveType::EPT_StaticMesh:
+		{
+			UStaticMeshComponent* StaticMeshComp = static_cast<UStaticMeshComponent*>(PrimitiveComponent);
+			return MeshBufferManager->GetStaticMeshBuffer(StaticMeshComp->GetStaticMesh());
+		}
+		case EPrimitiveType::EPT_SkeletalMesh:
+		{
+			USkinnedMeshComponent* SkinnedMeshComp = static_cast<USkinnedMeshComponent*>(PrimitiveComponent);
+			return SkinnedMeshComp->HasValidSkinnedMesh() ? SkinnedMeshComp->GetSkinnedRenderMeshBuffer() : nullptr;
+		}
+		default:
+			return &MeshBufferManager->GetMeshBuffer(PrimitiveComponent->GetPrimitiveType());
+		}
+	}
 }
 
 void FOverlayRenderCollector::CollectSelection(
@@ -313,16 +338,7 @@ void FOverlayRenderCollector::CollectOutline(
 				continue;
 			}
 
-			FMeshBuffer* MeshBuffer = nullptr;
-			if (PrimitiveComponent->GetPrimitiveType() == EPrimitiveType::EPT_StaticMesh)
-			{
-				UStaticMeshComponent* StaticMeshComp = static_cast<UStaticMeshComponent*>(PrimitiveComponent);
-				MeshBuffer = MeshBufferManager->GetStaticMeshBuffer(StaticMeshComp->GetStaticMesh());
-			}
-			else
-			{
-				MeshBuffer = &MeshBufferManager->GetMeshBuffer(PrimitiveComponent->GetPrimitiveType());
-			}
+			FMeshBuffer* MeshBuffer = GetOverlayMeshBuffer(PrimitiveComponent, MeshBufferManager);
 
 			if (MeshBuffer == nullptr || !MeshBuffer->IsValid())
 			{
@@ -510,18 +526,9 @@ bool FOverlayRenderCollector::CollectFromSelectedActor(
 			continue;
 		}
 
-		FMeshBuffer* MeshBuffer = nullptr;
-		if (primitiveComponent->GetPrimitiveType() == EPrimitiveType::EPT_StaticMesh)
-		{
-			auto* StaticMeshComp = static_cast<UStaticMeshComponent*>(primitiveComponent);
-			MeshBuffer = MeshBufferManager->GetStaticMeshBuffer(StaticMeshComp->GetStaticMesh());
-		}
-		else
-		{
-			MeshBuffer = &MeshBufferManager->GetMeshBuffer(primitiveComponent->GetPrimitiveType());
-		}
+		FMeshBuffer* MeshBuffer = GetOverlayMeshBuffer(primitiveComponent, MeshBufferManager);
 
-		if (!MeshBuffer)
+		if (MeshBuffer == nullptr || !MeshBuffer->IsValid())
 		{
 			continue;
 		}

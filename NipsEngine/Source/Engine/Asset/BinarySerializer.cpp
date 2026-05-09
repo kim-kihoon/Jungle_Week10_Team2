@@ -1,6 +1,6 @@
 ﻿#include "BinarySerializer.h"
 
-#include "Asset/StaticMeshTypes.h"
+#include "Asset/MeshTypes.h"
 #include "Core/Paths.h"
 
 #include <filesystem>
@@ -437,7 +437,7 @@ void FBinarySerializer::WriteSections(std::ofstream& Out, const FStaticMesh& Dat
 	uint32 Count = static_cast<uint32>(Data.Sections.size());
 	WriteUInt32LE(Out, Count);
 
-	for (const FStaticMeshSection& Section : Data.Sections)
+	for (const FMeshSection& Section : Data.Sections)
 	{
 		WriteUInt32LE(Out, Section.StartIndex);
 		WriteUInt32LE(Out, Section.IndexCount);
@@ -461,7 +461,7 @@ bool FBinarySerializer::ReadSections(std::ifstream& In, FStaticMesh& OutData, ui
 
 	OutData.Sections.resize(Count);
 
-	for (FStaticMeshSection& Section : OutData.Sections)
+	for (FMeshSection& Section : OutData.Sections)
 	{
 		if (!ReadUInt32LE(In, Section.StartIndex) ||
 			!ReadUInt32LE(In, Section.IndexCount) ||

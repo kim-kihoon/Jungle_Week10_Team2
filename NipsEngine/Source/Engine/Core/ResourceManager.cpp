@@ -23,7 +23,7 @@
 #include "Core/Logger.h"
 #include "Settings/EngineSettings.h"
 #include "Asset/BinarySerializer.h"
-#include "Asset/StaticMeshTypes.h"
+#include "Asset/MeshTypes.h"
 #include "Asset/StaticMeshSimplifier.h"
 #include "Render/Scene/RenderCommand.h"
 #include "Render/Resource/ObjMtlLoader.h"
@@ -2180,7 +2180,7 @@ UStaticMesh* FResourceManager::LoadStaticMeshWithOptions(const FString& Path, co
 	}
 
 	// Material 연결
-	for (FStaticMeshMaterialSlot& Slot : LoadedMeshData->Slots)
+	for (FMeshMaterialSlot& Slot : LoadedMeshData->Slots)
 	{
 		Slot.Material = GetMaterial(Slot.SlotName);
 

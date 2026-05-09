@@ -6,6 +6,7 @@
 #include "Component/PrimitiveComponent.h"
 #include "Component/Collision/ShapeComponent.h"
 #include "Component/SkyAtmosphereComponent.h"
+#include "Component/SkinnedMeshComponent.h"
 #include "Component/StaticMeshComponent.h"
 #include "Component/SubUVComponent.h"
 #include "Component/TextRenderComponent.h"
@@ -149,13 +150,13 @@ void FPrimitiveRenderCollector::CollectFromComponent(
 		if (!MeshBuffer) return;
 
 		const FStaticMesh* MeshData = StaticMesh->GetMeshData(SelectedLOD);
-		const TArray<FStaticMeshSection>& Sections = MeshData->Sections;
+		const TArray<FMeshSection>& Sections = MeshData->Sections;
 		const bool bDebugCollisionHighlight = ShouldHighlightDebugCollision(Primitive, ViewMode);
 		const FVector4 PrimitiveColor = FColor::White().ToVector4();
 
 		for (int32 SectionIdx = 0; SectionIdx < static_cast<int32>(Sections.size()); ++SectionIdx)
 		{
-			const FStaticMeshSection& Section = Sections[SectionIdx];
+			const FMeshSection& Section = Sections[SectionIdx];
 			UMaterialInterface* Material = bDebugCollisionHighlight
 				? FResourceManager::Get().GetMaterial("DefaultRed")
 				: Cast<UMaterialInterface>(StaticMeshComp->GetMaterial(SectionIdx));
@@ -174,6 +175,65 @@ void FPrimitiveRenderCollector::CollectFromComponent(
 			Cmd.Type = ERenderCommandType::StaticMesh;
 			Cmd.MeshBuffer = MeshBuffer;
 
+			Cmd.SectionIndexStart = Section.StartIndex;
+			Cmd.SectionIndexCount = Section.IndexCount;
+			Cmd.Material = Material;
+
+			RenderBus.AddCommand(ERenderPass::Opaque, Cmd);
+
+			if (Material->GetEffectiveLightingModel() == ELightingModel::Toon)
+			{
+				FRenderCommand OutlineCmd = {};
+				OutlineCmd.Type = ERenderCommandType::ToonOutline;
+				OutlineCmd.MeshBuffer = MeshBuffer;
+				OutlineCmd.PerObjectConstants = FPerObjectConstants{
+					Primitive->GetWorldMatrix()
+				};
+				OutlineCmd.SectionIndexStart = Section.StartIndex;
+				OutlineCmd.SectionIndexCount = Section.IndexCount;
+				OutlineCmd.Material = Material;
+
+				RenderBus.AddCommand(ERenderPass::ToonOutline, OutlineCmd);
+			}
+		}
+
+		break;
+	}
+
+	case EPrimitiveType::EPT_SkeletalMesh:
+	{
+		if (!ShowFlags.bPrimitives) return;
+
+		USkinnedMeshComponent* SkinnedMeshComp = static_cast<USkinnedMeshComponent*>(Primitive);
+		if (!SkinnedMeshComp->HasValidSkinnedMesh()) return;
+
+		FMeshBuffer* MeshBuffer = SkinnedMeshComp->GetSkinnedRenderMeshBuffer();
+		if (MeshBuffer == nullptr || !MeshBuffer->IsValid()) return;
+
+		const TArray<FSkinnedMeshSection>& Sections = SkinnedMeshComp->GetSkinnedRenderSections();
+		const bool bDebugCollisionHighlight = ShouldHighlightDebugCollision(Primitive, ViewMode);
+		const FVector4 PrimitiveColor = FColor::White().ToVector4();
+
+		for (int32 SectionIdx = 0; SectionIdx < static_cast<int32>(Sections.size()); ++SectionIdx)
+		{
+			const FSkinnedMeshSection& Section = Sections[SectionIdx];
+			UMaterialInterface* Material = bDebugCollisionHighlight
+				? FResourceManager::Get().GetMaterial("DefaultRed")
+				: Cast<UMaterialInterface>(SkinnedMeshComp->GetMaterial(SectionIdx));
+
+			if (Material == nullptr)
+			{
+				Material = FResourceManager::Get().GetMaterial("DefaultWhite");
+				if (Material == nullptr)
+				{
+					continue;
+				}
+			}
+
+			FRenderCommand Cmd = {};
+			Cmd.PerObjectConstants = FPerObjectConstants{ Primitive->GetWorldMatrix(), PrimitiveColor };
+			Cmd.Type = ERenderCommandType::StaticMesh;
+			Cmd.MeshBuffer = MeshBuffer;
 			Cmd.SectionIndexStart = Section.StartIndex;
 			Cmd.SectionIndexCount = Section.IndexCount;
 			Cmd.Material = Material;
@@ -319,11 +379,11 @@ void FPrimitiveRenderCollector::CollectFromComponent(
 			if (!MeshBuffer) return;
 
 			const FStaticMesh* MeshData = StaticMesh->GetMeshData(SelectedLOD);
-			const TArray<FStaticMeshSection>& Sections = MeshData->Sections;
+			const TArray<FMeshSection>& Sections = MeshData->Sections;
 
 			for (int32 SectionIdx = 0; SectionIdx < static_cast<int32>(Sections.size()); ++SectionIdx)
 			{
-				const FStaticMeshSection& Section = Sections[SectionIdx];
+				const FMeshSection& Section = Sections[SectionIdx];
 
 				FRenderCommand Cmd = {};
 				Cmd.Type = ERenderCommandType::Decal;

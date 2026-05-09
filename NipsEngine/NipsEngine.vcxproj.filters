@@ -446,6 +446,12 @@
     <ClCompile Include="Source\Engine\Component\MeshComponent.cpp">
       <Filter>Source\Engine\Component</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Engine\Component\SkeletalMeshComponent.cpp">
+      <Filter>Source\Engine\Component</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Component\SkinnedMeshComponent.cpp">
+      <Filter>Source\Engine\Component</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Engine\Component\PostProcessComponent.cpp">
       <Filter>Source\Engine\Component</Filter>
     </ClCompile>
@@ -1038,7 +1044,7 @@
     <ClInclude Include="Source\Engine\Asset\StaticMeshSimplifier.h">
       <Filter>Source\Engine\Asset</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Engine\Asset\StaticMeshTypes.h">
+    <ClInclude Include="Source\Engine\Asset\MeshTypes.h">
       <Filter>Source\Engine\Asset</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Audio\AudioSystem.h">
@@ -1117,6 +1123,12 @@
       <Filter>Source\Engine\Component</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Component\SceneComponent.h">
+      <Filter>Source\Engine\Component</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Component\SkeletalMeshComponent.h">
+      <Filter>Source\Engine\Component</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Component\SkinnedMeshComponent.h">
       <Filter>Source\Engine\Component</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Component\SkyAtmosphereComponent.h">

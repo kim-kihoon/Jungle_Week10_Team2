@@ -646,7 +646,7 @@ void FStaticMeshSimplifier::SaveCurrentStateAsLOD(int32 CurrentLOD, const TArray
 		return I0 != I1 && I1 != I2 && I0 != I2;
 	};
 
-	for (const FStaticMeshSection& SourceSection : MeshData->Sections)
+	for (const FMeshSection& SourceSection : MeshData->Sections)
 	{
 		const uint32 SectionStartIndex = static_cast<uint32>(TargetLOD->Indices.size());
 		const int32 StartTriangle = static_cast<int32>(SourceSection.StartIndex / 3);
@@ -676,7 +676,7 @@ void FStaticMeshSimplifier::SaveCurrentStateAsLOD(int32 CurrentLOD, const TArray
 			continue;
 		}
 
-		FStaticMeshSection LODSection;
+		FMeshSection LODSection;
 		LODSection.StartIndex = SectionStartIndex;
 		LODSection.IndexCount = SectionIndexCount;
 		LODSection.MaterialSlotIndex = SourceSection.MaterialSlotIndex;

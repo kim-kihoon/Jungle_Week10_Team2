@@ -1,7 +1,7 @@
 ﻿#pragma once
 #pragma once
 
-#include "StaticMeshTypes.h"
+#include "Asset/MeshTypes.h"
 #include "Object/Object.h"
 
 class UStaticMesh : public UObject
@@ -23,8 +23,8 @@ public:
 	const TArray<FNormalVertex>& GetVertices() const;
 	const TArray<uint32>& GetIndices() const;
 
-	const TArray<FStaticMeshSection>& GetSections() const;
-	const TArray<FStaticMeshMaterialSlot>& GetMaterialSlots() const;
+	const TArray<FMeshSection>& GetSections() const;
+	const TArray<FMeshMaterialSlot>& GetMaterialSlots() const;
 
 	const FAABB& GetLocalBounds() const;
 	

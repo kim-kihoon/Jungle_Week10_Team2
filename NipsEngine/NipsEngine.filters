@@ -235,6 +235,12 @@
     <ClCompile Include="Source\Engine\Component\MeshComponent.cpp">
       <Filter>Source\Engine\Component</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Engine\Component\SkeletalMeshComponent.cpp">
+      <Filter>Source\Engine\Component</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Component\SkinnedMeshComponent.cpp">
+      <Filter>Source\Engine\Component</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Engine\Component\PrimitiveComponent.cpp">
       <Filter>Source\Engine\Component</Filter>
     </ClCompile>
@@ -538,7 +544,7 @@
     <ClInclude Include="Source\Engine\Asset\StaticMesh.h">
       <Filter>Source\Engine\Asset</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Engine\Asset\StaticMeshTypes.h">
+    <ClInclude Include="Source\Engine\Asset\MeshTypes.h">
       <Filter>Source\Engine\Asset</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Component\ActorComponent.h">
@@ -554,6 +560,12 @@
       <Filter>Source\Engine\Component</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Component\MeshComponent.h">
+      <Filter>Source\Engine\Component</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Component\SkeletalMeshComponent.h">
+      <Filter>Source\Engine\Component</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Component\SkinnedMeshComponent.h">
       <Filter>Source\Engine\Component</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Component\PrimitiveComponent.h">

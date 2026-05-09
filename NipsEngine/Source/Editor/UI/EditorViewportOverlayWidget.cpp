@@ -9,7 +9,7 @@
 #include "Engine/Slate/SlateApplication.h"
 #include "Engine/Object/ObjectIterator.h"
 #include "Engine/Asset/StaticMesh.h"
-#include "Engine/Asset/StaticMeshTypes.h"
+#include "Asset/MeshTypes.h"
 #include "Engine/Component/GizmoComponent.h"
 #include "Engine/Object/FName.h"
 #include "Engine/Render/Renderer/RenderFlow/LightCullingPass.h"
@@ -630,7 +630,7 @@ float FEditorViewportOverlayWidget::RenderGeneralStatsWindow(int32 ViewportIndex
 					MeshMemoryBytes += sizeof(UStaticMesh)
 						+ Mesh->GetVertices().size()  * sizeof(FNormalVertex)
 						+ Mesh->GetIndices().size()   * sizeof(uint32)
-						+ Mesh->GetSections().size()  * sizeof(FStaticMeshSection);
+						+ Mesh->GetSections().size()  * sizeof(FMeshSection);
 				}
 			}
 

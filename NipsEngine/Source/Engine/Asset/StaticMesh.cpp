@@ -79,15 +79,15 @@ const TArray<uint32>& UStaticMesh::GetIndices() const
 	return MeshData ? MeshData->Indices : Empty;
 }
 
-const TArray<FStaticMeshSection>& UStaticMesh::GetSections() const
+const TArray<FMeshSection>& UStaticMesh::GetSections() const
 {
-	static const TArray<FStaticMeshSection> Empty = {};
+	static const TArray<FMeshSection> Empty = {};
 	return MeshData ? MeshData->Sections : Empty;
 }
 //	준혁님이 수정 예정
-const TArray<FStaticMeshMaterialSlot>& UStaticMesh::GetMaterialSlots() const
+const TArray<FMeshMaterialSlot>& UStaticMesh::GetMaterialSlots() const
 {
-	static const TArray<FStaticMeshMaterialSlot> Empty = {};
+	static const TArray<FMeshMaterialSlot> Empty = {};
 	return MeshData ? MeshData->Slots : Empty;
 }
 

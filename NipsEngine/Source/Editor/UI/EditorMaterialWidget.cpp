@@ -175,8 +175,8 @@ void FEditorMaterialWidget::RenderSectionList(UPrimitiveComponent* PrimitiveComp
 		FString SlotName = "Slot";
 		if (MeshAsset)
 		{
-			const TArray<FStaticMeshSection>& Sections = MeshAsset->GetSections();
-			const TArray<FStaticMeshMaterialSlot>& MatSlots = MeshAsset->GetMaterialSlots();
+			const TArray<FMeshSection>& Sections = MeshAsset->GetSections();
+			const TArray<FMeshMaterialSlot>& MatSlots = MeshAsset->GetMaterialSlots();
 			if (i < static_cast<int32>(Sections.size()))
 			{
 				int32 SlotIdx = Sections[i].MaterialSlotIndex;
@@ -226,8 +226,8 @@ void FEditorMaterialWidget::RenderMaterialDetails(UPrimitiveComponent* Primitive
 	FString SlotName = "Slot";
 	if (MeshAsset) 
 	{
-		const TArray<FStaticMeshSection>& Sections = MeshAsset->GetSections();
-		const TArray<FStaticMeshMaterialSlot>& MatSlots = MeshAsset->GetMaterialSlots();
+		const TArray<FMeshSection>& Sections = MeshAsset->GetSections();
+		const TArray<FMeshMaterialSlot>& MatSlots = MeshAsset->GetMaterialSlots();
 		if (SelectedSectionIndex < static_cast<int32>(Sections.size())) 
 		{
 			int32 SlotIdx = Sections[SelectedSectionIndex].MaterialSlotIndex;
