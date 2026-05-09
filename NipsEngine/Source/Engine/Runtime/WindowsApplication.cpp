@@ -136,7 +136,8 @@ LRESULT FWindowsApplication::WndProc(HWND hWnd, unsigned int Msg, WPARAM wParam,
 
 bool FWindowsApplication::Init(HINSTANCE InHInstance)
 {
-	SetProcessDPIAware();
+	/** 이거 하면 화면이 너무 작게 표시됨. */
+	//SetProcessDPIAware();
 	HInstance = InHInstance;
 
 	WCHAR WindowClass[] = L"JungleWindowClass";

@@ -377,6 +377,17 @@ void FEditorWorldController::OnKeyReleased(int VK)
 		if (SelectionManager)
 		{
 			const TArray<AActor*> SelectedActors = SelectionManager->GetSelectedActors();
+			if (SelectedActors.empty())
+			{
+				break;
+			}
+
+			SelectionManager->ClearSelection();
+			if (OnBeforeDeleteSelection)
+			{
+				OnBeforeDeleteSelection();
+			}
+
 			for (AActor* Actor : SelectedActors)
 			{
 				if (!Actor)
@@ -384,7 +395,6 @@ void FEditorWorldController::OnKeyReleased(int VK)
 				if (UWorld* ActorWorld = Actor->GetFocusedWorld())
 					ActorWorld->DestroyActor(Actor);
 			}
-			SelectionManager->ClearSelection();
 		}
 		break;
 	case 'G':
