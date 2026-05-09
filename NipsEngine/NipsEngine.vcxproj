@@ -254,6 +254,10 @@ if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" xcopy /Y /D
     <ClCompile Include="Source\Engine\Asset\FileUtils.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="Source\Engine\Asset\FbxLoader.cpp">
+      <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Game|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="Source\Engine\Asset\FontAtlasLoader.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
@@ -264,6 +268,9 @@ if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" xcopy /Y /D
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
     <ClCompile Include="Source\Engine\Asset\StaticMesh.cpp">
+      <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Asset\SkeletalMesh.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
     <ClCompile Include="Source\Engine\Asset\StaticMeshSimplifier.cpp">
@@ -852,6 +859,7 @@ if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" xcopy /Y /D
     <ClInclude Include="Source\Editor\Viewport\ViewportLayout.h" />
     <ClInclude Include="Source\Engine\Asset\BinarySerializer.h" />
     <ClInclude Include="Source\Engine\Asset\FileUtils.h" />
+    <ClInclude Include="Source\Engine\Asset\FbxLoader.h" />
     <ClInclude Include="Source\Engine\Asset\FontAtlasLoader.h" />
     <ClInclude Include="Source\Engine\Asset\IAssetLoader.h" />
     <ClInclude Include="Source\Engine\Asset\ObjLoader.h" />
@@ -860,6 +868,8 @@ if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" xcopy /Y /D
     <ClInclude Include="Source\Engine\Asset\StaticMesh.h" />
     <ClInclude Include="Source\Engine\Asset\StaticMeshSimplifier.h" />
     <ClInclude Include="Source\Engine\Asset\StaticMeshTypes.h" />
+    <ClInclude Include="Source\Engine\Asset\SkeletalMesh.h" />
+    <ClInclude Include="Source\Engine\Asset\SkeletalMeshTypes.h" />
     <ClInclude Include="Source\Engine\Audio\AudioSystem.h" />
     <ClInclude Include="Source\Engine\Camera\CameraModifier.h" />
     <ClInclude Include="Source\Engine\Camera\PlayerCameraManager.h" />
