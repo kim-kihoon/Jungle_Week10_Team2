@@ -24,10 +24,10 @@
 #include "Settings/EngineSettings.h"
 #include "Asset/BinarySerializer.h"
 #include "Asset/StaticMeshTypes.h"
+#include "Asset\SkeletalMesh.h"
 #include "Asset/StaticMeshSimplifier.h"
 #include "Render/Scene/RenderCommand.h"
 #include "Render/Resource/ObjMtlLoader.h"
-
 namespace
 {
 	constexpr const char* DefaultUberLitShaderPath = "Shaders/UberLit.hlsl";
@@ -574,6 +574,10 @@ void FResourceManager::LoadFromAssetDirectory(const FString& Path)
 			//	TextureFilePaths.push_back(RelativePath);
 			//}
 		}
+        else if (Extension == L".fbx")
+        {
+            SkeletalMeshFilePaths.push_back(RelativePath);
+        }
 	}
 
 	for (const FString& MaterialPath : MaterialFiles)
@@ -2226,6 +2230,54 @@ UStaticMesh* FResourceManager::FindStaticMesh(const FString& Path) const
 TArray<FString> FResourceManager::GetStaticMeshPaths() const
 {
 	return ObjFilePaths;
+}
+
+USkeletalMesh* FResourceManager::LoadSkeletalMesh(const FString& Path)
+{
+    if (USkeletalMesh* FoundMesh = FindSkeletalMesh(Path))
+    {
+        return FoundMesh;
+    }
+
+    USkeletalMesh* LoadedMesh = FbxLoader.Load(Path);
+
+    if (LoadedMesh == nullptr)
+    {
+        UE_LOG("[SkeletalMeshLoad] Failed | Path=%s", Path.c_str());
+        return nullptr;
+    }
+
+    for (FSkeletalMeshMaterialSlot& Slot : LoadedMesh->GetMeshData()->MaterialSlots)
+    {
+        Slot.Material = GetMaterial(Slot.SlotName);
+
+        if (Slot.Material == nullptr)
+        {
+            Slot.Material = GetMaterial("DefaultWhite");
+        }
+    }
+
+    SkeletalMeshes.insert({ Path, LoadedMesh });
+
+    UE_LOG("[SkeletalMeshLoad] Loaded | Path=%s", Path.c_str());
+
+    return LoadedMesh;
+}
+
+USkeletalMesh* FResourceManager::FindSkeletalMesh(const FString& Path) const
+{
+    auto It = SkeletalMeshes.find(Path);
+    if (It == SkeletalMeshes.end())
+    {
+        return nullptr;
+    }
+
+    return It->second;
+}
+
+TArray<FString> FResourceManager::GetSkeletalMeshPaths() const
+{
+    return SkeletalMeshFilePaths;
 }
 
 const TArray<FString>& FResourceManager::GetTextureFilePath() const

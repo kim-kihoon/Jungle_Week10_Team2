@@ -5,6 +5,7 @@
 #include "Asset/ObjLoader.h"
 #include "Asset/ParticleAtlasLoader.h"
 #include "Asset/StaticMesh.h"
+#include "Asset/FbxLoader.h"
 #include "Core/CoreTypes.h"
 #include "Core/Singleton.h"
 #include "Core/ResourceTypes.h"
@@ -139,6 +140,10 @@ public:
 	UStaticMesh* FindStaticMesh(const FString& Path) const;
 	TArray<FString> GetStaticMeshPaths() const;
 
+	USkeletalMesh* LoadSkeletalMesh(const FString& Path);
+    USkeletalMesh* FindSkeletalMesh(const FString& Path) const;
+    TArray<FString> GetSkeletalMeshPaths() const;
+
 	ID3D11SamplerState* GetOrCreateSamplerState(ESamplerType Type, ID3D11Device* Device = nullptr);
 	ID3D11DepthStencilState* GetOrCreateDepthStencilState(EDepthStencilType Type, ID3D11Device* Device = nullptr);
 	ID3D11BlendState* GetOrCreateBlendState(EBlendType Type, ID3D11Device* Device = nullptr);
@@ -198,4 +203,8 @@ private:
 	TArray<FString> ParticleFilePaths;
 	TArray<FString> FontFilePaths;
 	TArray<FString> TextureFilePaths;
+
+	FFbxLoader FbxLoader;
+    TMap<FString, USkeletalMesh*> SkeletalMeshes;
+    TArray<FString> SkeletalMeshFilePaths;
 };
