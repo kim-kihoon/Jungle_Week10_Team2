@@ -250,6 +250,9 @@ if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" xcopy /Y /D
     <ClCompile Include="Source\Engine\Asset\BinarySerializer.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="Source\Engine\Asset\FbxLoader.cpp">
+      <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="Source\Engine\Asset\FileUtils.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
@@ -325,10 +328,10 @@ if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" xcopy /Y /D
     <ClCompile Include="Source\Engine\Component\KnockbackComponent.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
-    <ClCompile Include="Source\Engine\Component\LuaCameraModifierComponent.cpp">
+    <ClCompile Include="Source\Engine\Component\LineBatchComponent.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
-    <ClCompile Include="Source\Engine\Component\LineBatchComponent.cpp">
+    <ClCompile Include="Source\Engine\Component\LuaCameraModifierComponent.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
     <ClCompile Include="Source\Engine\Component\LuaScriptComponent.cpp">
@@ -850,12 +853,14 @@ if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" xcopy /Y /D
     <ClInclude Include="Source\Editor\Viewport\SEditorViewport.h" />
     <ClInclude Include="Source\Editor\Viewport\ViewportLayout.h" />
     <ClInclude Include="Source\Engine\Asset\BinarySerializer.h" />
+    <ClInclude Include="Source\Engine\Asset\FbxLoader.h" />
     <ClInclude Include="Source\Engine\Asset\FileUtils.h" />
     <ClInclude Include="Source\Engine\Asset\FontAtlasLoader.h" />
     <ClInclude Include="Source\Engine\Asset\IAssetLoader.h" />
     <ClInclude Include="Source\Engine\Asset\ObjLoader.h" />
     <ClInclude Include="Source\Engine\Asset\ObjRawTypes.h" />
     <ClInclude Include="Source\Engine\Asset\ParticleAtlasLoader.h" />
+    <ClInclude Include="Source\Engine\Asset\SkeletalMesh.h" />
     <ClInclude Include="Source\Engine\Asset\StaticMesh.h" />
     <ClInclude Include="Source\Engine\Asset\StaticMeshSimplifier.h" />
     <ClInclude Include="Source\Engine\Asset\StaticMeshTypes.h" />
@@ -885,6 +890,7 @@ if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" xcopy /Y /D
     <ClInclude Include="Source\Engine\Component\PostProcessComponent.h" />
     <ClInclude Include="Source\Engine\Component\PrimitiveComponent.h" />
     <ClInclude Include="Source\Engine\Component\SceneComponent.h" />
+    <ClInclude Include="Source\Engine\Component\SkinnedMeshComponent.h" />
     <ClInclude Include="Source\Engine\Component\SkyAtmosphereComponent.h" />
     <ClInclude Include="Source\Engine\Component\SpringArmComponent.h" />
     <ClInclude Include="Source\Engine\Component\StaticMeshComponent.h" />
