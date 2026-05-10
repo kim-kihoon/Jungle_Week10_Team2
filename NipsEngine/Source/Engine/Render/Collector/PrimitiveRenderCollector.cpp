@@ -450,32 +450,41 @@ void FPrimitiveRenderCollector::CollectFromComponent(
         USkinnedMeshComponent* SkinnedMeshComp = static_cast<USkinnedMeshComponent*>(Primitive);
         USkeletalMesh* SkeletalMesh = SkinnedMeshComp->GetSkeletalMesh();
         if (!SkeletalMesh || !SkeletalMesh->HasValidMeshData())
+        {
+			//vertices와 indices가 없으면 바로 컷
             return;
-
+		}
+		
+		//무엇을 그릴 지 가져왔으니 이제 GPU에 어떻게 올릴 지 버퍼에 담아보기
         FMeshBuffer* MeshBuffer = MeshBufferManager->GetSkeletalMeshBuffer(SkinnedMeshComp);
         if (!MeshBuffer)
+        {
+			//담기 실패하면 컷
             return;
+		}
 
         const TArray<FSkeletalMeshSection>& Sections = SkeletalMesh->GetSections();
         const TArray<uint32>& Indices = SkeletalMesh->GetIndices();
         const bool bDebugCollisionHighlight = ShouldHighlightDebugCollision(Primitive, ViewMode);
         const FVector4 PrimitiveColor = FColor::White().ToVector4();
 
+		if (Sections.empty())
+		{
+			//세션이 따로 없는 단순 메시라면 인덱스 넘겨서 한번에 그림
+			AddSkeletalSectionCommand(Primitive, SkinnedMeshComp, MeshBuffer, RenderBus, bDebugCollisionHighlight, 0, static_cast<uint32>(Indices.size()), 0);
+		}
+		else
+		{
+            int32 sectionlen = static_cast<int32>(Sections.size());
+            for (int32 SectionIdx = 0; SectionIdx < sectionlen; ++SectionIdx)
+			{
+				const FSkeletalMeshSection& Section = Sections[SectionIdx];
+				//세션으로 구분되어 있으므로 세션 별 인덱스를 뽑아서 그림 
+				AddSkeletalSectionCommand(Primitive, SkinnedMeshComp, MeshBuffer, RenderBus, bDebugCollisionHighlight, Section.StartIndex, Section.IndexCount, SectionIdx);
+			}
+		}
 
-	if (Sections.empty())
-        {
-            AddSkeletalSectionCommand(Primitive, SkinnedMeshComp, MeshBuffer, RenderBus, bDebugCollisionHighlight, 0, static_cast<uint32>(Indices.size()), 0);
-        }
-        else
-        {
-            for (int32 SectionIdx = 0; SectionIdx < static_cast<int32>(Sections.size()); ++SectionIdx)
-            {
-                const FSkeletalMeshSection& Section = Sections[SectionIdx];
-                AddSkeletalSectionCommand(Primitive, SkinnedMeshComp, MeshBuffer, RenderBus, bDebugCollisionHighlight, Section.StartIndex, Section.IndexCount, SectionIdx);
-            }
-        }
-
-        break;
+		break;
 	}
 
 	default:

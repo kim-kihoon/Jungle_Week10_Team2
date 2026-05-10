@@ -17,6 +17,19 @@ namespace
 
 USkeletalMesh* FFbxLoader::Load(const FString& Path)
 {
+    /*
+    FBX 로딩 전체 흐름.
+    
+	1. FBX SDK 객체 생성
+    2. 파일 import
+    3. 씬 정규화
+    4. 삼각형화
+    5. Skeleton 수집
+    6. Mesh 추출
+    7. USkeletalMesh 생성
+    8. FBX SDK 객체 정리
+	
+	*/
 	return nullptr;
 }
 
