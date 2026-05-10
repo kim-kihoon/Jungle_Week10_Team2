@@ -371,12 +371,6 @@
     <ClCompile Include="Source\Engine\Asset\ParticleAtlasLoader.cpp">
       <Filter>Source\Engine\Asset</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Engine\Asset\DynamicMesh.cpp">
-      <Filter>Source\Engine\Asset</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Engine\Asset\DynamicMeshTypes.cpp">
-      <Filter>Source\Engine\Asset</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Engine\Asset\StaticMesh.cpp">
       <Filter>Source\Engine\Asset</Filter>
     </ClCompile>
@@ -936,6 +930,9 @@
     <ClCompile Include="Source\Engine\Component\SkeletalMeshComponent.cpp" />
     <ClCompile Include="Source\Engine\Render\Resource\FbxParser.cpp" />
     <ClCompile Include="HighPerformanceGpuHint.cpp" />
+    <ClCompile Include="Source\Engine\Asset\SkeletalMesh.cpp" />
+    <ClCompile Include="Source\Engine\Asset\SkeletalMeshTypes.cpp" />
+    <ClCompile Include="Source\Engine\Component\SkinnedMeshComponent.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Editor\EditorEngine.h">
@@ -1038,12 +1035,6 @@
       <Filter>Source\Engine\Asset</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Asset\ParticleAtlasLoader.h">
-      <Filter>Source\Engine\Asset</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Asset\DynamicMesh.h">
-      <Filter>Source\Engine\Asset</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Asset\DynamicMeshTypes.h">
       <Filter>Source\Engine\Asset</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Asset\StaticMesh.h">
@@ -1771,6 +1762,9 @@
     </ClInclude>
     <ClInclude Include="Source\Engine\Component\SkeletalMeshComponent.h" />
     <ClInclude Include="Source\Engine\Render\Resource\FbxParser.h" />
+    <ClInclude Include="Source\Engine\Asset\SkeletalMesh.h" />
+    <ClInclude Include="Source\Engine\Asset\SkeletalMeshTypes.h" />
+    <ClInclude Include="Source\Engine\Component\SkinnedMeshComponent.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Source\Game\UI\Documents\GameUI.rcss">

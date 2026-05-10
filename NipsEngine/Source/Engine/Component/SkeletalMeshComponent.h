@@ -1,62 +1,28 @@
 ﻿#pragma once
 
-#include "MeshComponent.h"
-#include "Asset/SkeletalMesh.h"
-#include "Render/Resource/Material.h"
+#include "SkinnedMeshComponent.h"
 
-class USkeletalMeshComponent : public UMeshComponent
+class USkeletalMeshComponent : public USkinnedMeshComponent
 {
 public:
-	DECLARE_CLASS(USkeletalMeshComponent, UMeshComponent)
+	DECLARE_CLASS(USkeletalMeshComponent, USkinnedMeshComponent)
 	USkeletalMeshComponent() = default;
-	~USkeletalMeshComponent() override;
+	virtual ~USkeletalMeshComponent() override = default;
 
-	void PostDuplicate(UObject* Original) override;
-	void Serialize(FArchive& Ar) override;
+	virtual void SetSkeletalMesh(USkeletalMesh* InSkeletalMesh) override;
 
-	void SetSkeletalMesh(USkeletalMesh* InSkeletalMesh);
-	USkeletalMesh* GetSkeletalMesh() const;
-	bool HasValidMesh() const;
-	FDynamicMeshBuffer* GetRenderBuffer();
-	void TestReferencePoseSkinning();
+	void SetBoneLocalTransform(int32 BoneIndex, const FTransform& NewTransform);
 
-	const TArray<FNormalVertex>& GetRenderVertices() const;
-	const TArray<uint32>& GetRenderIndices() const;
-	const TArray<FSkeletalMeshSection>& GetSections() const;
-
-	void GetEditableProperties(TArray<FPropertyDescriptor>& OutProps) override;
-	void PostEditProperty(const char* PropertyName) override;
-
-	void UpdateWorldAABB() const override;
-	bool RaycastMesh(const FRay& Ray, FHitResult& OutHitResult) override;
-	EPrimitiveType GetPrimitiveType() const override { return EPrimitiveType::EPT_SkeletalMesh; }
-
-	const FAABB& GetWorldAABB() const override;
-
-	void UpdateRenderVertices(ID3D11DeviceContext* InContext, const TArray<FNormalVertex>& InVertices);
+	virtual void TickComponent(float DeltaTime) override;
 
 	void InitializeBonePoses();
 	void UpdateBoneMatrices();
-	void PerformCPUSkinning();
 
-private:
-	void RebuildRenderVertices();
-	void RebuildMeshBuffer();
-	void MarkBoundsDirty();
-	void MarkRenderBufferDirty();
-	void EnsureBoundsUpdated() const;
+	void TestReferencePoseSkinning();
 
 protected:
 	TArray<FTransform> LocalBoneTransforms;
 	TArray<FMatrix> GlobalBoneMatrices;
-	TArray<FMatrix> SkinningMatrices;
 
-private:
-	USkeletalMesh* SkeletalMeshAsset = nullptr;
-	FString SkeletalMeshAssetPath;
-
-	TArray<FNormalVertex> RenderVertices;
-	FDynamicMeshBuffer MeshBuffer;
-	mutable bool bBoundsDirty = true;
-	bool bRenderBufferDirty = true;
+	bool bPoseDirty = true;
 };
