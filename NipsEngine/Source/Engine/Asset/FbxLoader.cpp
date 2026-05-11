@@ -555,6 +555,7 @@ FVector2 GetPolygonUV(FbxMesh* Mesh, int32 PolygonIndex, int32 VertexInPolygon, 
     return FVector2(0.0f, 0.0f);
 }
 
+// Assigns the top 4 bone influences to the vertex, optionally normalizing the weights so they sum to 1.0.
 void AssignTopNormalizedBoneInfluences(
     FSkeletalMeshVertex& Vertex,
     const TArray<FControlPointInfluence>& Influences,

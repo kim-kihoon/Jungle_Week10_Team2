@@ -202,7 +202,7 @@ void FPrimitiveRenderCollector::CollectFromComponent(
 
 	case EPrimitiveType::EPT_SkeletalMesh:
 	{
-		if (!ShowFlags.bPrimitives) return;
+		if (!ShowFlags.bPrimitives || !ShowFlags.bSkeletalMesh) return;
 
 		USkeletalMeshComponent* SkeletalMeshComp = static_cast<USkeletalMeshComponent*>(Primitive);
 		if (!SkeletalMeshComp->HasValidMesh()) return;

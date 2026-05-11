@@ -73,6 +73,7 @@ inline bool ShouldBypassSceneCompositePasses(EViewMode ViewMode)
 struct FShowFlags
 {
 	bool bPrimitives = true;
+	bool bSkeletalMesh = true;
 	bool bGrid = false;
 	bool bAxis = false;
 	bool bGizmo = false;
