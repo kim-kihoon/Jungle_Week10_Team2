@@ -78,6 +78,8 @@ namespace
 	const ImU32 ColorEmptyBg = IM_COL32(0, 0, 0, 150);
 	const ImU32 ColorEmptyBorder = IM_COL32(255, 255, 255, 100);
 	const ImU32 ColorHighlightRect = IM_COL32(255, 220, 0, 220);
+
+	bool OpenSkeletalMeshFbxFileDialog(FString& OutFilePath);
 	const ImU32 ColorHighlightText = IM_COL32(255, 220, 0, 255);
 
 	ULuaScriptComponent* PendingLuaScriptComponent = nullptr;
@@ -1224,7 +1226,22 @@ bool FEditorPropertyWidget::RenderPropertyWidget(FPropertyDescriptor& Prop)
 			Options = FResourceManager::Get().GetTextureFilePath();
 		else if (strcmp(Prop.Name, "StaticMesh") == 0)
 			Options = FResourceManager::Get().GetStaticMeshPaths();
+		else if (strcmp(Prop.Name, "SkeletalMesh") == 0)
+			Options = FResourceManager::Get().GetSkeletalMeshPaths();
 		bChanged = EditorUIUtils::RenderStringComboOrInput(Prop.Name, *Val, Options);
+		if (strcmp(Prop.Name, "SkeletalMesh") == 0)
+		{
+			if (ImGui::Button("Import FBX##SkeletalMesh", ImVec2(-1, 0)))
+			{
+				FString SelectedFbxPath;
+				if (OpenSkeletalMeshFbxFileDialog(SelectedFbxPath))
+				{
+					*Val = SelectedFbxPath;
+					FResourceManager::Get().RefreshFromAssetDirectory("Asset");
+					bChanged = true;
+				}
+			}
+		}
 		break;
 	}
 	case EPropertyType::Name:
@@ -1698,6 +1715,51 @@ namespace
 		DialogDesc.lpstrFile = FileBuffer;
 		DialogDesc.nMaxFile = MAX_PATH;
 		DialogDesc.lpstrInitialDir = InitialDir.c_str();
+		DialogDesc.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+
+		const BOOL bPicked = GetOpenFileNameW(&DialogDesc);
+
+		std::error_code RestoreEc;
+		std::filesystem::current_path(PrevCwd, RestoreEc);
+
+		if (!bPicked)
+		{
+			return false;
+		}
+
+		OutFilePath = FPaths::Normalize(FPaths::ToRelativeString(FileBuffer));
+		return true;
+	}
+
+	bool OpenSkeletalMeshFbxFileDialog(FString& OutFilePath)
+	{
+		OutFilePath.clear();
+
+		std::filesystem::path AssetDir(FPaths::RootDir());
+		AssetDir /= L"Asset";
+		AssetDir = AssetDir.lexically_normal();
+		AssetDir.make_preferred();
+
+		std::error_code Ec;
+		std::filesystem::create_directories(AssetDir, Ec);
+
+		WCHAR FileBuffer[MAX_PATH] = { 0 };
+		const std::filesystem::path OpenPattern = AssetDir / L"*.fbx";
+		wcsncpy_s(FileBuffer, MAX_PATH, OpenPattern.wstring().c_str(), _TRUNCATE);
+		const std::wstring InitialDir = AssetDir.wstring();
+
+		const std::filesystem::path PrevCwd = std::filesystem::current_path();
+		std::error_code ChdirEc;
+		std::filesystem::current_path(AssetDir, ChdirEc);
+
+		OPENFILENAMEW DialogDesc = {};
+		DialogDesc.lStructSize = sizeof(DialogDesc);
+		DialogDesc.hwndOwner = static_cast<HWND>(ImGui::GetMainViewport()->PlatformHandleRaw);
+		DialogDesc.lpstrFilter = L"FBX Files (*.fbx)\0*.fbx\0All Files (*.*)\0*.*\0";
+		DialogDesc.lpstrFile = FileBuffer;
+		DialogDesc.nMaxFile = MAX_PATH;
+		DialogDesc.lpstrInitialDir = InitialDir.c_str();
+		DialogDesc.lpstrDefExt = L"fbx";
 		DialogDesc.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
 
 		const BOOL bPicked = GetOpenFileNameW(&DialogDesc);

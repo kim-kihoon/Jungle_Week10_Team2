@@ -1,9 +1,11 @@
 ﻿#pragma once
 
 #include "Asset/BinarySerializer.h"
+#include "Asset/FbxLoader.h"
 #include "Asset/FontAtlasLoader.h"
 #include "Asset/ObjLoader.h"
 #include "Asset/ParticleAtlasLoader.h"
+#include "Asset/SkeletalMesh.h"
 #include "Asset/StaticMesh.h"
 #include "Core/CoreTypes.h"
 #include "Core/Singleton.h"
@@ -139,6 +141,10 @@ public:
 	UStaticMesh* FindStaticMesh(const FString& Path) const;
 	TArray<FString> GetStaticMeshPaths() const;
 
+	USkeletalMesh* LoadSkeletalMesh(const FString& Path);
+	USkeletalMesh* FindSkeletalMesh(const FString& Path) const;
+	TArray<FString> GetSkeletalMeshPaths() const;
+
 	ID3D11SamplerState* GetOrCreateSamplerState(ESamplerType Type, ID3D11Device* Device = nullptr);
 	ID3D11DepthStencilState* GetOrCreateDepthStencilState(EDepthStencilType Type, ID3D11Device* Device = nullptr);
 	ID3D11BlendState* GetOrCreateBlendState(EBlendType Type, ID3D11Device* Device = nullptr);
@@ -168,6 +174,7 @@ private:
 	TComPtr<ID3D11Device> CachedDevice;
 
 	FObjLoader ObjLoader;
+	FFbxImporter FbxImporter;
 	FFontAtlasLoader FontLoader;
 	FParticleAtlasLoader ParticleLoader;
 	
@@ -182,6 +189,7 @@ private:
 	TComPtr<ID3D11Texture2D>          DefaultNormalTexture;
 
 	TMap<FString, UStaticMesh*> StaticMeshes;
+	TMap<FString, USkeletalMesh*> SkeletalMeshes;
 	TMap<FString, UShader*> Shaders;
 	TMap<FShaderCompileKey, UShader*> ShaderVariants;
 	TMap<FString, UTexture*> Textures;
@@ -194,6 +202,7 @@ private:
 
 	/* Paths */
 	TArray<FString> ObjFilePaths;
+	TArray<FString> SkeletalMeshFilePaths;
 	TArray<FString> MaterialFilePaths;
 	TArray<FString> ParticleFilePaths;
 	TArray<FString> FontFilePaths;

@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <cfloat>
+#include <cstring>
 
+#include "Core/ResourceManager.h"
 #include "Object/ObjectFactory.h"
 
 DEFINE_CLASS(USkeletalMeshComponent, USkinnedMeshComponent)
@@ -45,6 +47,35 @@ void USkeletalMeshComponent::PostDuplicate(UObject* Original)
 	bSkinningDirty = true;
 	bBoundsDirty = true;
 	bRenderStateDirty = true;
+}
+
+void USkeletalMeshComponent::Serialize(FArchive& Ar)
+{
+	UMeshComponent::Serialize(Ar);
+	Ar << "FbxSkeletalMeshAsset" << SkeletalMeshAssetPath;
+
+	if (Ar.IsLoading())
+	{
+		TArray<UMaterialInterface*> SavedMaterials = Materials;
+
+		if (!SkeletalMeshAssetPath.empty())
+		{
+			SetSkeletalMesh(FResourceManager::Get().LoadSkeletalMesh(SkeletalMeshAssetPath));
+		}
+		else
+		{
+			SetSkeletalMesh(nullptr);
+		}
+
+		const int32 RestoreCount = static_cast<int32>(std::min(SavedMaterials.size(), Materials.size()));
+		for (int32 i = 0; i < RestoreCount; ++i)
+		{
+			if (SavedMaterials[i] != nullptr)
+			{
+				SetMaterial(i, SavedMaterials[i]);
+			}
+		}
+	}
 }
 
 void USkeletalMeshComponent::SetSkeletalMesh(USkeletalMesh* InSkeletalMesh)
@@ -190,6 +221,35 @@ const FAABB& USkeletalMeshComponent::GetWorldAABB() const
 {
 	EnsureBoundsUpdated();
 	return WorldAABB;
+}
+
+void USkeletalMeshComponent::GetEditableProperties(TArray<FPropertyDescriptor>& OutProps)
+{
+	UMeshComponent::GetEditableProperties(OutProps);
+	OutProps.push_back({ "SkeletalMesh", EPropertyType::String, &SkeletalMeshAssetPath });
+}
+
+void USkeletalMeshComponent::PostEditProperty(const char* PropertyName)
+{
+	UMeshComponent::PostEditProperty(PropertyName);
+
+	if (std::strcmp(PropertyName, "SkeletalMesh") == 0)
+	{
+		if (SkeletalMeshAssetPath.empty())
+		{
+			SetSkeletalMesh(nullptr);
+			return;
+		}
+
+		SetSkeletalMesh(FResourceManager::Get().LoadSkeletalMesh(SkeletalMeshAssetPath));
+	}
+	else if (std::strcmp(PropertyName, "Materials") == 0)
+	{
+		for (int32 i = 0; i < static_cast<int32>(Materials.size()); ++i)
+		{
+			SetMaterial(i, Materials[i]);
+		}
+	}
 }
 
 void USkeletalMeshComponent::OnSkeletalMeshChanged()

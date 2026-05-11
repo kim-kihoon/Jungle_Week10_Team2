@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <fbxsdk.h>
 #include <filesystem>
 #include <cstdio>
@@ -216,7 +217,7 @@ int32 AddBoneRecursive(FbxNode* BoneNode, FSkeletalMesh& OutMesh)
     const int32 BoneIndex = OutMesh.RefSkeleton.Add(BoneInfo, FTransform(ConvertFbxMatrixToEngineMatrix(LocalTransform)));
 
     // Fallback inverse global bind pose matrix if not provided by skinning data.
-	// This is needed to ensure the skeleton can be used even without skinning.
+    // This is needed to ensure the skeleton can be used even without skinning.
     if (BoneIndex >= static_cast<int32>(OutMesh.InverseBindGlobalMatrices.size()))
     {
         OutMesh.InverseBindGlobalMatrices.resize(BoneIndex + 1, FMatrix::Identity);
@@ -398,7 +399,7 @@ void BuildSkinClusterBindings(
         {
             continue;
         }
-		
+
         for (int32 ClusterIndex = 0; ClusterIndex < Skin->GetClusterCount(); ++ClusterIndex)
         {
             FbxCluster* Cluster = Skin->GetCluster(ClusterIndex);
@@ -413,7 +414,7 @@ void BuildSkinClusterBindings(
                 continue;
             }
 
-			// Store the inverse bind pose global matrix for this bone.
+            // Store the inverse bind pose global matrix for this bone.
             FbxAMatrix BindGlobalMatrix;
             Cluster->GetTransformLinkMatrix(BindGlobalMatrix);
             if (BoneIndex >= static_cast<int32>(OutMesh.InverseBindGlobalMatrices.size()))
@@ -469,7 +470,7 @@ void RebuildLocalTransforms(FSkeletalMesh& OutMesh)
 
     OutMesh.RefSkeleton.LocalTransforms.resize(BoneCount, FTransform::Identity);
 
-	// Compute local bind pose transforms from inverse global bind pose matrices.
+    // Compute local bind pose transforms from inverse global bind pose matrices.
     TArray<FMatrix> BindGlobalMatrices;
     BindGlobalMatrices.resize(BoneCount, FMatrix::Identity);
     for (int32 BoneIndex = 0; BoneIndex < BoneCount; ++BoneIndex)
@@ -491,6 +492,75 @@ void RebuildLocalTransforms(FSkeletalMesh& OutMesh)
     }
 }
 
+float GetMaxAbsMatrixDifference(const FMatrix& A, const FMatrix& B)
+{
+    float MaxDiff = 0.0f;
+    for (int32 Row = 0; Row < 4; ++Row)
+    {
+        for (int32 Col = 0; Col < 4; ++Col)
+        {
+            MaxDiff = std::max(MaxDiff, std::fabs(A.M[Row][Col] - B.M[Row][Col]));
+        }
+    }
+    return MaxDiff;
+}
+
+void ValidateBindPoseSkinningMatrices(const FSkeletalMesh& Mesh, const FString& Path)
+{
+    const int32 BoneCount = Mesh.RefSkeleton.GetNum();
+    if (BoneCount <= 0)
+    {
+        return;
+    }
+
+    if (Mesh.RefSkeleton.LocalTransforms.size() < static_cast<size_t>(BoneCount) ||
+        Mesh.InverseBindGlobalMatrices.size() < static_cast<size_t>(BoneCount))
+    {
+        UE_LOG("[FbxImporter] Bind pose validation skipped for %s: incomplete skeleton matrices.", Path.c_str());
+        return;
+    }
+
+    TArray<FMatrix> BindGlobalMatrices;
+    BindGlobalMatrices.resize(BoneCount, FMatrix::Identity);
+
+    float MaxDeviation = 0.0f;
+    int32 WorstBoneIndex = -1;
+
+    for (int32 BoneIndex = 0; BoneIndex < BoneCount; ++BoneIndex)
+    {
+        const FMatrix LocalMatrix = Mesh.RefSkeleton.LocalTransforms[BoneIndex].ToMatrixWithScale();
+        const int32 ParentIndex = Mesh.RefSkeleton.BoneInfo[BoneIndex].ParentIndex;
+
+        if (ParentIndex >= 0 && ParentIndex < BoneIndex)
+        {
+            BindGlobalMatrices[BoneIndex] = LocalMatrix * BindGlobalMatrices[ParentIndex];
+        }
+        else
+        {
+            BindGlobalMatrices[BoneIndex] = LocalMatrix;
+        }
+
+        const FMatrix SkinningMatrix = Mesh.InverseBindGlobalMatrices[BoneIndex] * BindGlobalMatrices[BoneIndex];
+        const float Deviation = GetMaxAbsMatrixDifference(SkinningMatrix, FMatrix::Identity);
+        if (Deviation > MaxDeviation)
+        {
+            MaxDeviation = Deviation;
+            WorstBoneIndex = BoneIndex;
+        }
+    }
+
+    constexpr float BindPoseTolerance = 1.0e-3f;
+    if (MaxDeviation > BindPoseTolerance && WorstBoneIndex >= 0)
+    {
+        const FString& BoneName = Mesh.RefSkeleton.BoneInfo[WorstBoneIndex].Name;
+        UE_LOG("[FbxImporter] Bind pose validation warning for %s: max deviation %.6f at bone %d (%s).",
+               Path.c_str(),
+               MaxDeviation,
+               WorstBoneIndex,
+               BoneName.c_str());
+    }
+}
+
 void ImportSkeletalMeshData(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh, const FSkeletalMeshImportOptions& ImportOptions)
 {
     if (Node == nullptr || Mesh == nullptr)
@@ -504,7 +574,7 @@ void ImportSkeletalMeshData(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh
         OutMesh.RenderData.LODRenderData.emplace_back();
     }
 
-    // Build bone influences for control points and create inverse bind pose matrices for bones.
+    // Collect per-control-point bone influences and bind-pose link matrices from FBX skin clusters.
     FSkeletalMeshLODRenderData& LODData = OutMesh.RenderData.LODRenderData[0];
     TArray<TArray<FControlPointInfluence>> ControlPointInfluences;
     BuildSkinClusterBindings(Mesh, OutMesh, ControlPointInfluences);
@@ -697,6 +767,7 @@ USkeletalMesh* FFbxImporter::ImportSkeletalMesh(const FString& Path, const FSkel
 
 	// Rebuild local transforms from inverse bind pose global matrices.
     RebuildLocalTransforms(*ImportedMesh);
+    ValidateBindPoseSkinningMatrices(*ImportedMesh, Path);
 
     // Validate that we have valid vertex and index data before creating the skeletal mesh asset.
     const FSkeletalMeshLODRenderData& LODData = ImportedMesh->RenderData.LODRenderData[0];

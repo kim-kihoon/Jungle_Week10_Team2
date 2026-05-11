@@ -3,6 +3,7 @@
 #include "Engine/GameFramework/AActor.h"
 #include "Selection/SelectionManager.h"
 #include "Component/StaticMeshComponent.h"
+#include "Component/SkeletalMeshComponent.h"
 #include "Component/BillboardComponent.h"
 #include "Component/TextRenderComponent.h"
 #include "Component/SubUVComponent.h"
@@ -138,6 +139,7 @@ const TArray<FComponentMenuEntry>& FEditorComponentFactory::GetMenuRegistry()
     static const TArray<FComponentMenuEntry> Registry = {
         { "Scene Component", "Common", RegisterComp<USceneComponent> },
         { "StaticMesh Component", "Common", RegisterComp<UStaticMeshComponent> },
+        { "SkeletalMesh Component", "Common", RegisterComp<USkeletalMeshComponent> },
         { "SubUV Component", "Common", RegisterComp<USubUVComponent> },
         { "TextRender Component", "Common", RegisterComp<UTextRenderComponent> },
         { "Billboard Component", "Common", RegisterComp<UBillboardComponent> },

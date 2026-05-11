@@ -10,6 +10,7 @@ public:
 
 	USkeletalMeshComponent() = default;
 	void PostDuplicate(UObject* Original) override;
+	void Serialize(FArchive& Ar) override;
 
 	void SetSkeletalMesh(USkeletalMesh* InSkeletalMesh);
 
@@ -22,6 +23,8 @@ public:
 	void UpdateWorldAABB() const override;
 	bool RaycastMesh(const FRay& Ray, FHitResult& OutHitResult) override;
 	const FAABB& GetWorldAABB() const override;
+	void GetEditableProperties(TArray<FPropertyDescriptor>& OutProps) override;
+	void PostEditProperty(const char* PropertyName) override;
 
 protected:
 	void OnSkeletalMeshChanged() override;

@@ -484,6 +484,7 @@ void FResourceManager::LoadFromAssetDirectory(const FString& Path)
 {
 	//	초기화
 	ObjFilePaths.clear();
+	SkeletalMeshFilePaths.clear();
 	FontFilePaths.clear();
 	TextureFilePaths.clear();
 	MaterialFilePaths.clear();
@@ -534,6 +535,10 @@ void FResourceManager::LoadFromAssetDirectory(const FString& Path)
 			Resource.bPreload = false;
 			Resource.bNormalizeToUnitCube = false;
 			StaticMeshRegistry[Resource.Name] = Resource;
+		}
+		else if (Extension == L".fbx")
+		{
+			SkeletalMeshFilePaths.push_back(RelativePath);
 		}
 		else if (Extension == L".mtl")
 		{
@@ -604,6 +609,7 @@ void FResourceManager::RefreshFromAssetDirectory(const FString& Path)
 	namespace fs = std::filesystem;
 
 	ObjFilePaths.clear();
+	SkeletalMeshFilePaths.clear();
 	FontFilePaths.clear();
 	TextureFilePaths.clear();
 	MaterialFilePaths.clear();
@@ -650,6 +656,10 @@ void FResourceManager::RefreshFromAssetDirectory(const FString& Path)
 				Resource.bPreload = false;
 				Resource.bNormalizeToUnitCube = false;
 				StaticMeshRegistry[Resource.Name] = Resource;
+			}
+			else if (Extension == L".fbx")
+			{
+				SkeletalMeshFilePaths.push_back(RelativePath);
 			}
 			else if (Extension == L".mtl")
 			{
@@ -1075,6 +1085,13 @@ void FResourceManager::ReleaseGPUResources()
 	}
 	StaticMeshes.clear();
 	StaticMeshRegistry.clear();
+
+	for (auto& [Path, SkeletalMeshAsset] : SkeletalMeshes)
+	{
+		UObjectManager::Get().DestroyObject(SkeletalMeshAsset);
+	}
+	SkeletalMeshes.clear();
+	SkeletalMeshFilePaths.clear();
 
 	// D3D state object caches
 	SamplerStates.clear();
@@ -2223,9 +2240,53 @@ UStaticMesh* FResourceManager::FindStaticMesh(const FString& Path) const
 	return It->second;
 }
 
+USkeletalMesh* FResourceManager::LoadSkeletalMesh(const FString& Path)
+{
+	if (USkeletalMesh* FoundMesh = FindSkeletalMesh(Path))
+	{
+		return FoundMesh;
+	}
+
+	USkeletalMesh* LoadedMesh = FbxImporter.ImportSkeletalMesh(Path);
+	if (LoadedMesh == nullptr)
+	{
+		UE_LOG("[SkeletalMeshLoad] Failed | Path=%s", Path.c_str());
+		return nullptr;
+	}
+
+	for (FSkeletalMaterial& Slot : LoadedMesh->GetSkeletalMeshData()->Materials)
+	{
+		Slot.Material = GetMaterialInterface(Slot.MaterialSlotName);
+		if (Slot.Material == nullptr)
+		{
+			Slot.Material = GetMaterialInterface("DefaultWhite");
+		}
+	}
+
+	SkeletalMeshes.insert({ Path, LoadedMesh });
+	UE_LOG("[SkeletalMeshLoad] Source=FBX | Path=%s", Path.c_str());
+	return LoadedMesh;
+}
+
+USkeletalMesh* FResourceManager::FindSkeletalMesh(const FString& Path) const
+{
+	auto It = SkeletalMeshes.find(Path);
+	if (It == SkeletalMeshes.end())
+	{
+		return nullptr;
+	}
+
+	return It->second;
+}
+
 TArray<FString> FResourceManager::GetStaticMeshPaths() const
 {
 	return ObjFilePaths;
+}
+
+TArray<FString> FResourceManager::GetSkeletalMeshPaths() const
+{
+	return SkeletalMeshFilePaths;
 }
 
 const TArray<FString>& FResourceManager::GetTextureFilePath() const
