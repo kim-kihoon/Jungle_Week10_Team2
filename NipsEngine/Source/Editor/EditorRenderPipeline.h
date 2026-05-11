@@ -5,6 +5,7 @@
 
 class UEditorEngine;
 class FEditorViewportClient;
+class FSkeletalMeshPreviewScene;
 struct FSceneView;
 
 class FEditorRenderPipeline : public IRenderPipeline
@@ -17,6 +18,7 @@ public:
 	const FRenderCollector::FCullingStats& GetViewportCullingStats(int32 ViewportIndex) const;
 	const FRenderCollector::FDecalStats& GetViewportDecalStats(int32 ViewportIndex) const;
 	const FRenderCollector::FShadowStats& GetViewportShadowStats(int32 ViewportIndex) const;
+	void RenderSkeletalMeshPreviewViewport(FRenderer& Renderer, FSkeletalMeshPreviewScene& PreviewScene);
 
 private:
 	/*

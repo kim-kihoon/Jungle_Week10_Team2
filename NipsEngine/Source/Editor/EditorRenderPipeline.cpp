@@ -2,6 +2,7 @@
 
 #include "Editor/EditorEngine.h"
 #include "Engine/Viewport/ViewportCamera.h"
+#include "Editor/SkeletalMesh/SkeletalMeshPreviewScene.h"
 #include "Render/Renderer/Renderer.h"
 #include "GameFramework/World.h"
 #include "Core/Logging/Stats.h"
@@ -42,11 +43,14 @@ void FEditorRenderPipeline::Execute(float DeltaTime, FRenderer& Renderer)
 		RenderViewport(Renderer, i);
 	}
 
-	Renderer.UseBackBufferRenderTargets();
+	if (FSkeletalMeshPreviewScene* PreviewScene = Editor->GetMainPanel().GetSkeletalMeshPreviewScene())
+	{
+		RenderSkeletalMeshPreviewViewport(Renderer, *PreviewScene);
+	}
 
+	Renderer.UseBackBufferRenderTargets();
 	// ImGui UI 오버레이
 	Editor->RenderUI(DeltaTime);
-
 	Renderer.EndFrame();
 }
 
@@ -185,4 +189,36 @@ const FRenderCollector::FShadowStats& FEditorRenderPipeline::GetViewportShadowSt
 	}
 
 	return ViewportShadowStats[ViewportIndex];
+}
+
+void FEditorRenderPipeline::RenderSkeletalMeshPreviewViewport(FRenderer& Renderer, FSkeletalMeshPreviewScene& PreviewScene)
+{
+	FSceneView SceneView;
+	FSkeletalMeshPreviewViewportClient* VC = &PreviewScene.GetViewportClient();
+	VC->BuildSceneView(SceneView);
+
+	const FViewportRect& Rect = PreviewScene.GetSceneViewport().GetRect();
+	if (Rect.Width <= 0 || Rect.Height <= 0) return;
+
+	FViewportRenderResource& ViewportResource = Renderer.AcquireViewportResource(Rect.Width, Rect.Height, PreviewScene.GetViewportIndex());
+	PreviewScene.GetSceneViewport().SetRenderTargetSet(&ViewportResource.GetView());
+
+	Renderer.BeginViewportFrame(PreviewScene.GetSceneViewport().GetViewportRenderTargets());
+
+	Bus.Clear();
+	Bus.SetSceneView(SceneView);
+
+	// 뷰어는 복잡한 그림자/FXAA 생략하거나 기본값 사용
+	Bus.SetRenderSettings(EViewMode::Lit, Editor->GetSettings().ShowFlags);
+
+	Renderer.GetEditorLineBatcher().Clear();
+	Collector.SetLineBatcher(&Renderer.GetEditorLineBatcher());
+
+	// 메인 월드가 아니라 PreviewWorld를 수집
+	Collector.CollectWorld(PreviewScene.GetWorld(), Editor->GetSettings().ShowFlags, EViewMode::Lit, Bus, &SceneView.CameraFrustum);
+
+	// 나중에 여기에 Gizmo, Bone Debug Line Collect 추가
+
+	Renderer.PrepareBatchers(Bus);
+	Renderer.Render(Bus);
 }

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "ImGui/imgui.h"
 #include "Editor/UI/EditorConsoleWidget.h"
@@ -11,6 +11,7 @@
 #include "Editor/UI/EditorToolbarWidget.h"
 #include "Editor/UI/EditorPlayStreamWidget.h"
 #include "Editor/UI/EditorCameraShakeWidget.h"
+#include "Editor/UI/EditorSkeletalMeshViewerWidget.h"
 
 class FRenderer;
 class UEditorEngine;
@@ -27,6 +28,7 @@ public:
 	FEditorPropertyWidget& GetPropertyWidget() { return PropertyWidget; }
 	FEditorMaterialWidget& GetMaterialWidget() { return MaterialWidget; }
 	FEditorSceneWidget& GetSceneWidget() { return SceneWidget; }
+	FSkeletalMeshPreviewScene* GetSkeletalMeshPreviewScene() { return SkeletalMeshViewerWidget.IsOpen() ? SkeletalMeshViewerWidget.GetPreviewScene() : nullptr; }
 	const FEditorSceneWidget& GetSceneWidget() const { return SceneWidget; }
 
 	void ResetWidgetSelections()
@@ -55,6 +57,7 @@ private:
 	FEditorToolbarWidget ToolbarWidget;
 	FEditorPlayStreamWidget PlayStreamWidget;
 	FEditorCameraShakeWidget CameraShakeWidget;
+	FEditorSkeletalMeshViewerWidget SkeletalMeshViewerWidget;
 
 	bool bShowConsole = true;
 	bool bShowCameraShake = true;

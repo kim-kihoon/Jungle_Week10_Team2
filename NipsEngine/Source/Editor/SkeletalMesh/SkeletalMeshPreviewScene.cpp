@@ -1,0 +1,93 @@
+﻿#include "SkeletalMeshPreviewScene.h"
+#include "Editor/EditorEngine.h"
+#include "GameFramework/World.h"
+#include "GameFramework/WorldContext.h"
+#include "GameFramework/PrimitiveActors.h"
+#include "Component/SkeletalMeshComponent.h"
+
+static int32 GPreviewWorldCounter = 0;
+
+FSkeletalMeshPreviewScene::~FSkeletalMeshPreviewScene()
+{
+	Shutdown();
+}
+
+void FSkeletalMeshPreviewScene::Initialize(UEditorEngine* InEditor)
+{
+	if (Editor != nullptr)
+	{
+		return; // 이미 초기화됨
+	}
+
+	Editor = InEditor;
+
+	ViewportClient.SetPreviewScene(this);
+
+	// 월드 생성
+	std::string ContextName = "SkeletalMeshViewer_Preview_" + std::to_string(GPreviewWorldCounter++);
+	WorldHandle = FName(ContextName.c_str());
+
+	FWorldContext& Context = Editor->CreateWorldContext(EWorldType::ViewerPreview, WorldHandle, ContextName);
+	PreviewWorld = Context.World;
+
+	// Preview용 액터 스폰
+	PreviewActor = PreviewWorld->SpawnActor<ASkeletalMeshActor>();
+	PreviewMeshComponent = static_cast<USkeletalMeshComponent*>(PreviewActor->GetRootComponent());
+
+	// Directional Light 액터 스폰
+	auto* LightActor = PreviewWorld->SpawnActor<ADirectionalLightActor>();
+}
+
+void FSkeletalMeshPreviewScene::Shutdown()
+{
+	if (Editor != nullptr && PreviewWorld != nullptr)
+	{
+		Editor->DestroyWorldContext(WorldHandle);
+
+		PreviewWorld = nullptr;
+		PreviewActor = nullptr;
+		PreviewMeshComponent = nullptr;
+		Editor = nullptr;
+	}
+}
+
+void FSkeletalMeshPreviewScene::Tick(float DeltaTime)
+{
+	ViewportClient.Tick(DeltaTime);
+}
+
+void FSkeletalMeshPreviewScene::SetVisible(bool bInVisible)
+{
+	if (Editor == nullptr)
+		return;
+
+	// UEditorEngine::WorldTick 을 보면 Ctx.bPaused 가 true면 Tick을 건너뜀
+	if (FWorldContext* Context = Editor->GetWorldContextFromHandle(WorldHandle))
+	{
+		Context->bPaused = !bInVisible;
+	}
+}
+
+void FSkeletalMeshPreviewScene::SetSkeletalMesh(USkeletalMesh* Mesh)
+{
+	if (PreviewMeshComponent)
+	{
+		PreviewMeshComponent->SetSkeletalMesh(Mesh);
+		ResetPose();
+	}
+}
+
+void FSkeletalMeshPreviewScene::ResetPose()
+{
+	if (PreviewMeshComponent)
+	{
+		// 본 포즈를 레퍼런스 포즈로 리셋하는 로직 호출
+		// PreviewMeshComponent->ResetBonePose(); 
+	}
+}
+
+void FSkeletalMeshPreviewScene::SetViewportSize(uint32 Width, uint32 Height)
+{
+	PreviewViewport.SetRect(FViewportRect(0, 0, Width, Height));
+	ViewportClient.SetViewportSize(static_cast<float>(Width), static_cast<float>(Height));
+}

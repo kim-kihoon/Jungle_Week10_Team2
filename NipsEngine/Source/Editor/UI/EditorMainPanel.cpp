@@ -144,12 +144,15 @@ void FEditorMainPanel::Create(FWindowsWindow* InWindow, FRenderer& InRenderer, U
 	StatWidget.Initialize(InEditorEngine);
 	PlayStreamWidget.Initialize(InEditorEngine);
 	CameraShakeWidget.Initialize(InEditorEngine);
+	SkeletalMeshViewerWidget.Initialize(InEditorEngine);
 	ToolbarWidget.Initialize(InEditorEngine);
 	ToolbarWidget.SetViewportOverlayWidget(&ViewportOverlayWidget);
 	ToolbarWidget.SetSceneWidget(&SceneWidget);
 	ToolbarWidget.SetPlayStreamWidget(&PlayStreamWidget);
 	ToolbarWidget.SetPanelVisibilityRefs(&bShowConsole, &bShowControl, &bShowProperty, &bShowSceneManager,
 										 &bShowMaterialEditor, &bShowStatProfiler);
+
+	SkeletalMeshViewerWidget.Open();
 }
 
 void FEditorMainPanel::Release()
@@ -187,6 +190,7 @@ void FEditorMainPanel::Render(float DeltaTime)
 		StatWidget.Render(DeltaTime);
 	if (bShowCameraShake)
 		CameraShakeWidget.Render(DeltaTime);
+	SkeletalMeshViewerWidget.Render(DeltaTime);
 	ViewportOverlayWidget.Render(DeltaTime);
 
 	// 게임 UI는 PIE 중에만 표시합니다. 편집 중에는 씬 작업을 방해하지 않습니다.
