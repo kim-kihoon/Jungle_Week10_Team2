@@ -132,19 +132,24 @@ namespace
 
 		/*
 			Axis System
-			FbxAxisSystem의 두 번째 인자 eParityOdd / eParityEven은 "앞 방향 축"을 결정하는 값.
+			엔진 좌표계는 left-handed, Z-up이며 축은 Forward=+X, Right=+Y, Up=+Z.
+			FBX SDK 문자열 표현은 right/up/forward 순서이므로 "yzx"가 엔진 축과 일치한다.
 		*/
-		const FbxAxisSystem EngineAxisSystem(
-			FbxAxisSystem::eZAxis,
-			FbxAxisSystem::eParityOdd,
-			FbxAxisSystem::eLeftHanded);
+		FbxAxisSystem EngineAxisSystem;
+		if (!FbxAxisSystem::ParseAxisSystem("yzx", EngineAxisSystem))
+		{
+			UE_LOG("FBX engine axis system parse failed. Path: %s", Context.SourcePath.c_str());
+			return;
+		}
 
 		const FbxAxisSystem CurrentAxisSystem =
 			Context.Scene->GetGlobalSettings().GetAxisSystem();
 
 		if (CurrentAxisSystem != EngineAxisSystem)
 		{
-			EngineAxisSystem.ConvertScene(Context.Scene);
+			// ConvertScene() cannot fully represent handedness changes. DeepConvertScene()
+			// converts transforms, vertices and animation curves for RH -> LH assets.
+			EngineAxisSystem.DeepConvertScene(Context.Scene);
 
 			UE_LOG("FBX axis system converted to engine axis system. Path: %s",
 				   Context.SourcePath.c_str());
