@@ -215,7 +215,8 @@ int32 AddBoneRecursive(FbxNode* BoneNode, FSkeletalMesh& OutMesh)
     BoneInfo.ParentIndex = ParentIndex;
     const int32 BoneIndex = OutMesh.RefSkeleton.Add(BoneInfo, FTransform(ConvertFbxMatrixToEngineMatrix(LocalTransform)));
 
-    // Store the inverse bind pose global matrix for skinning.
+    // Fallback inverse global bind pose matrix if not provided by skinning data.
+	// This is needed to ensure the skeleton can be used even without skinning.
     if (BoneIndex >= static_cast<int32>(OutMesh.InverseBindGlobalMatrices.size()))
     {
         OutMesh.InverseBindGlobalMatrices.resize(BoneIndex + 1, FMatrix::Identity);
@@ -381,7 +382,7 @@ void AssignTopNormalizedBoneInfluences(
     }
 }
 
-void BuildControlPointBoneInfluences(
+void BuildSkinClusterBindings(
     FbxMesh* Mesh,
     FSkeletalMesh& OutMesh,
     TArray<TArray<FControlPointInfluence>>& OutInfluences)
@@ -412,6 +413,7 @@ void BuildControlPointBoneInfluences(
                 continue;
             }
 
+			// Store the inverse bind pose global matrix for this bone.
             FbxAMatrix BindGlobalMatrix;
             Cluster->GetTransformLinkMatrix(BindGlobalMatrix);
             if (BoneIndex >= static_cast<int32>(OutMesh.InverseBindGlobalMatrices.size()))
@@ -452,6 +454,43 @@ void BuildBoundsAndFallbackTangents(FSkeletalMeshLODRenderData& LODData)
     }
 }
 
+void RebuildLocalTransforms(FSkeletalMesh& OutMesh)
+{
+    const int32 BoneCount = OutMesh.RefSkeleton.GetNum();
+    if (BoneCount <= 0)
+    {
+        return;
+    }
+
+    if (OutMesh.InverseBindGlobalMatrices.size() < static_cast<size_t>(BoneCount))
+    {
+        OutMesh.InverseBindGlobalMatrices.resize(BoneCount, FMatrix::Identity);
+    }
+
+    OutMesh.RefSkeleton.LocalTransforms.resize(BoneCount, FTransform::Identity);
+
+	// Compute local bind pose transforms from inverse global bind pose matrices.
+    TArray<FMatrix> BindGlobalMatrices;
+    BindGlobalMatrices.resize(BoneCount, FMatrix::Identity);
+    for (int32 BoneIndex = 0; BoneIndex < BoneCount; ++BoneIndex)
+    {
+        BindGlobalMatrices[BoneIndex] = OutMesh.InverseBindGlobalMatrices[BoneIndex].GetInverse();
+    }
+
+    for (int32 BoneIndex = 0; BoneIndex < BoneCount; ++BoneIndex)
+    {
+        const int32 ParentIndex = OutMesh.RefSkeleton.BoneInfo[BoneIndex].ParentIndex;
+        FMatrix LocalBindMatrix = BindGlobalMatrices[BoneIndex];
+        if (ParentIndex >= 0 && ParentIndex < BoneCount)
+        {
+            // Row-vector convention: ChildGlobal = Local * ParentGlobal.
+            LocalBindMatrix = BindGlobalMatrices[BoneIndex] * BindGlobalMatrices[ParentIndex].GetInverse();
+        }
+
+        OutMesh.RefSkeleton.LocalTransforms[BoneIndex] = FTransform(LocalBindMatrix);
+    }
+}
+
 void ImportSkeletalMeshData(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh, const FSkeletalMeshImportOptions& ImportOptions)
 {
     if (Node == nullptr || Mesh == nullptr)
@@ -465,12 +504,12 @@ void ImportSkeletalMeshData(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh
         OutMesh.RenderData.LODRenderData.emplace_back();
     }
 
-    // Build bone influences for control points.
+    // Build bone influences for control points and create inverse bind pose matrices for bones.
     FSkeletalMeshLODRenderData& LODData = OutMesh.RenderData.LODRenderData[0];
     TArray<TArray<FControlPointInfluence>> ControlPointInfluences;
-    BuildControlPointBoneInfluences(Mesh, OutMesh, ControlPointInfluences);
+    BuildSkinClusterBindings(Mesh, OutMesh, ControlPointInfluences);
 
-    // Map to track unique vertices and their indices, and material-based index lists.
+    // Get the geometric transform of the node to apply to vertex positions and normals.
     const FMatrix FbxGeometricTransformMatrix = GetFbxGeometricTransformMatrix(Node);
     FbxVector4* ControlPoints = Mesh->GetControlPoints();
     std::unordered_map<FVertexKey, uint32, FVertexKeyHash> VertexMap;
@@ -656,11 +695,8 @@ USkeletalMesh* FFbxImporter::ImportSkeletalMesh(const FString& Path, const FSkel
         ImportedMesh->InverseBindGlobalMatrices.push_back(FMatrix::Identity);
     }
 
-    // Ensure the inverse reference matrices array is large enough to hold all bones.
-    if (ImportedMesh->InverseBindGlobalMatrices.size() < ImportedMesh->RefSkeleton.BoneInfo.size())
-    {
-        ImportedMesh->InverseBindGlobalMatrices.resize(ImportedMesh->RefSkeleton.BoneInfo.size(), FMatrix::Identity);
-    }
+	// Rebuild local transforms from inverse bind pose global matrices.
+    RebuildLocalTransforms(*ImportedMesh);
 
     // Validate that we have valid vertex and index data before creating the skeletal mesh asset.
     const FSkeletalMeshLODRenderData& LODData = ImportedMesh->RenderData.LODRenderData[0];
