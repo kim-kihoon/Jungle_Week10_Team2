@@ -12,11 +12,12 @@ public:
 	void SetOpen(bool bInOpen) { bIsOpen = bInOpen; }
 	bool IsOpen() const { return bIsOpen; }
 
+	bool IsViewportInputActive() const { return PreviewScene.IsInputCaptured(); }
+
 	FSkeletalMeshPreviewScene* GetPreviewScene() { return &PreviewScene; }
 
 private:
 	void RenderToolbar();
-	void HandleViewportInput(float DeltaTime, bool bViewportHovered);
 
 	bool bIsOpen = false;
 	bool bViewportInputCaptured = false;

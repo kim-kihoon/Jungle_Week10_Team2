@@ -7,6 +7,8 @@
 
 #include "Component/SkeletalMeshComponent.h"
 
+#include <windows.h>
+
 static int32 GPreviewWorldCounter = 0;
 
 FSkeletalMeshPreviewScene::~FSkeletalMeshPreviewScene()
@@ -28,6 +30,10 @@ void FSkeletalMeshPreviewScene::Initialize(UEditorEngine* InEditor)
 	ViewportClient.SetState(&PreviewViewport.GetState());
 	ViewportClient.SetViewportType(EVT_Perspective);
 	ViewportClient.ApplyCameraMode();
+
+	// 입력 설정
+	PreviewInputController.SetViewportClient(&ViewportClient);
+	PreviewInputRouter.SetEditorWorldController(&PreviewInputController);
 
 	// 월드 생성
 	std::string ContextName = "SkeletalMeshViewer_Preview_" + std::to_string(GPreviewWorldCounter++);
@@ -70,6 +76,32 @@ void FSkeletalMeshPreviewScene::Shutdown()
 
 void FSkeletalMeshPreviewScene::Tick(float DeltaTime)
 {
+	const bool bMouseControlDown = FInputRouter::GetKey(VK_RBUTTON) || FInputRouter::GetKey(VK_MBUTTON);
+	const bool bPreviewCaptureBegin =
+		bPreviewHovered &&
+		(FInputRouter::GetKeyDown(VK_RBUTTON) || FInputRouter::GetKeyDown(VK_MBUTTON));
+
+	if (bPreviewCaptureBegin)
+	{
+		bPreviewInputCaptured = true;
+	}
+	else if (!bMouseControlDown)
+	{
+		bPreviewInputCaptured = false;
+	}
+
+	FInputRouteContext Context;
+	Context.Window = Editor->GetWindow(); // 엔진 창 핸들 (엔진 시스템에 맞춰 GetMainWindow() 등으로 변경 필요할 수 있음)
+	Context.ViewportRect = PreviewInputRect;
+	Context.bHovered = bPreviewHovered || bPreviewInputCaptured;
+	Context.bInputActive = true;
+	Context.bControlLocked = false;
+	Context.bHasActiveCamera = true;
+	Context.bIgnoreGuiBlock = true;
+
+	PreviewInputRouter.Tick(DeltaTime, Context);
+
+	// Viewport, Camera Update
 	ViewportClient.Tick(DeltaTime);
 }
 
@@ -106,4 +138,14 @@ void FSkeletalMeshPreviewScene::SetViewportSize(uint32 Width, uint32 Height)
 {
 	PreviewViewport.SetRect(FViewportRect(0, 0, Width, Height));
 	ViewportClient.SetViewportSize(static_cast<float>(Width), static_cast<float>(Height));
+}
+
+void FSkeletalMeshPreviewScene::SetInputRectFromScreenRect(float MinX, float MinY, float MaxX, float MaxY)
+{
+	int32 X = static_cast<int32>(MinX);
+	int32 Y = static_cast<int32>(MinY);
+	int32 Width = static_cast<int32>(MaxX - MinX);
+	int32 Height = static_cast<int32>(MaxY - MinY);
+
+	PreviewInputRect = FViewportRect(X, Y, Width, Height);
 }

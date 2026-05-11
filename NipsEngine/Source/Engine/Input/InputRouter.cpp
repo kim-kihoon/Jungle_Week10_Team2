@@ -298,7 +298,7 @@ void FInputRouter::TickCursorCapture(const FInputRouteContext& Context)
 
 	if (WorldType == EWorldType::Editor)
 	{
-		if (IS.GetGuiInputState().bBlockViewportInput)
+		if (!Context.bIgnoreGuiBlock && IS.GetGuiInputState().bBlockViewportInput)
 		{
 			return;
 		}
@@ -361,7 +361,7 @@ void FInputRouter::TickKeyboardInput(const FInputRouteContext& Context)
 {
 	const InputSystem& IS = InputSystem::Get();
 	const FGuiInputState& GuiState = IS.GetGuiInputState();
-	if (GuiState.bBlockViewportInput)
+	if (!Context.bIgnoreGuiBlock && GuiState.bBlockViewportInput)
 	{
 		return;
 	}
@@ -459,7 +459,7 @@ void FInputRouter::TickKeyboardInput(const FInputRouteContext& Context)
 void FInputRouter::TickMouseInput(const FInputRouteContext& Context)
 {
 	const InputSystem& IS = InputSystem::Get();
-	if (IS.GetGuiInputState().bBlockViewportInput)
+	if (!Context.bIgnoreGuiBlock && IS.GetGuiInputState().bBlockViewportInput)
 		return;
 
 	POINT MousePoint = IS.GetMousePos();

@@ -231,9 +231,11 @@ void FEditorMainPanel::Update()
 		IO.ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
 	}
 
+	const bool bPreviewViewportInputActive =
+		bShowSkeletalMeshViewer && SkeletalMeshViewerWidget.IsViewportInputActive();
 	const bool bPropertyModalBlockingInput = PropertyWidget.IsModalInputBlocking();
 	FGuiInputState& GuiState = FInputRouter::GetGuiInputState();
-	GuiState.bBlockViewportInput = bPropertyModalBlockingInput;
+	GuiState.bBlockViewportInput = bPropertyModalBlockingInput || bPreviewViewportInputActive;
 	GuiState.bUsingMouse = bPropertyModalBlockingInput || (bViewportOperationActive ? false : IO.WantCaptureMouse);
 	GuiState.bUsingKeyboard = bPropertyModalBlockingInput || IO.WantCaptureKeyboard;
 

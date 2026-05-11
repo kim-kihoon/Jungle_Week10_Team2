@@ -5,6 +5,8 @@
 #include "Editor/Viewport/FSceneViewport.h" 
 #include "Editor/Viewport/SkeletalMeshPreviewViewportClient.h"
 
+#include "Editor/Input/SkeletalMeshPreviewController.h"
+
 class UEditorEngine;
 class UWorld;
 class AActor;
@@ -36,6 +38,11 @@ public:
 	AActor* GetPreviewActor() const { return PreviewActor; }
 	FSkeletalMeshPreviewViewportClient& GetViewportClient() { return ViewportClient; }
 
+	void SetInputRectFromScreenRect(float MinX, float MinY, float MaxX, float MaxY);
+	void SetViewportHovered(bool bHovered) { bPreviewHovered = bHovered; }
+
+	bool IsInputCaptured() const { return bPreviewInputCaptured; }
+
 private:
 	UEditorEngine* Editor = nullptr;
 	FName WorldHandle;
@@ -45,4 +52,11 @@ private:
 
 	UWorld* PreviewWorld = nullptr;
 	AActor* PreviewActor = nullptr;
+
+	FInputRouter PreviewInputRouter;
+	FSkeletalMeshPreviewController PreviewInputController;
+
+	FViewportRect PreviewInputRect;
+	bool bPreviewHovered = false;
+	bool bPreviewInputCaptured = false;
 };

@@ -105,7 +105,7 @@ void FEditorViewportLayout::UpdateHoverStates()
 
 	// Viewport host 밖이면 모든 hover를 해제합니다.
 
-	if (!GuiState.IsInViewportHost(MouseX, MouseY))
+	if (GuiState.bBlockViewportInput || GuiState.bUsingMouse)
 	{
 		for (int32 i = 0; i < MaxViewports; ++i)
 		{

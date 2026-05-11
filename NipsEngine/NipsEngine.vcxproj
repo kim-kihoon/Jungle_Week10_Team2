@@ -168,6 +168,7 @@ if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" xcopy /Y /D
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Game|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="Source\Editor\Input\SkeletalMeshPreviewController.cpp" />
     <ClCompile Include="Source\Editor\Selection\SelectionManager.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Game|x64'">true</ExcludedFromBuild>
@@ -840,6 +841,7 @@ if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" xcopy /Y /D
     <ClInclude Include="Source\Editor\Input\BaseEditorController.h" />
     <ClInclude Include="Source\Editor\Input\EditorWorldController.h" />
     <ClInclude Include="Source\Editor\Input\PIEController.h" />
+    <ClInclude Include="Source\Editor\Input\SkeletalMeshPreviewController.h" />
     <ClInclude Include="Source\Editor\Selection\SelectionManager.h" />
     <ClInclude Include="Source\Editor\Settings\EditorSettings.h" />
     <ClInclude Include="Source\Editor\SkeletalMesh\SkeletalMeshPreviewScene.h" />
