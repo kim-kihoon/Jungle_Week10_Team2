@@ -22,6 +22,12 @@ void FSkeletalMeshPreviewViewportClient::BuildSceneView(FSceneView& OutView) con
 	Camera.BuildSceneView(OutView, Rect, EViewMode::Lit);
 }
 
+void FSkeletalMeshPreviewViewportClient::SetViewportSize(float InWidth, float InHeight)
+{
+	FViewportClient::SetViewportSize(InWidth, InHeight);
+	Camera.OnResize(static_cast<uint32>(WindowWidth), static_cast<uint32>(WindowHeight));
+}
+
 void FSkeletalMeshPreviewViewportClient::AddOrbitInput(float DeltaYaw, float DeltaPitch)
 {
 	OrbitYaw += DeltaYaw;

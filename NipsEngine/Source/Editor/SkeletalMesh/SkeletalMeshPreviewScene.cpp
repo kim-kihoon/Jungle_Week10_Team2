@@ -3,6 +3,9 @@
 #include "GameFramework/World.h"
 #include "GameFramework/WorldContext.h"
 #include "GameFramework/PrimitiveActors.h"
+#include "Engine/Core/ResourceManager.h"
+
+#include "Component/SkeletalMeshComponent.h"
 
 static int32 GPreviewWorldCounter = 0;
 
@@ -33,10 +36,19 @@ void FSkeletalMeshPreviewScene::Initialize(UEditorEngine* InEditor)
 	PreviewWorld->SetActiveCamera(ViewportClient.GetCamera());
 
 	// Preview용 액터 스폰
-	PreviewActor = PreviewWorld->SpawnActor<ASceneActor>();
+	PreviewActor = PreviewWorld->SpawnActor<ASkeletalMeshActor>();
+	PreviewActor->InitDefaultComponents();
+
+	USkeletalMeshComponent* PreviewMeshComponent = static_cast<USkeletalMeshComponent*>(PreviewActor->GetRootComponent());
+	USkeletalMesh* Mesh = FResourceManager::Get().LoadSkeletalMesh("Asset/Fbx/SKM_Quinn_Simple.FBX");
+	if (PreviewMeshComponent && Mesh)
+	{
+		PreviewMeshComponent->SetSkeletalMesh(Mesh);
+	}
 
 	// Directional Light 액터 스폰
 	auto* LightActor = PreviewWorld->SpawnActor<ADirectionalLightActor>();
+	LightActor->InitDefaultComponents();
 }
 
 void FSkeletalMeshPreviewScene::Shutdown()

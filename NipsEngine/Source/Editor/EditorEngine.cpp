@@ -319,18 +319,22 @@ void UEditorEngine::Init(FWindowsWindow* InWindow)
 	FEditorSettings::Get().LoadFromFile(FEditorSettings::GetDefaultSettingsPath());
 	SyncEngineSettings();
 
-	MainPanel.Create(Window, Renderer, this);
-	if (WorldList.empty())
+	if (GetEditorWorldHandle() == FName::None)
 	{
 		CreateWorldContext(EWorldType::Editor, FName("Default"));
 	}
-	SetActiveWorld(WorldList[0].ContextHandle);
+	SetActiveWorld(GetEditorWorldHandle());
 	ApplySpatialIndexMaintenanceSettings();
+
+	MainPanel.Create(Window, Renderer, this);
 
 	// Selection & Gizmo
 	SelectionManager.Init();
 	ViewportLayout.Init(InWindow, GetWorld(), &SelectionManager, this);
-	GetFocusedWorld()->SetActiveCamera(GetCamera());
+	if (UWorld* FocusedWorld = GetFocusedWorld())
+	{
+		FocusedWorld->SetActiveCamera(GetCamera());
+	}
 
 	// Slate 초기화 및 Viewport Layout 추가
 	FSlateApplication::Get().Initialize();
@@ -944,13 +948,22 @@ void UEditorEngine::ClearScene()
 {
 	SelectionManager.ClearSelection();
 
-	for (FWorldContext& Ctx : WorldList)
+	for (auto It = WorldList.begin(); It != WorldList.end();)
 	{
-		Ctx.World->EndPlay(EEndPlayReason::Type::LevelTransition);
-		UObjectManager::Get().DestroyObject(Ctx.World);
+		if (It->WorldType == EWorldType::ViewerPreview)
+		{
+			++It;
+			continue;
+		}
+
+		if (It->World)
+		{
+			It->World->EndPlay(EEndPlayReason::Type::LevelTransition);
+			UObjectManager::Get().DestroyObject(It->World);
+		}
+		It = WorldList.erase(It);
 	}
 
-	WorldList.clear();
 	ActiveWorldHandle = FName::None;
 
 	for (int32 i = 0; i < FEditorViewportLayout::MaxViewports; ++i)

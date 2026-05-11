@@ -17,6 +17,7 @@ public:
 	virtual void BuildSceneView(FSceneView& OutView) const override;
 
 	void SetPreviewScene(FSkeletalMeshPreviewScene* InScene) { PreviewScene = InScene; }
+	void SetViewportSize(float InWidth, float InHeight) override;
 	FViewportCamera* GetCamera() { return &Camera; }
 
 	// 마우스 입력을 통한 Orbit 카메라 제어용 함수
