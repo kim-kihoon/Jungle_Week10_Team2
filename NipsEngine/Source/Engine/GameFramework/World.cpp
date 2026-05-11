@@ -16,7 +16,9 @@ namespace
 {
 	bool ShouldRunBeginPlay(EWorldType WorldType)
 	{
-		return WorldType == EWorldType::PIE || WorldType == EWorldType::Game;
+		return WorldType == EWorldType::PIE ||
+			WorldType == EWorldType::ViewerPreview ||
+			WorldType == EWorldType::Game;
 	}
 }
 

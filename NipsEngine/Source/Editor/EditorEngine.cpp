@@ -28,6 +28,7 @@
 #include "Settings/EditorSettings.h"
 #include "Settings/EngineSettings.h"
 #include <algorithm>
+#include <utility>
 
 DEFINE_CLASS(UEditorEngine, UEngine)
 REGISTER_FACTORY(UEditorEngine)
@@ -319,12 +320,15 @@ void UEditorEngine::Init(FWindowsWindow* InWindow)
 	FEditorSettings::Get().LoadFromFile(FEditorSettings::GetDefaultSettingsPath());
 	SyncEngineSettings();
 
-	MainPanel.Create(Window, Renderer, this);
-	if (WorldList.empty())
+	FName EditorWorldHandle = GetEditorWorldHandle();
+	if (EditorWorldHandle == FName::None)
 	{
-		CreateWorldContext(EWorldType::Editor, FName("Default"));
+		FWorldContext& EditorContext = CreateWorldContext(EWorldType::Editor, FName("Default"));
+		EditorWorldHandle = EditorContext.ContextHandle;
 	}
-	SetActiveWorld(WorldList[0].ContextHandle);
+	SetActiveWorld(EditorWorldHandle);
+
+	MainPanel.Create(Window, Renderer, this);
 	ApplySpatialIndexMaintenanceSettings();
 
 	// Selection & Gizmo
@@ -924,13 +928,23 @@ void UEditorEngine::ClearScene()
 {
 	SelectionManager.ClearSelection();
 
+	TArray<FWorldContext> PreservedPreviewContexts;
 	for (FWorldContext& Ctx : WorldList)
 	{
-		Ctx.World->EndPlay(EEndPlayReason::Type::LevelTransition);
-		UObjectManager::Get().DestroyObject(Ctx.World);
+		if (Ctx.WorldType == EWorldType::ViewerPreview)
+		{
+			PreservedPreviewContexts.push_back(Ctx);
+			continue;
+		}
+
+		if (Ctx.World)
+		{
+			Ctx.World->EndPlay(EEndPlayReason::Type::LevelTransition);
+			UObjectManager::Get().DestroyObject(Ctx.World);
+		}
 	}
 
-	WorldList.clear();
+	WorldList = std::move(PreservedPreviewContexts);
 	ActiveWorldHandle = FName::None;
 
 	for (int32 i = 0; i < FEditorViewportLayout::MaxViewports; ++i)

@@ -1,6 +1,7 @@
 ﻿#include "EditorRenderPipeline.h"
 
 #include "Editor/EditorEngine.h"
+#include "Editor/SkeletalMesh/SkeletalMeshPreviewScene.h"
 #include "Engine/Viewport/ViewportCamera.h"
 #include "Render/Renderer/Renderer.h"
 #include "GameFramework/World.h"
@@ -40,6 +41,11 @@ void FEditorRenderPipeline::Execute(float DeltaTime, FRenderer& Renderer)
 	for (int32 i = 0; i < FEditorViewportLayout::MaxViewports; ++i)
 	{
 		RenderViewport(Renderer, i);
+	}
+
+	if (FSkeletalMeshPreviewScene* PreviewScene = Editor->GetMainPanel().GetSkeletalMeshPreviewScene())
+	{
+		RenderSkeletalMeshPreview(Renderer, *PreviewScene);
 	}
 
 	Renderer.UseBackBufferRenderTargets();
@@ -116,6 +122,42 @@ void FEditorRenderPipeline::RenderViewport(FRenderer& Renderer, int32 ViewportIn
 	{
 		GameUISystem::Get().RenderToCurrentTarget(EUIRenderMode::Play, SceneView.ViewRect.Width, SceneView.ViewRect.Height);
 	}
+}
+
+void FEditorRenderPipeline::RenderSkeletalMeshPreview(FRenderer& Renderer, FSkeletalMeshPreviewScene& PreviewScene)
+{
+	FSceneView SceneView;
+	PreviewScene.GetViewportClient().BuildSceneView(SceneView);
+
+	const FViewportRect& Rect = SceneView.ViewRect;
+	if (Rect.Width <= 0 || Rect.Height <= 0 || !PreviewScene.GetWorld())
+	{
+		return;
+	}
+
+	FSceneViewport& SceneViewport = PreviewScene.GetSceneViewport();
+	FViewportRenderResource& ViewportResource =
+		Renderer.AcquireViewportResource(Rect.Width, Rect.Height, PreviewScene.GetViewportIndex());
+	SceneViewport.SetRenderTargetSet(&ViewportResource.GetView());
+
+	Renderer.BeginViewportFrame(SceneViewport.GetViewportRenderTargets());
+
+	const FEditorSettings& Settings = Editor->GetSettings();
+	Renderer.GetEditorLineBatcher().Clear();
+	Collector.SetLineBatcher(&Renderer.GetEditorLineBatcher());
+
+	Bus.Clear();
+	Bus.SetSceneView(SceneView);
+	Bus.SetRenderSettings(SceneView.ViewMode, Settings.ShowFlags);
+	Bus.SetFXAAEnabled(Settings.bEnableFXAA && !SceneView.bOrthographic);
+	Bus.SetShadowFilterType(Settings.ShadowFilterType);
+
+	const FFrustum& ViewFrustum = SceneView.CameraFrustum;
+	Collector.CollectWorld(PreviewScene.GetWorld(), Settings.ShowFlags, SceneView.ViewMode, Bus, &ViewFrustum);
+	Collector.CollectDebugBounds(PreviewScene.GetWorld(), Settings.ShowFlags, SceneView.ViewMode, Bus);
+
+	Renderer.PrepareBatchers(Bus);
+	Renderer.Render(Bus);
 }
 
 // 지정한 에디터 뷰포트의 렌더 타겟과 RenderBus 기본 상태를 준비합니다.

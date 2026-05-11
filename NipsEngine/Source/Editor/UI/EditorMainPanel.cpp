@@ -144,12 +144,13 @@ void FEditorMainPanel::Create(FWindowsWindow* InWindow, FRenderer& InRenderer, U
 	StatWidget.Initialize(InEditorEngine);
 	PlayStreamWidget.Initialize(InEditorEngine);
 	CameraShakeWidget.Initialize(InEditorEngine);
+	SkeletalMeshViewerWidget.Initialize(InEditorEngine);
 	ToolbarWidget.Initialize(InEditorEngine);
 	ToolbarWidget.SetViewportOverlayWidget(&ViewportOverlayWidget);
 	ToolbarWidget.SetSceneWidget(&SceneWidget);
 	ToolbarWidget.SetPlayStreamWidget(&PlayStreamWidget);
 	ToolbarWidget.SetPanelVisibilityRefs(&bShowConsole, &bShowControl, &bShowProperty, &bShowSceneManager,
-										 &bShowMaterialEditor, &bShowStatProfiler);
+										 &bShowMaterialEditor, &bShowStatProfiler, &bShowSkeletalMeshViewer);
 }
 
 void FEditorMainPanel::Release()
@@ -187,6 +188,9 @@ void FEditorMainPanel::Render(float DeltaTime)
 		StatWidget.Render(DeltaTime);
 	if (bShowCameraShake)
 		CameraShakeWidget.Render(DeltaTime);
+	SkeletalMeshViewerWidget.SetOpen(bShowSkeletalMeshViewer);
+	SkeletalMeshViewerWidget.Render(DeltaTime);
+	bShowSkeletalMeshViewer = SkeletalMeshViewerWidget.IsOpen();
 	ViewportOverlayWidget.Render(DeltaTime);
 
 	// 게임 UI는 PIE 중에만 표시합니다. 편집 중에는 씬 작업을 방해하지 않습니다.
@@ -227,10 +231,12 @@ void FEditorMainPanel::Update()
 	}
 
 	const bool bPropertyModalBlockingInput = PropertyWidget.IsModalInputBlocking();
+	const bool bSkeletalMeshViewerBlockingInput = SkeletalMeshViewerWidget.IsViewportInputActive();
 	FGuiInputState& GuiState = FInputRouter::GetGuiInputState();
-	GuiState.bBlockViewportInput = bPropertyModalBlockingInput;
-	GuiState.bUsingMouse = bPropertyModalBlockingInput || (bViewportOperationActive ? false : IO.WantCaptureMouse);
-	GuiState.bUsingKeyboard = bPropertyModalBlockingInput || IO.WantCaptureKeyboard;
+	GuiState.bBlockViewportInput = bPropertyModalBlockingInput || bSkeletalMeshViewerBlockingInput;
+	GuiState.bUsingMouse =
+		bPropertyModalBlockingInput || bSkeletalMeshViewerBlockingInput || (bViewportOperationActive ? false : IO.WantCaptureMouse);
+	GuiState.bUsingKeyboard = bPropertyModalBlockingInput || bSkeletalMeshViewerBlockingInput || IO.WantCaptureKeyboard;
 
 	// IME는 ImGui가 텍스트 입력을 원할 때만 활성화.
 	// 그 외에는 OS 수준에서 IME 컨텍스트를 NULL로 연결해 한글 조합이
@@ -302,6 +308,7 @@ void FEditorMainPanel::EnsureDefaultDockLayout(ImGuiID DockspaceId)
 	ImGui::DockBuilderDockWindow("Jungle Property Window", RightBottomNode);
 	ImGui::DockBuilderDockWindow("Material Editor", RightBottomNode);
 	ImGui::DockBuilderDockWindow("ObjViewer Panel", RightBottomNode);
+	ImGui::DockBuilderDockWindow("SkeletalMesh Viewer", RightBottomNode);
 
 	ImGui::DockBuilderFinish(DockspaceId);
 }

@@ -64,10 +64,15 @@ void FInputRouter::Tick(float DeltaTime, const FInputRouteContext& Context)
 
 	SetViewportDim(static_cast<float>(Context.ViewportRect.X), static_cast<float>(Context.ViewportRect.Y), static_cast<float>(Context.ViewportRect.Width), static_cast<float>(Context.ViewportRect.Height));
 
+	const bool bBlockedByGui = !Context.bIgnoreGuiBlock && GetGuiInputState().bBlockViewportInput;
 	UpdateControllerModifiers();
 	if (IInputController* Controller = GetActiveController())
 	{
-		Controller->SetInputEnabled(Context.bInputActive && !Context.bControlLocked);
+		Controller->SetInputEnabled(Context.bInputActive && !Context.bControlLocked && !bBlockedByGui);
+	}
+	if (bBlockedByGui)
+	{
+		return;
 	}
 	TickCursorCapture(Context);
 	Tick(DeltaTime);
@@ -298,7 +303,7 @@ void FInputRouter::TickCursorCapture(const FInputRouteContext& Context)
 
 	if (WorldType == EWorldType::Editor)
 	{
-		if (IS.GetGuiInputState().bBlockViewportInput)
+		if (!Context.bIgnoreGuiBlock && IS.GetGuiInputState().bBlockViewportInput)
 		{
 			return;
 		}
@@ -361,7 +366,7 @@ void FInputRouter::TickKeyboardInput(const FInputRouteContext& Context)
 {
 	const InputSystem& IS = InputSystem::Get();
 	const FGuiInputState& GuiState = IS.GetGuiInputState();
-	if (GuiState.bBlockViewportInput)
+	if (!Context.bIgnoreGuiBlock && GuiState.bBlockViewportInput)
 	{
 		return;
 	}
@@ -412,7 +417,7 @@ void FInputRouter::TickKeyboardInput(const FInputRouteContext& Context)
 		return;
 	}
 
-	if (GuiState.bUsingKeyboard)
+	if (!Context.bIgnoreGuiBlock && GuiState.bUsingKeyboard)
 	{
 		return;
 	}
@@ -459,7 +464,7 @@ void FInputRouter::TickKeyboardInput(const FInputRouteContext& Context)
 void FInputRouter::TickMouseInput(const FInputRouteContext& Context)
 {
 	const InputSystem& IS = InputSystem::Get();
-	if (IS.GetGuiInputState().bBlockViewportInput)
+	if (!Context.bIgnoreGuiBlock && IS.GetGuiInputState().bBlockViewportInput)
 		return;
 
 	POINT MousePoint = IS.GetMousePos();

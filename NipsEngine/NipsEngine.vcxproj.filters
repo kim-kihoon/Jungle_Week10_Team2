@@ -22,6 +22,9 @@
     <Filter Include="Source\Editor\Settings">
       <UniqueIdentifier>{1393aad3-59b4-8a7e-bf2a-94277bd1f371}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Editor\SkeletalMesh">
+      <UniqueIdentifier>{ab3f9928-d8ed-4c5f-8c74-81cf49324462}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Source\Editor\UI">
       <UniqueIdentifier>{bc6f9cd9-3513-78f0-0505-1eb95e34498d}</UniqueIdentifier>
     </Filter>
@@ -296,6 +299,12 @@
     <ClCompile Include="Source\Editor\Input\PIEController.cpp">
       <Filter>Source\Editor\Input</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Editor\Input\SkeletalMeshPreviewController.cpp">
+      <Filter>Source\Editor\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Editor\SkeletalMesh\SkeletalMeshPreviewScene.cpp">
+      <Filter>Source\Editor\SkeletalMesh</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Editor\Selection\SelectionManager.cpp">
       <Filter>Source\Editor\Selection</Filter>
     </ClCompile>
@@ -329,6 +338,9 @@
     <ClCompile Include="Source\Editor\UI\EditorSceneWidget.cpp">
       <Filter>Source\Editor\UI</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Editor\UI\EditorSkeletalMeshViewerWidget.cpp">
+      <Filter>Source\Editor\UI</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Editor\UI\EditorStatWidget.cpp">
       <Filter>Source\Editor\UI</Filter>
     </ClCompile>
@@ -351,6 +363,9 @@
       <Filter>Source\Editor\Viewport</Filter>
     </ClCompile>
     <ClCompile Include="Source\Editor\Viewport\FSceneViewport.cpp">
+      <Filter>Source\Editor\Viewport</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Editor\Viewport\SkeletalMeshPreviewViewportClient.cpp">
       <Filter>Source\Editor\Viewport</Filter>
     </ClCompile>
     <ClCompile Include="Source\Editor\Viewport\ViewportLayout.cpp">
@@ -957,6 +972,12 @@
     <ClInclude Include="Source\Editor\Input\PIEController.h">
       <Filter>Source\Editor\Input</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Editor\Input\SkeletalMeshPreviewController.h">
+      <Filter>Source\Editor\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Editor\SkeletalMesh\SkeletalMeshPreviewScene.h">
+      <Filter>Source\Editor\SkeletalMesh</Filter>
+    </ClInclude>
     <ClInclude Include="Source\Editor\Selection\SelectionManager.h">
       <Filter>Source\Editor\Selection</Filter>
     </ClInclude>
@@ -990,6 +1011,9 @@
     <ClInclude Include="Source\Editor\UI\EditorSceneWidget.h">
       <Filter>Source\Editor\UI</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Editor\UI\EditorSkeletalMeshViewerWidget.h">
+      <Filter>Source\Editor\UI</Filter>
+    </ClInclude>
     <ClInclude Include="Source\Editor\UI\EditorStatWidget.h">
       <Filter>Source\Editor\UI</Filter>
     </ClInclude>
@@ -1018,6 +1042,9 @@
       <Filter>Source\Editor\Viewport</Filter>
     </ClInclude>
     <ClInclude Include="Source\Editor\Viewport\SEditorViewport.h">
+      <Filter>Source\Editor\Viewport</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Editor\Viewport\SkeletalMeshPreviewViewportClient.h">
       <Filter>Source\Editor\Viewport</Filter>
     </ClInclude>
     <ClInclude Include="Source\Editor\Viewport\ViewportLayout.h">

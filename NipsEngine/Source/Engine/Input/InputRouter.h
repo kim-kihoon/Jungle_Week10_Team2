@@ -19,6 +19,7 @@ struct FInputRouteContext
 	bool bInputActive = true;
 	bool bHasActiveCamera = false;
 	bool bUseCustomCursor = false;
+	bool bIgnoreGuiBlock = false;
 };
 
 class FInputRouter
