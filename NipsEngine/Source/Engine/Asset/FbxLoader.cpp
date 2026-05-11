@@ -188,6 +188,7 @@ int32 AddBoneRecursive(FbxNode* BoneNode, FSkeletalMesh& OutMesh)
         return -1;
     }
 
+    // Check if this bone already exists in the skeleton.
     const FString BoneName = FbxNameToString(BoneNode->GetName());
     const int32 ExistingIndex = OutMesh.RefSkeleton.FindBoneIndex(BoneName);
     if (ExistingIndex >= 0)
@@ -195,6 +196,7 @@ int32 AddBoneRecursive(FbxNode* BoneNode, FSkeletalMesh& OutMesh)
         return ExistingIndex;
     }
 
+    // Recursively add parent bones first.
     int32 ParentIndex = -1;
     FbxNode* ParentNode = BoneNode->GetParent();
     if (ParentNode != nullptr)
@@ -206,17 +208,19 @@ int32 AddBoneRecursive(FbxNode* BoneNode, FSkeletalMesh& OutMesh)
         }
     }
 
-    FbxAMatrix RefLocalMatrix = BoneNode->EvaluateLocalTransform();
+    // Add this bone to the skeleton.
+    FbxAMatrix LocalTransform = BoneNode->EvaluateLocalTransform();
     FBoneInfo BoneInfo;
     BoneInfo.Name = BoneName;
     BoneInfo.ParentIndex = ParentIndex;
-    const int32 BoneIndex = OutMesh.RefSkeleton.Add(BoneInfo, FTransform(ConvertFbxMatrixToEngineMatrix(RefLocalMatrix)));
+    const int32 BoneIndex = OutMesh.RefSkeleton.Add(BoneInfo, FTransform(ConvertFbxMatrixToEngineMatrix(LocalTransform)));
 
-    if (BoneIndex >= static_cast<int32>(OutMesh.InverseRefMatrices.size()))
+    // Store the inverse bind pose global matrix for skinning.
+    if (BoneIndex >= static_cast<int32>(OutMesh.InverseBindGlobalMatrices.size()))
     {
-        OutMesh.InverseRefMatrices.resize(BoneIndex + 1, FMatrix::Identity);
+        OutMesh.InverseBindGlobalMatrices.resize(BoneIndex + 1, FMatrix::Identity);
     }
-    OutMesh.InverseRefMatrices[BoneIndex] = ConvertFbxMatrixToEngineMatrix(BoneNode->EvaluateGlobalTransform()).GetInverse();
+    OutMesh.InverseBindGlobalMatrices[BoneIndex] = ConvertFbxMatrixToEngineMatrix(BoneNode->EvaluateGlobalTransform()).GetInverse();
 
     return BoneIndex;
 }
@@ -234,6 +238,7 @@ void CollectSkeletonNodes(FbxNode* Node, FSkeletalMesh& OutMesh)
         AddBoneRecursive(Node, OutMesh);
     }
 
+    // Recursively collect from child nodes.
     for (int32 ChildIndex = 0; ChildIndex < Node->GetChildCount(); ++ChildIndex)
     {
         CollectSkeletonNodes(Node->GetChild(ChildIndex), OutMesh);
@@ -384,6 +389,7 @@ void BuildControlPointBoneInfluences(
     OutInfluences.clear();
     OutInfluences.resize(Mesh->GetControlPointsCount());
 
+    // Iterate through skin deformers to collect bone influences for each control point.
     for (int32 DeformerIndex = 0; DeformerIndex < Mesh->GetDeformerCount(FbxDeformer::eSkin); ++DeformerIndex)
     {
         FbxSkin* Skin = static_cast<FbxSkin*>(Mesh->GetDeformer(DeformerIndex, FbxDeformer::eSkin));
@@ -391,7 +397,7 @@ void BuildControlPointBoneInfluences(
         {
             continue;
         }
-
+		
         for (int32 ClusterIndex = 0; ClusterIndex < Skin->GetClusterCount(); ++ClusterIndex)
         {
             FbxCluster* Cluster = Skin->GetCluster(ClusterIndex);
@@ -408,11 +414,11 @@ void BuildControlPointBoneInfluences(
 
             FbxAMatrix TransformLinkMatrix;
             Cluster->GetTransformLinkMatrix(TransformLinkMatrix);
-            if (BoneIndex >= static_cast<int32>(OutMesh.InverseRefMatrices.size()))
+            if (BoneIndex >= static_cast<int32>(OutMesh.InverseBindGlobalMatrices.size()))
             {
-                OutMesh.InverseRefMatrices.resize(BoneIndex + 1, FMatrix::Identity);
+                OutMesh.InverseBindGlobalMatrices.resize(BoneIndex + 1, FMatrix::Identity);
             }
-            OutMesh.InverseRefMatrices[BoneIndex] = ConvertFbxMatrixToEngineMatrix(TransformLinkMatrix).GetInverse();
+            OutMesh.InverseBindGlobalMatrices[BoneIndex] = ConvertFbxMatrixToEngineMatrix(TransformLinkMatrix).GetInverse();
 
             const int32* ControlPointIndices = Cluster->GetControlPointIndices();
             const double* ControlPointWeights = Cluster->GetControlPointWeights();
@@ -453,20 +459,24 @@ void ImportSkeletalMeshData(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh
         return;
     }
 
+    // Ensure there is at least one LOD level in the skeletal mesh.
     if (OutMesh.RenderData.LODRenderData.empty())
     {
         OutMesh.RenderData.LODRenderData.emplace_back();
     }
 
+    // Build bone influences for control points.
     FSkeletalMeshLODRenderData& LODData = OutMesh.RenderData.LODRenderData[0];
     TArray<TArray<FControlPointInfluence>> ControlPointInfluences;
     BuildControlPointBoneInfluences(Mesh, OutMesh, ControlPointInfluences);
 
+    // Map to track unique vertices and their indices, and material-based index lists.
     const FMatrix FbxGeometricTransformMatrix = GetFbxGeometricTransformMatrix(Node);
     FbxVector4* ControlPoints = Mesh->GetControlPoints();
     std::unordered_map<FVertexKey, uint32, FVertexKeyHash> VertexMap;
     TArray<TArray<uint32>> IndicesByMaterial;
 
+    // Iterate through polygons to build vertices and indices.
     const int32 PolygonCount = Mesh->GetPolygonCount();
     for (int32 PolygonIndex = 0; PolygonIndex < PolygonCount; ++PolygonIndex)
     {
@@ -476,6 +486,7 @@ void ImportSkeletalMeshData(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh
             continue;
         }
 
+        // Determine material slot index for this polygon.
         const int32 MaterialSlotIndex = GetPolygonMaterialSlotIndex(Mesh, Node, PolygonIndex, OutMesh);
         if (MaterialSlotIndex >= static_cast<int32>(IndicesByMaterial.size()))
         {
@@ -484,23 +495,27 @@ void ImportSkeletalMeshData(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh
 
         for (int32 VertexInPolygon = 0; VertexInPolygon < 3; ++VertexInPolygon)
         {
+            // Get the control point index for this vertex and validate it.
             const int32 ControlPointIndex = Mesh->GetPolygonVertex(PolygonIndex, VertexInPolygon);
             if (ControlPointIndex < 0)
             {
                 continue;
             }
 
+            // Retrieve normal and UV for this vertex, and track their indices for vertex uniqueness.
             int32 NormalIndex = -1;
             int32 UVIndex = -1;
             const FVector Normal = FbxGeometricTransformMatrix.TransformVector(GetPolygonNormal(Mesh, PolygonIndex, VertexInPolygon, NormalIndex)).GetSafeNormal();
             const FVector2 UV = GetPolygonUV(Mesh, PolygonIndex, VertexInPolygon, UVIndex);
 
+            // Create a vertex key based on control point, normal, UV, and material to ensure uniqueness.
             FVertexKey Key;
             Key.ControlPointIndex = ControlPointIndex;
             Key.NormalIndex = NormalIndex;
             Key.UVIndex = UVIndex;
             Key.MaterialSlotIndex = MaterialSlotIndex;
 
+            // Check if a vertex with the same key already exists to reuse it.
             auto Found = VertexMap.find(Key);
             if (Found != VertexMap.end())
             {
@@ -508,6 +523,7 @@ void ImportSkeletalMeshData(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh
                 continue;
             }
 
+            // Create a new vertex and add it to the LOD data, then map the key to the new vertex index.
             FSkeletalMeshVertex Vertex;
             Vertex.Position = FbxGeometricTransformMatrix.TransformPosition(ToEngineVector(ControlPoints[ControlPointIndex]));
             Vertex.Normal = Normal;
@@ -518,6 +534,7 @@ void ImportSkeletalMeshData(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh
                 AssignTopNormalizedBoneInfluences(Vertex, ControlPointInfluences[ControlPointIndex], ImportOptions.bNormalizeWeights);
             }
 
+            // Add the new vertex and update mappings.
             const uint32 NewVertexIndex = static_cast<uint32>(LODData.Vertices.size());
             LODData.Vertices.push_back(Vertex);
             VertexMap.emplace(Key, NewVertexIndex);
@@ -552,7 +569,7 @@ void ImportSkeletalMeshDataRecursive(FbxNode* Node, FSkeletalMesh& OutMesh, cons
         return;
     }
 
-    FbxMesh* Mesh = Node->GetMesh();  
+    FbxMesh* Mesh = Node->GetMesh();
     if (Mesh != nullptr)
     {
         ImportSkeletalMeshData(Node, Mesh, OutMesh, ImportOptions);
@@ -567,6 +584,7 @@ void ImportSkeletalMeshDataRecursive(FbxNode* Node, FSkeletalMesh& OutMesh, cons
 
 USkeletalMesh* FFbxImporter::ImportSkeletalMesh(const FString& Path, const FSkeletalMeshImportOptions& ImportOptions)
 {
+    // Create an FBX Manager.
     FbxManager* Manager = FbxManager::Create();
     if (Manager == nullptr)
     {
@@ -574,12 +592,18 @@ USkeletalMesh* FFbxImporter::ImportSkeletalMesh(const FString& Path, const FSkel
         return nullptr;
     }
 
+    // Create an IOSettings object. This object holds all import/export settings.
     FbxIOSettings* IOSettings = FbxIOSettings::Create(Manager, IOSROOT);
     Manager->SetIOSettings(IOSettings);
 
+    // Create an importer using the SDK manager.
     FbxImporter* Importer = FbxImporter::Create(Manager, "");
-    // FbxImporter only exposes a narrow char path API in this SDK. Creates an ASCII temp copy if needed.
+
+    // Build the import path, creating a temporary ASCII path if necessary for the FBX SDK.
     FFbxImportPath ImportPath = BuildImportPathForFbxSdk(Path);
+
+
+    // Initialize the importer by providing a filename.
     if (Importer == nullptr || !Importer->Initialize(ImportPath.ImportPath.c_str(), -1, Manager->GetIOSettings()))
     {
         UE_LOG("[FbxImporter] Failed to initialize importer: %s", Path.c_str());
@@ -591,6 +615,7 @@ USkeletalMesh* FFbxImporter::ImportSkeletalMesh(const FString& Path, const FSkel
         return nullptr;
     }
 
+    // Create an FbxScene.
     FbxScene* Scene = FbxScene::Create(Manager, "ImportedScene");
     if (Scene == nullptr || !Importer->Import(Scene))
     {
@@ -601,31 +626,43 @@ USkeletalMesh* FFbxImporter::ImportSkeletalMesh(const FString& Path, const FSkel
     }
     Importer->Destroy();
 
+    // Triangulate the scene.
     FbxGeometryConverter GeometryConverter(Manager);
-    GeometryConverter.Triangulate(Scene, true);    
+    GeometryConverter.Triangulate(Scene, true);
 
+    // Convert the scene's axis system to match the engine's coordinate system (Y-up, left-handed).
     FSkeletalMesh* ImportedMesh = new FSkeletalMesh();
     ImportedMesh->PathFileName = Path;
     ImportedMesh->RenderData.LODRenderData.emplace_back();
 
+
     FbxNode* RootNode = Scene->GetRootNode();
+
+    // Recursively collect skeleton nodes and import mesh data.
     CollectSkeletonNodes(RootNode, *ImportedMesh);
+
+
+    // Recursively import mesh data for all nodes.
+    // This allows for multiple meshes in the same FBX to be merged into one skeletal mesh asset.
     ImportSkeletalMeshDataRecursive(RootNode, *ImportedMesh, ImportOptions);
 
+    // Ensure there is at least a root bone in the skeleton, as some FBX files may not have any skeleton data.
     if (ImportedMesh->RefSkeleton.GetNum() == 0)
     {
         FBoneInfo RootBone;
         RootBone.Name = "Root";
         RootBone.ParentIndex = -1;
         ImportedMesh->RefSkeleton.Add(RootBone, FTransform::Identity);
-        ImportedMesh->InverseRefMatrices.push_back(FMatrix::Identity);
+        ImportedMesh->InverseBindGlobalMatrices.push_back(FMatrix::Identity);
     }
 
-    if (ImportedMesh->InverseRefMatrices.size() < ImportedMesh->RefSkeleton.BoneInfo.size())
+    // Ensure the inverse reference matrices array is large enough to hold all bones.
+    if (ImportedMesh->InverseBindGlobalMatrices.size() < ImportedMesh->RefSkeleton.BoneInfo.size())
     {
-        ImportedMesh->InverseRefMatrices.resize(ImportedMesh->RefSkeleton.BoneInfo.size(), FMatrix::Identity);
+        ImportedMesh->InverseBindGlobalMatrices.resize(ImportedMesh->RefSkeleton.BoneInfo.size(), FMatrix::Identity);
     }
 
+    // Validate that we have valid vertex and index data before creating the skeletal mesh asset.
     const FSkeletalMeshLODRenderData& LODData = ImportedMesh->RenderData.LODRenderData[0];
     if (LODData.Vertices.empty() || LODData.Indices.empty())
     {
@@ -635,6 +672,7 @@ USkeletalMesh* FFbxImporter::ImportSkeletalMesh(const FString& Path, const FSkel
         return nullptr;
     }
 
+    // Create a new skeletal mesh asset and assign the imported mesh data to it.
     USkeletalMesh* SkeletalMesh = UObjectManager::Get().CreateObject<USkeletalMesh>();
     SkeletalMesh->SetSkeletalMeshData(ImportedMesh);
 
