@@ -1,13 +1,25 @@
 ﻿#include "FbxParser.h"
 #include "fbxsdk.h"
 #include "Asset/SkeletalMeshTypes.h"
+#include "Core/Paths.h"
+#include "Core/ResourceManager.h"
 #include "Core/Logger.h"
 #include <vector>
 #include <algorithm>
+#include <filesystem>
+#include <functional>
 #include <map>
+#include <cmath>
 
 namespace
 {
+	constexpr int32 TriangleVertexCount = 3;
+	constexpr int32 MaxBoneInfluences = 4;
+	constexpr int32 Vector2ComponentCount = 2;
+	constexpr int32 Vector3ComponentCount = 3;
+	constexpr int32 Vector4ComponentCount = 4;
+	constexpr float VertexKeyQuantizeScale = 100000.0f;
+
 	FMatrix ToMatrix(const FbxAMatrix& InMatrix)
 	{
 		FMatrix OutMatrix;
@@ -81,6 +93,500 @@ namespace
 		return 0;
 	}
 
+	void HashCombine(size_t& Seed, size_t Value)
+	{
+		Seed ^= Value + 0x9e3779b97f4a7c15ull + (Seed << 6) + (Seed >> 2);
+	}
+
+	int32 QuantizeVertexFloat(float Value)
+	{
+		return static_cast<int32>(std::round(Value * VertexKeyQuantizeScale));
+	}
+
+	bool IsValidDirectIndex(int32 DirectIndex, int32 DirectArrayCount)
+	{
+		return DirectIndex >= 0 && DirectIndex < DirectArrayCount;
+	}
+
+	FVector ReadFbxPosition(FbxVector4* ControlPoints, int32 ControlPointIndex)
+	{
+		FbxVector4 Position = ControlPoints[ControlPointIndex];
+		return FVector(
+			static_cast<float>(Position[0]),
+			static_cast<float>(Position[1]),
+			static_cast<float>(Position[2]));
+	}
+
+	FVector ReadFbxNormal(FbxGeometryElementNormal* NormalElement, int32 ControlPointIndex, int32 PolygonVertexIndex)
+	{
+		if (NormalElement == nullptr)
+		{
+			return FVector::ZeroVector;
+		}
+
+		const int32 DirectIndex = GetLayerElementIndex(
+			NormalElement->GetMappingMode(),
+			NormalElement->GetReferenceMode(),
+			NormalElement->GetIndexArray(),
+			ControlPointIndex,
+			PolygonVertexIndex);
+
+		if (!IsValidDirectIndex(DirectIndex, NormalElement->GetDirectArray().GetCount()))
+		{
+			return FVector::ZeroVector;
+		}
+
+		FbxVector4 Normal = NormalElement->GetDirectArray().GetAt(DirectIndex);
+		Normal.Normalize();
+		return FVector(
+			static_cast<float>(Normal[0]),
+			static_cast<float>(Normal[1]),
+			static_cast<float>(Normal[2]));
+	}
+
+	FVector4 ReadFbxTangent(FbxGeometryElementTangent* TangentElement, int32 ControlPointIndex, int32 PolygonVertexIndex)
+	{
+		if (TangentElement == nullptr)
+		{
+			return FVector4(1.0f, 0.0f, 0.0f, 1.0f);
+		}
+
+		const int32 DirectIndex = GetLayerElementIndex(
+			TangentElement->GetMappingMode(),
+			TangentElement->GetReferenceMode(),
+			TangentElement->GetIndexArray(),
+			ControlPointIndex,
+			PolygonVertexIndex);
+
+		if (!IsValidDirectIndex(DirectIndex, TangentElement->GetDirectArray().GetCount()))
+		{
+			return FVector4(1.0f, 0.0f, 0.0f, 1.0f);
+		}
+
+		FbxVector4 Tangent = TangentElement->GetDirectArray().GetAt(DirectIndex);
+		Tangent.Normalize();
+		return FVector4(
+			static_cast<float>(Tangent[0]),
+			static_cast<float>(Tangent[1]),
+			static_cast<float>(Tangent[2]),
+			static_cast<float>(Tangent[3]));
+	}
+
+	FVector2 ReadFbxUV(FbxGeometryElementUV* UVElement, int32 ControlPointIndex, int32 PolygonVertexIndex)
+	{
+		if (UVElement == nullptr)
+		{
+			return FVector2::ZeroVector;
+		}
+
+		const int32 DirectIndex = GetLayerElementIndex(
+			UVElement->GetMappingMode(),
+			UVElement->GetReferenceMode(),
+			UVElement->GetIndexArray(),
+			ControlPointIndex,
+			PolygonVertexIndex);
+
+		if (!IsValidDirectIndex(DirectIndex, UVElement->GetDirectArray().GetCount()))
+		{
+			return FVector2::ZeroVector;
+		}
+
+		FbxVector2 UV = UVElement->GetDirectArray().GetAt(DirectIndex);
+		return FVector2(static_cast<float>(UV[0]), 1.0f - static_cast<float>(UV[1]));
+	}
+
+	struct FControlPointInfluences
+	{
+		TArray<std::pair<int32, float>> Weights;
+
+		void Add(int32 BoneIndex, float Weight)
+		{
+			Weights.push_back({ BoneIndex, Weight });
+		}
+
+		void GetTop4(uint32 OutBoneIndices[MaxBoneInfluences], float OutBoneWeights[MaxBoneInfluences])
+		{
+			std::sort(Weights.begin(), Weights.end(), [](const auto& A, const auto& B) {
+				return A.second > B.second;
+				});
+
+			const int32 Count = std::min(MaxBoneInfluences, static_cast<int32>(Weights.size()));
+
+			float TotalWeight = 0.0f;
+			for (int32 Index = 0; Index < Count; ++Index)
+			{
+				TotalWeight += Weights[Index].second;
+			}
+
+			for (int32 Index = 0; Index < MaxBoneInfluences; ++Index)
+			{
+				if (Index < Count && TotalWeight > 0.0001f)
+				{
+					OutBoneIndices[Index] = static_cast<uint32>(Weights[Index].first);
+					OutBoneWeights[Index] = Weights[Index].second / TotalWeight;
+				}
+				else
+				{
+					OutBoneIndices[Index] = 0;
+					OutBoneWeights[Index] = 0.0f;
+				}
+			}
+		}
+	};
+
+	struct FVertexDedupKey
+	{
+		int32 Position[Vector3ComponentCount] = {};
+		int32 Normal[Vector3ComponentCount] = {};
+		int32 UV[Vector2ComponentCount] = {};
+		int32 Tangent[Vector4ComponentCount] = {};
+		int32 Color[Vector4ComponentCount] = {};
+		uint32 BoneIndices[MaxBoneInfluences] = {};
+		int32 BoneWeights[MaxBoneInfluences] = {};
+
+		explicit FVertexDedupKey(const FSkeletalMeshVertex& Vertex)
+		{
+			Position[0] = QuantizeVertexFloat(Vertex.Position.X);
+			Position[1] = QuantizeVertexFloat(Vertex.Position.Y);
+			Position[2] = QuantizeVertexFloat(Vertex.Position.Z);
+
+			Normal[0] = QuantizeVertexFloat(Vertex.Normal.X);
+			Normal[1] = QuantizeVertexFloat(Vertex.Normal.Y);
+			Normal[2] = QuantizeVertexFloat(Vertex.Normal.Z);
+
+			UV[0] = QuantizeVertexFloat(Vertex.UV.X);
+			UV[1] = QuantizeVertexFloat(Vertex.UV.Y);
+
+			Tangent[0] = QuantizeVertexFloat(Vertex.Tangent.X);
+			Tangent[1] = QuantizeVertexFloat(Vertex.Tangent.Y);
+			Tangent[2] = QuantizeVertexFloat(Vertex.Tangent.Z);
+			Tangent[3] = QuantizeVertexFloat(Vertex.Tangent.W);
+
+			Color[0] = QuantizeVertexFloat(Vertex.Color.X);
+			Color[1] = QuantizeVertexFloat(Vertex.Color.Y);
+			Color[2] = QuantizeVertexFloat(Vertex.Color.Z);
+			Color[3] = QuantizeVertexFloat(Vertex.Color.W);
+
+			for (int32 Index = 0; Index < MaxBoneInfluences; ++Index)
+			{
+				BoneIndices[Index] = Vertex.BoneIndices[Index];
+				BoneWeights[Index] = QuantizeVertexFloat(Vertex.BoneWeights[Index]);
+			}
+		}
+
+		bool operator==(const FVertexDedupKey& Other) const
+		{
+			for (int32 Index = 0; Index < Vector3ComponentCount; ++Index)
+			{
+				if (Position[Index] != Other.Position[Index] || Normal[Index] != Other.Normal[Index])
+				{
+					return false;
+				}
+			}
+
+			for (int32 Index = 0; Index < Vector2ComponentCount; ++Index)
+			{
+				if (UV[Index] != Other.UV[Index])
+				{
+					return false;
+				}
+			}
+
+			for (int32 Index = 0; Index < Vector4ComponentCount; ++Index)
+			{
+				if (Tangent[Index] != Other.Tangent[Index] || Color[Index] != Other.Color[Index])
+				{
+					return false;
+				}
+			}
+
+			for (int32 Index = 0; Index < MaxBoneInfluences; ++Index)
+			{
+				if (BoneIndices[Index] != Other.BoneIndices[Index] ||
+					BoneWeights[Index] != Other.BoneWeights[Index])
+				{
+					return false;
+				}
+			}
+
+			return true;
+		}
+	};
+
+	struct FVertexDedupKeyHash
+	{
+		size_t operator()(const FVertexDedupKey& Key) const
+		{
+			size_t Seed = 0;
+			for (int32 Index = 0; Index < Vector3ComponentCount; ++Index)
+			{
+				HashCombine(Seed, std::hash<int32>{}(Key.Position[Index]));
+				HashCombine(Seed, std::hash<int32>{}(Key.Normal[Index]));
+			}
+
+			for (int32 Index = 0; Index < Vector2ComponentCount; ++Index)
+			{
+				HashCombine(Seed, std::hash<int32>{}(Key.UV[Index]));
+			}
+
+			for (int32 Index = 0; Index < Vector4ComponentCount; ++Index)
+			{
+				HashCombine(Seed, std::hash<int32>{}(Key.Tangent[Index]));
+				HashCombine(Seed, std::hash<int32>{}(Key.Color[Index]));
+			}
+
+			for (int32 Index = 0; Index < MaxBoneInfluences; ++Index)
+			{
+				HashCombine(Seed, std::hash<uint32>{}(Key.BoneIndices[Index]));
+				HashCombine(Seed, std::hash<int32>{}(Key.BoneWeights[Index]));
+			}
+
+			return Seed;
+		}
+	};
+
+	struct FUniqueVertexMap
+	{
+		int32 FindOrAdd(const FVertexDedupKey& Key, const FSkeletalMeshVertex& Vertex, FSkeletalMesh* OutMesh)
+		{
+			auto FoundVertex = VertexToIndex.find(Key);
+			if (FoundVertex != VertexToIndex.end())
+			{
+				return FoundVertex->second;
+			}
+
+			const int32 VertexIndex = static_cast<int32>(OutMesh->Vertices.size());
+			OutMesh->Vertices.push_back(Vertex);
+			VertexToIndex.emplace(Key, VertexIndex);
+			return VertexIndex;
+		}
+
+	private:
+		TMap<FVertexDedupKey, int32, FVertexDedupKeyHash> VertexToIndex;
+	};
+}
+
+bool FbxParser::TextureFileExists(const FString& TexturePath)
+{
+	if (TexturePath.empty())
+	{
+		return false;
+	}
+
+	return std::filesystem::exists(std::filesystem::path(FPaths::ToAbsolute(FPaths::ToWide(TexturePath))));
+}
+
+FString FbxParser::FindExistingTexturePath(const TArray<FString>& Candidates)
+{
+	for (const FString& Candidate : Candidates)
+	{
+		if (TextureFileExists(Candidate))
+		{
+			return Candidate;
+		}
+	}
+
+	return {};
+}
+
+FString FbxParser::ResolveFbxTexturePath(const FString& FbxFilePath, const char* TextureFilePath)
+{
+	if (TextureFilePath == nullptr || TextureFilePath[0] == '\0')
+	{
+		return {};
+	}
+
+	std::filesystem::path TexturePath(FPaths::ToWide(TextureFilePath));
+	if (TexturePath.is_absolute())
+	{
+		return FPaths::ToUtf8(TexturePath.lexically_normal().generic_wstring());
+	}
+
+	const std::filesystem::path FbxDir = std::filesystem::path(FPaths::ToWide(FbxFilePath)).parent_path();
+	const FString FbxRelativePath = FPaths::ToUtf8((FbxDir / TexturePath).lexically_normal().generic_wstring());
+	if (TextureFileExists(FbxRelativePath))
+	{
+		return FbxRelativePath;
+	}
+
+	const FString FileName = FPaths::ToUtf8(TexturePath.filename().generic_wstring());
+	const FString AssetTexturePath = FindExistingTexturePath({
+		"Asset/Texture/" + FileName,
+		"Asset/Fbx/Textures/" + FileName
+		});
+
+	return AssetTexturePath.empty() ? FbxRelativePath : AssetTexturePath;
+}
+
+FString FbxParser::GetTexturePathFromProperty(const FString& FbxFilePath, FbxSurfaceMaterial* Material, const char* PropertyName)
+{
+	if (Material == nullptr)
+	{
+		return {};
+	}
+
+	FbxProperty TextureProperty = Material->FindProperty(PropertyName);
+	if (!TextureProperty.IsValid())
+	{
+		return {};
+	}
+
+	const int32 TextureCount = TextureProperty.GetSrcObjectCount<FbxFileTexture>();
+	for (int32 TextureIndex = 0; TextureIndex < TextureCount; ++TextureIndex)
+	{
+		FbxFileTexture* Texture = TextureProperty.GetSrcObject<FbxFileTexture>(TextureIndex);
+		if (Texture == nullptr)
+		{
+			continue;
+		}
+
+		const char* RelativeFileName = Texture->GetRelativeFileName();
+		if (RelativeFileName != nullptr && RelativeFileName[0] != '\0')
+		{
+			return ResolveFbxTexturePath(FbxFilePath, RelativeFileName);
+		}
+
+		const char* FileName = Texture->GetFileName();
+		if (FileName != nullptr && FileName[0] != '\0')
+		{
+			return ResolveFbxTexturePath(FbxFilePath, FileName);
+		}
+	}
+
+	return {};
+}
+
+FString FbxParser::BuildTextureStemFromMaterialName(const FString& MaterialName, const char* TextureSuffix)
+{
+	FString BaseName = MaterialName;
+	if (BaseName.starts_with("MI_"))
+	{
+		BaseName = BaseName.substr(3);
+	}
+	else if (BaseName.starts_with("M_"))
+	{
+		BaseName = BaseName.substr(2);
+	}
+
+	if (!BaseName.starts_with("T_"))
+	{
+		BaseName = "T_" + BaseName;
+	}
+
+	return BaseName + "_" + TextureSuffix;
+}
+
+FString FbxParser::FindAssetTextureByMaterialName(const FString& MaterialName, const char* TextureSuffix)
+{
+	const FString Stem = BuildTextureStemFromMaterialName(MaterialName, TextureSuffix);
+	const TArray<FString> Extensions = { ".PNG", ".png", ".DDS", ".dds", ".JPG", ".jpg", ".JPEG", ".jpeg" };
+
+	TArray<FString> Candidates;
+	for (const FString& Extension : Extensions)
+	{
+		Candidates.push_back("Asset/Texture/" + Stem + Extension);
+		Candidates.push_back("Asset/Fbx/Textures/" + Stem + Extension);
+	}
+
+	return FindExistingTexturePath(Candidates);
+}
+
+
+FString FbxParser::GetDiffuseTexturePath(const FString& FbxFilePath, FbxSurfaceMaterial* Material)
+{
+	FString TexturePath = GetTexturePathFromProperty(FbxFilePath, Material, FbxSurfaceMaterial::sDiffuse);
+	if (!TexturePath.empty())
+	{
+		return TexturePath;
+	}
+
+	return Material ? FindAssetTextureByMaterialName(Material->GetName(), "D") : FString();
+}
+
+FString FbxParser::GetNormalTexturePath(const FString& FbxFilePath, FbxSurfaceMaterial* Material)
+{
+	FString TexturePath = GetTexturePathFromProperty(FbxFilePath, Material, FbxSurfaceMaterial::sNormalMap);
+	if (!TexturePath.empty())
+	{
+		return TexturePath;
+	}
+
+	TexturePath = GetTexturePathFromProperty(FbxFilePath, Material, FbxSurfaceMaterial::sBump);
+	if (!TexturePath.empty())
+	{
+		return TexturePath;
+	}
+
+	return Material ? FindAssetTextureByMaterialName(Material->GetName(), "N") : FString();
+}
+
+UMaterialInterface* FbxParser::GetOrCreateFbxMaterial(const FString& FbxFilePath, FbxSurfaceMaterial* FbxMaterial)
+{
+	FResourceManager& ResourceManager = FResourceManager::Get();
+	if (FbxMaterial == nullptr)
+	{
+		return ResourceManager.GetMaterial("DefaultWhite");
+	}
+
+	const FString MaterialName = FbxMaterial->GetName();
+	if (UMaterial* ExistingMaterial = ResourceManager.GetMaterial(MaterialName))
+	{
+		return ExistingMaterial;
+	}
+
+	const FString DiffuseTexturePath = GetDiffuseTexturePath(FbxFilePath, FbxMaterial);
+	const FString NormalTexturePath = GetNormalTexturePath(FbxFilePath, FbxMaterial);
+	if (DiffuseTexturePath.empty() && NormalTexturePath.empty())
+	{
+		return ResourceManager.GetMaterial("DefaultWhite");
+	}
+
+	UTexture* DiffuseTexture = DiffuseTexturePath.empty() ? ResourceManager.GetTexture("DefaultWhite") : ResourceManager.LoadTexture(DiffuseTexturePath);
+	if (DiffuseTexture == nullptr && !DiffuseTexturePath.empty())
+	{
+		UE_LOG("Fbx Parser diffuse texture 로드 실패: %s", DiffuseTexturePath.c_str());
+	}
+
+	UTexture* NormalTexture = NormalTexturePath.empty() ? ResourceManager.GetTexture("DefaultNormal") : ResourceManager.LoadTexture(NormalTexturePath);
+	if (NormalTexture == nullptr && !NormalTexturePath.empty())
+	{
+		UE_LOG("Fbx Parser normal texture 로드 실패: %s", NormalTexturePath.c_str());
+	}
+
+	if (DiffuseTexture == nullptr && NormalTexture == nullptr)
+	{
+		return ResourceManager.GetMaterial("DefaultWhite");
+	}
+
+	UMaterial* Material = ResourceManager.GetOrCreateMaterial(MaterialName, "Shaders/UberLit.hlsl");
+	Material->MaterialData.Name = MaterialName;
+	Material->MaterialData.DiffuseTexPath = DiffuseTexturePath;
+	Material->MaterialData.bHasDiffuseTexture = DiffuseTexture != nullptr && !DiffuseTexturePath.empty();
+	Material->MaterialData.NormalTexPath = NormalTexturePath;
+	Material->MaterialData.bHasNormalTexture = NormalTexture != nullptr && !NormalTexturePath.empty();
+
+	Material->MaterialParams["BaseColor"] = FMaterialParamValue(Material->MaterialData.BaseColor);
+	Material->MaterialParams["SpecularColor"] = FMaterialParamValue(Material->MaterialData.SpecularColor);
+	Material->MaterialParams["EmissiveColor"] = FMaterialParamValue(Material->MaterialData.EmissiveColor);
+	Material->MaterialParams["Shininess"] = FMaterialParamValue(Material->MaterialData.Shininess);
+	Material->MaterialParams["Opacity"] = FMaterialParamValue(Material->MaterialData.Opacity);
+	Material->MaterialParams["DiffuseMap"] = FMaterialParamValue(DiffuseTexture ? DiffuseTexture : ResourceManager.GetTexture("DefaultWhite"));
+	Material->MaterialParams["bHasDiffuseMap"] = FMaterialParamValue(Material->MaterialData.bHasDiffuseTexture);
+
+	if (UTexture* DefaultWhite = ResourceManager.GetTexture("DefaultWhite"))
+	{
+		Material->MaterialParams["SpecularMap"] = FMaterialParamValue(DefaultWhite);
+		Material->MaterialParams["BumpMap"] = FMaterialParamValue(DefaultWhite);
+	}
+
+	Material->MaterialParams["NormalMap"] = FMaterialParamValue(NormalTexture ? NormalTexture : ResourceManager.GetTexture("DefaultNormal"));
+
+	Material->MaterialParams["bHasSpecularMap"] = FMaterialParamValue(false);
+	Material->MaterialParams["bHasNormalMap"] = FMaterialParamValue(Material->MaterialData.bHasNormalTexture);
+	Material->MaterialParams["bHasBumpMap"] = FMaterialParamValue(false);
+	Material->MaterialParams["ScrollUV"] = FMaterialParamValue(FVector2(0.0f, 0.0f));
+
+	return Material;
 }
 
 FSkeletalMesh* FbxParser::ParseFbx(const std::string& FilePath)
@@ -153,45 +659,10 @@ void FbxParser::ProcessNode(FbxNode* Node, FSkeletalMesh* OutMesh, TMap<std::str
 
 void FbxParser::ProcessMesh(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh* OutMesh, TMap<std::string, int32>& BoneMap)
 {
-	int32 VertexOffset = static_cast<int32>(OutMesh->Vertices.size());
-
 	Mesh->GenerateTangentsDataForAllUVSets();
 
 	int32 ControlPointCount = Mesh->GetControlPointsCount();
-	struct FTempWeight
-	{
-		TArray<std::pair<int32, float>> Weights;
-
-		void Add(int32 Index, float Weight) { Weights.push_back({ Index, Weight }); }
-
-		void GetTop4(uint32 OutIndices[4], float OutWeights[4])
-		{
-			std::sort(Weights.begin(), Weights.end(), [](const auto& a, const auto& b) {
-				return a.second > b.second;
-				});
-
-			float TotalWeight = 0.0f;
-			int32 Count = std::min(4, static_cast<int32>(Weights.size()));
-
-			for (int32 i = 0; i < Count; ++i) TotalWeight += Weights[i].second;
-
-			for (int32 i = 0; i < 4; ++i)
-			{
-				if (i < Count && TotalWeight > 0.0001f)
-				{
-					OutIndices[i] = static_cast<uint32>(Weights[i].first);
-					OutWeights[i] = Weights[i].second / TotalWeight;
-				}
-				else
-				{
-					OutIndices[i] = 0;
-					OutWeights[i] = 0.0f;
-				}
-			}
-		}
-	};
-
-	TArray<FTempWeight> CntrlPtWeights(ControlPointCount);
+	TArray<FControlPointInfluences> ControlPointInfluences(ControlPointCount);
 
 	int32 SkinCount = Mesh->GetDeformerCount(FbxDeformer::eSkin);
 	if (SkinCount > 0)
@@ -240,7 +711,7 @@ void FbxParser::ProcessMesh(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh* OutMesh
 			{
 				if (Indices[i] >= 0 && Indices[i] < ControlPointCount)
 				{
-					CntrlPtWeights[Indices[i]].Add(BoneIndex, static_cast<float>(Weights[i]));
+					ControlPointInfluences[Indices[i]].Add(BoneIndex, static_cast<float>(Weights[i]));
 				}
 			}
 		}
@@ -254,72 +725,33 @@ void FbxParser::ProcessMesh(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh* OutMesh
 
 	int32 PolygonCount = Mesh->GetPolygonCount();
 	TMap<int32, TArray<int32>> MaterialToIndices;
+	FUniqueVertexMap UniqueVertexMap;
 	int32 VertexCounter = 0;
 
-	for (int32 p = 0; p < PolygonCount; p++)
+	for (int32 PolygonIndex = 0; PolygonIndex < PolygonCount; PolygonIndex++)
 	{
-		int32 PolyMaterialIndex = GetMaterialIndex(MaterialElement, p);
+		int32 PolyMaterialIndex = GetMaterialIndex(MaterialElement, PolygonIndex);
 
-		for (int32 v = 0; v < 3; v++)
+		for (int32 CornerIndex = 0; CornerIndex < TriangleVertexCount; CornerIndex++)
 		{
-			int32 CtrlPointIndex = Mesh->GetPolygonVertex(p, v);
-			if (CtrlPointIndex < 0 || CtrlPointIndex >= ControlPointCount)
+			int32 ControlPointIndex = Mesh->GetPolygonVertex(PolygonIndex, CornerIndex);
+			if (ControlPointIndex < 0 || ControlPointIndex >= ControlPointCount)
 			{
 				continue;
 			}
 
 			FSkeletalMeshVertex NewVert;
-
-			FbxVector4 Pos = ControlPoints[CtrlPointIndex];
-			NewVert.Position = FVector(static_cast<float>(Pos[0]), static_cast<float>(Pos[1]), static_cast<float>(Pos[2]));
-
-			if (NormalElement)
-			{
-				int32 DirectIndex = GetLayerElementIndex(NormalElement->GetMappingMode(), NormalElement->GetReferenceMode(),
-					NormalElement->GetIndexArray(), CtrlPointIndex, VertexCounter);
-
-				if (DirectIndex >= 0 && DirectIndex < NormalElement->GetDirectArray().GetCount())
-				{
-					FbxVector4 Normal = NormalElement->GetDirectArray().GetAt(DirectIndex);
-					Normal.Normalize();
-					NewVert.Normal = FVector(static_cast<float>(Normal[0]), static_cast<float>(Normal[1]), static_cast<float>(Normal[2]));
-				}
-			}
-
-			if (TangentElement)
-			{
-				int32 DirectIndex = GetLayerElementIndex(TangentElement->GetMappingMode(), TangentElement->GetReferenceMode(),
-					TangentElement->GetIndexArray(), CtrlPointIndex, VertexCounter);
-
-				if (DirectIndex >= 0 && DirectIndex < TangentElement->GetDirectArray().GetCount())
-				{
-					FbxVector4 Tangent = TangentElement->GetDirectArray().GetAt(DirectIndex);
-					Tangent.Normalize();
-					NewVert.Tangent = FVector4(static_cast<float>(Tangent[0]), static_cast<float>(Tangent[1]), static_cast<float>(Tangent[2]), static_cast<float>(Tangent[3]));
-				}
-			}
-			else
-			{
-				NewVert.Tangent = FVector4(1, 0, 0, 1);
-			}
-
-			if (UVElement)
-			{
-				int32 DirectIndex = GetLayerElementIndex(UVElement->GetMappingMode(), UVElement->GetReferenceMode(),
-					UVElement->GetIndexArray(), CtrlPointIndex, VertexCounter);
-
-				if (DirectIndex >= 0 && DirectIndex < UVElement->GetDirectArray().GetCount())
-				{
-					FbxVector2 UV = UVElement->GetDirectArray().GetAt(DirectIndex);
-					NewVert.UV = FVector2(static_cast<float>(UV[0]), 1.0f - static_cast<float>(UV[1]));
-				}
-			}
+			NewVert.Position = ReadFbxPosition(ControlPoints, ControlPointIndex);
+			NewVert.Normal = ReadFbxNormal(NormalElement, ControlPointIndex, VertexCounter);
+			NewVert.Tangent = ReadFbxTangent(TangentElement, ControlPointIndex, VertexCounter);
+			NewVert.UV = ReadFbxUV(UVElement, ControlPointIndex, VertexCounter);
 			NewVert.Color = FVector4(1, 1, 1, 1);
 
-			CntrlPtWeights[CtrlPointIndex].GetTop4(NewVert.BoneIndices, NewVert.BoneWeights);
+			ControlPointInfluences[ControlPointIndex].GetTop4(NewVert.BoneIndices, NewVert.BoneWeights);
 
-			OutMesh->Vertices.push_back(NewVert);
-			MaterialToIndices[PolyMaterialIndex].push_back(VertexOffset + VertexCounter);
+			const FVertexDedupKey VertexKey(NewVert);
+			const int32 VertexIndex = UniqueVertexMap.FindOrAdd(VertexKey, NewVert, OutMesh);
+			MaterialToIndices[PolyMaterialIndex].push_back(VertexIndex);
 			VertexCounter++;
 		}
 	}
@@ -330,9 +762,10 @@ void FbxParser::ProcessMesh(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh* OutMesh
 		const TArray<int32>& Indices = MatPair.second;
 
 		FString MaterialSlotName = "DefaultWhite";
+		FbxSurfaceMaterial* Material = nullptr;
 		if (Node->GetMaterialCount() > MatIndex)
 		{
-			FbxSurfaceMaterial* Material = Node->GetMaterial(MatIndex);
+			Material = Node->GetMaterial(MatIndex);
 			if (Material)
 			{
 				MaterialSlotName = Material->GetName();
@@ -353,6 +786,7 @@ void FbxParser::ProcessMesh(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh* OutMesh
 		{
 			FSkeletalMeshMaterialSlot NewSlot;
 			NewSlot.SlotName = MaterialSlotName;
+			NewSlot.Material = GetOrCreateFbxMaterial(OutMesh->PathFileName, Material);
 			OutMesh->Slots.push_back(NewSlot);
 			MaterialSlotIndex = static_cast<int32>(OutMesh->Slots.size()) - 1;
 		}
