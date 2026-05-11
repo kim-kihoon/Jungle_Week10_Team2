@@ -4,6 +4,7 @@
 
 class UTextRenderComponent;
 class UDecalComponent;
+class USkinnedMeshComponent;
 
 class APawnActor : public AActor
 {
@@ -29,6 +30,15 @@ class AStaticMeshActor : public AActor
 public:
 	DECLARE_CLASS(AStaticMeshActor, AActor)
 	AStaticMeshActor() = default;
+
+	void InitDefaultComponents();
+};
+
+class ASkeletalMeshActor : public AActor
+{
+public:
+	DECLARE_CLASS(ASkeletalMeshActor, AActor)
+	ASkeletalMeshActor() = default;
 
 	void InitDefaultComponents();
 };

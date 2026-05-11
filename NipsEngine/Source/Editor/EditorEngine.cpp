@@ -561,27 +561,7 @@ void UEditorEngine::StartPlaySession()
 
 	MainPanel.GetPropertyWidget().RestoreSelection(MappedPrimaryActor, MappedSelectedComponent, bPreviousActorSelected);
 
-	UCameraComponent* PawnCamera = nullptr;
-	if (APawnActor* Pawn = PIEWorld->FindPawn())
-	{
-		for (UActorComponent* Component : Pawn->GetComponents())
-		{
-			if (UCameraComponent* CameraComponent = Cast<UCameraComponent>(Component))
-			{
-				PawnCamera = CameraComponent;
-				break;
-			}
-		}
-	}
-
-	if (PawnCamera)
-	{
-		PIEWorld->SetActiveCameraComponent(PawnCamera);
-	}
-	else
-	{
-		PIEWorld->SetActiveCamera(FocusedClient->GetCamera());
-	}
+	PIEWorld->SetActiveCamera(FocusedClient->GetCamera());
 	PIEWorld->BeginPlay();
 }
 

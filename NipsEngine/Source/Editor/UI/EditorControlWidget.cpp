@@ -42,6 +42,7 @@ namespace
 		{ "Pawn", SpawnActor<APawnActor> },
 		{ "Scene", SpawnActor<ASceneActor> },
 		{ "StaticMesh", SpawnActor<AStaticMeshActor> },
+		{ "SkeletalMesh", SpawnActor<ASkeletalMeshActor> },
 		{ "TextRender", SpawnActor<ATextRenderActor> },
 		{ "SubUV", SpawnActor<ASubUVActor> },
 		{ "Billboard", SpawnActor<ABillboardActor> },

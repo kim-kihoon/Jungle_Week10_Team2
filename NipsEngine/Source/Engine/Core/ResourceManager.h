@@ -5,6 +5,7 @@
 #include "Asset/ObjLoader.h"
 #include "Asset/ParticleAtlasLoader.h"
 #include "Asset/StaticMesh.h"
+#include "Asset/FbxLoader.h"
 #include "Core/CoreTypes.h"
 #include "Core/Singleton.h"
 #include "Core/ResourceTypes.h"
@@ -139,6 +140,12 @@ public:
 	UStaticMesh* FindStaticMesh(const FString& Path) const;
 	TArray<FString> GetStaticMeshPaths() const;
 
+	USkeletalMesh* LoadSkeletalMesh(const FString& Path);
+    USkeletalMesh* FindSkeletalMesh(const FString& Path) const;
+    TArray<FString> GetSkeletalMeshPaths() const;
+	bool LoadSkeletalMeshMaterialOverrides(const FString& Path, USkeletalMesh* Mesh);
+	bool SaveSkeletalMeshMaterialOverrides(const FString& Path, const USkeletalMesh* Mesh) const;
+
 	ID3D11SamplerState* GetOrCreateSamplerState(ESamplerType Type, ID3D11Device* Device = nullptr);
 	ID3D11DepthStencilState* GetOrCreateDepthStencilState(EDepthStencilType Type, ID3D11Device* Device = nullptr);
 	ID3D11BlendState* GetOrCreateBlendState(EBlendType Type, ID3D11Device* Device = nullptr);
@@ -152,6 +159,7 @@ public:
 private:
 	uint64 GetFileWriteTimeTicks(const FString& Path) const;
 	FString MakeStaticMeshBinaryPath(const FString& SourcePath, bool bNormalized = false) const;
+	FString MakeSkeletalMeshMaterialOverridePath(const FString& SourcePath) const;
 	bool IsStaticMeshBinaryValid(const FString& SourcePath, const FString& BinaryPath) const;
 	void PreloadStaticMeshes();
 	UStaticMesh* LoadStaticMeshWithOptions(const FString& Path, const FStaticMeshLoadOptions& LoadOptions);
@@ -198,4 +206,8 @@ private:
 	TArray<FString> ParticleFilePaths;
 	TArray<FString> FontFilePaths;
 	TArray<FString> TextureFilePaths;
+
+	FFbxLoader FbxLoader;
+    TMap<FString, USkeletalMesh*> SkeletalMeshes;
+    TArray<FString> SkeletalMeshFilePaths;
 };

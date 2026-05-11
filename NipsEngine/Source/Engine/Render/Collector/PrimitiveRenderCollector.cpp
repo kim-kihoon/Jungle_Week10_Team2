@@ -5,6 +5,7 @@
 #include "Component/HeightFogComponent.h"
 #include "Component/PrimitiveComponent.h"
 #include "Component/Collision/ShapeComponent.h"
+#include "Component/SkinnedMeshComponent.h"
 #include "Component/SkyAtmosphereComponent.h"
 #include "Component/StaticMeshComponent.h"
 #include "Component/SubUVComponent.h"
@@ -12,6 +13,7 @@
 #include "Component/Light/LightComponent.h"
 #include "Core/ResourceManager.h"
 #include "Engine/Asset/StaticMesh.h"
+#include "Engine/Asset/SkeletalMesh.h"
 #include "GameFramework/AActor.h"
 #include "GameFramework/World.h"
 #include "Geometry/OBB.h"
@@ -83,7 +85,56 @@ namespace
 		}
 		return false;
 	}
-}
+
+	void AddSkeletalSectionCommand(UPrimitiveComponent* Primitive, USkinnedMeshComponent* SkinnedMeshComp,
+        FMeshBuffer* MeshBuffer, FRenderBus& RenderBus, bool bDebugCollisionHighlight,
+		int32 SectionStartIndex, uint32 SectionIndexCount, int32 MaterialIndex)
+    {
+        if (SectionIndexCount == 0)
+        {
+            return;
+        }
+
+        UMaterialInterface* Material = bDebugCollisionHighlight
+                                           ? FResourceManager::Get().GetMaterial("DefaultRed")
+                                           : Cast<UMaterialInterface>(SkinnedMeshComp->GetMaterial(MaterialIndex));
+
+        if (Material == nullptr)
+        {
+            Material = FResourceManager::Get().GetMaterial("DefaultWhite");
+            if (Material == nullptr)
+            {
+                return;
+            }
+        }
+
+        const FVector4 PrimitiveColor = FColor::White().ToVector4();
+
+        FRenderCommand Cmd = {};
+        Cmd.PerObjectConstants = FPerObjectConstants{ Primitive->GetWorldMatrix(), PrimitiveColor };
+        Cmd.Type = ERenderCommandType::StaticMesh;
+        Cmd.MeshBuffer = MeshBuffer;
+        Cmd.SectionIndexStart = SectionStartIndex;
+        Cmd.SectionIndexCount = SectionIndexCount;
+        Cmd.Material = Material;
+
+        RenderBus.AddCommand(ERenderPass::Opaque, Cmd);
+
+        if (Material->GetEffectiveLightingModel() == ELightingModel::Toon)
+        {
+            FRenderCommand OutlineCmd = {};
+            OutlineCmd.Type = ERenderCommandType::ToonOutline;
+            OutlineCmd.MeshBuffer = MeshBuffer;
+            OutlineCmd.PerObjectConstants = FPerObjectConstants{ Primitive->GetWorldMatrix() };
+            OutlineCmd.SectionIndexStart = SectionStartIndex;
+            OutlineCmd.SectionIndexCount = SectionIndexCount;
+            OutlineCmd.Material = Material;
+
+            RenderBus.AddCommand(ERenderPass::ToonOutline, OutlineCmd);
+        }
+    }
+
+} // namespace
 
 void FPrimitiveRenderCollector::CollectFromActor(
 	AActor* Actor,
@@ -390,6 +441,52 @@ void FPrimitiveRenderCollector::CollectFromComponent(
 		RenderBus.AddCommand(ERenderPass::Sky, Cmd);
 		break;
 	}
+
+	case EPrimitiveType::EPT_SkeletalMesh:
+	{
+        if (!ShowFlags.bPrimitives)
+            return;
+
+        USkinnedMeshComponent* SkinnedMeshComp = static_cast<USkinnedMeshComponent*>(Primitive);
+        USkeletalMesh* SkeletalMesh = SkinnedMeshComp->GetSkeletalMesh();
+        if (!SkeletalMesh || !SkeletalMesh->HasValidMeshData())
+        {
+			//vertices와 indices가 없으면 바로 컷
+            return;
+		}
+		
+		//무엇을 그릴 지 가져왔으니 이제 GPU에 어떻게 올릴 지 버퍼에 담아보기
+        FMeshBuffer* MeshBuffer = MeshBufferManager->GetSkeletalMeshBuffer(SkinnedMeshComp);
+        if (!MeshBuffer)
+        {
+			//담기 실패하면 컷
+            return;
+		}
+
+        const TArray<FSkeletalMeshSection>& Sections = SkeletalMesh->GetSections();
+        const TArray<uint32>& Indices = SkeletalMesh->GetIndices();
+        const bool bDebugCollisionHighlight = ShouldHighlightDebugCollision(Primitive, ViewMode);
+        const FVector4 PrimitiveColor = FColor::White().ToVector4();
+
+		if (Sections.empty())
+		{
+			//세션이 따로 없는 단순 메시라면 인덱스 넘겨서 한번에 그림
+			AddSkeletalSectionCommand(Primitive, SkinnedMeshComp, MeshBuffer, RenderBus, bDebugCollisionHighlight, 0, static_cast<uint32>(Indices.size()), 0);
+		}
+		else
+		{
+            int32 sectionlen = static_cast<int32>(Sections.size());
+            for (int32 SectionIdx = 0; SectionIdx < sectionlen; ++SectionIdx)
+			{
+				const FSkeletalMeshSection& Section = Sections[SectionIdx];
+				//세션으로 구분되어 있으므로 세션 별 인덱스를 뽑아서 그림 
+				AddSkeletalSectionCommand(Primitive, SkinnedMeshComp, MeshBuffer, RenderBus, bDebugCollisionHighlight, Section.StartIndex, Section.IndexCount, SectionIdx);
+			}
+		}
+
+		break;
+	}
+
 	default:
 		if (PrimType == EPrimitiveType::EPT_TransGizmo || PrimType == EPrimitiveType::EPT_RotGizmo || PrimType == EPrimitiveType::EPT_ScaleGizmo)
 		{

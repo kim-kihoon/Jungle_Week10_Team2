@@ -3,6 +3,7 @@
 #include "Component/DecalComponent.h"
 #include "Component/CameraComponent.h"
 #include "Component/StaticMeshComponent.h"
+#include "Component/SkeletalMeshComponent.h"
 #include "Component/TextRenderComponent.h"
 #include "Component/HeightFogComponent.h"
 #include "Component/SkyAtmosphereComponent.h"
@@ -23,6 +24,13 @@
 #include "GameFramework/World.h"
 #include <format>
 
+namespace
+{
+	// FBX 화면 출력 테스트용 하드코딩 경로.
+	constexpr const char* GTestSkeletalMeshPath = "Asset/Fbx/Hip_Hop_Dancing/Hip_Hop_Dancing.fbx";
+	constexpr float GTestSkeletalMeshScale = 1.0f;
+}
+
 DEFINE_CLASS(APawnActor, AActor)
 REGISTER_FACTORY(APawnActor)
 
@@ -31,6 +39,9 @@ REGISTER_FACTORY(ASceneActor)
 
 DEFINE_CLASS(AStaticMeshActor, AActor)
 REGISTER_FACTORY(AStaticMeshActor)
+
+DEFINE_CLASS(ASkeletalMeshActor, AActor)
+REGISTER_FACTORY(ASkeletalMeshActor)
 
 DEFINE_CLASS(ASubUVActor, AActor)
 REGISTER_FACTORY(ASubUVActor)
@@ -174,6 +185,23 @@ void AStaticMeshActor::InitDefaultComponents()
 {
 	auto* StaticMesh = AddComponent<UStaticMeshComponent>();
 	SetRootComponent(StaticMesh);
+}
+
+void ASkeletalMeshActor::InitDefaultComponents()
+{
+	auto* SkeletalMeshComp = AddComponent<USkeletalMeshComponent>();
+	SetRootComponent(SkeletalMeshComp);
+
+	SkeletalMeshComp->SetRelativeScale(FVector(
+		GTestSkeletalMeshScale,
+		GTestSkeletalMeshScale,
+		GTestSkeletalMeshScale));
+
+	USkeletalMesh* TestMesh = FResourceManager::Get().LoadSkeletalMesh(GTestSkeletalMeshPath);
+	if (TestMesh != nullptr)
+	{
+		SkeletalMeshComp->SetSkeletalMesh(TestMesh);
+	}
 }
 
 void ASubUVActor::InitDefaultComponents()

@@ -25,14 +25,7 @@ namespace
 			return ExistingPawn;
 		}
 
-		APawnActor* Pawn = World->SpawnActor<APawnActor>();
-		Pawn->InitDefaultComponents();
-		if (APlayerStartActor* PlayerStart = World->FindPlayerStart())
-		{
-			Pawn->SetActorLocation(PlayerStart->GetActorLocation());
-			Pawn->SetActorRotation(PlayerStart->GetActorRotation());
-		}
-		return Pawn;
+		return nullptr;
 	}
 
 	UCameraComponent* FindPawnCamera(APawnActor* Pawn)

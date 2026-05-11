@@ -6,7 +6,9 @@
 #include "Component/PrimitiveComponent.h"
 #include "Component/DecalComponent.h"
 #include "Component/StaticMeshComponent.h"
+#include "Component/SkinnedMeshComponent.h"
 #include "Asset/StaticMesh.h"
+#include "Asset/SkeletalMesh.h"
 #include "GameFramework/AActor.h"
 #include "Core/ResourceManager.h"
 #include "Object/ObjectIterator.h"
@@ -47,6 +49,76 @@ namespace
 			{
 				FResourceManager::Get().SerializeMaterial(BaseMaterial->GetFilePath(), BaseMaterial);
 			}
+		}
+	}
+
+	FString GetMaterialSlotName(UPrimitiveComponent* PrimitiveComp, int32 SectionIndex)
+	{
+		if (UStaticMeshComponent* MeshComp = Cast<UStaticMeshComponent>(PrimitiveComp))
+		{
+			UStaticMesh* MeshAsset = MeshComp->GetStaticMesh();
+			if (MeshAsset)
+			{
+				const TArray<FStaticMeshSection>& Sections = MeshAsset->GetSections();
+				const TArray<FStaticMeshMaterialSlot>& MatSlots = MeshAsset->GetMaterialSlots();
+				if (SectionIndex >= 0 && SectionIndex < static_cast<int32>(Sections.size()))
+				{
+					const int32 SlotIdx = Sections[SectionIndex].MaterialSlotIndex;
+					if (SlotIdx >= 0 && SlotIdx < static_cast<int32>(MatSlots.size()))
+					{
+						return MatSlots[SlotIdx].SlotName;
+					}
+				}
+			}
+		}
+
+		if (USkinnedMeshComponent* SkinnedComp = Cast<USkinnedMeshComponent>(PrimitiveComp))
+		{
+			USkeletalMesh* MeshAsset = SkinnedComp->GetSkeletalMesh();
+			if (MeshAsset)
+			{
+				const TArray<FSkeletalMeshSection>& Sections = MeshAsset->GetSections();
+				const TArray<FSkeletalMeshMaterialSlot>& MatSlots = MeshAsset->GetMaterialSlots();
+				if (SectionIndex >= 0 && SectionIndex < static_cast<int32>(Sections.size()))
+				{
+					const int32 SlotIdx = Sections[SectionIndex].MaterialSlotIndex;
+					if (SlotIdx >= 0 && SlotIdx < static_cast<int32>(MatSlots.size()))
+					{
+						return MatSlots[SlotIdx].SlotName;
+					}
+				}
+			}
+		}
+
+		return "Slot";
+	}
+
+	void PersistSkeletalMeshDefaultMaterial(UPrimitiveComponent* PrimitiveComp, int32 SectionIndex, UMaterialInterface* Material)
+	{
+		USkinnedMeshComponent* SkinnedComp = Cast<USkinnedMeshComponent>(PrimitiveComp);
+		if (SkinnedComp == nullptr)
+		{
+			return;
+		}
+
+		USkeletalMesh* MeshAsset = SkinnedComp->GetSkeletalMesh();
+		FSkeletalMesh* MeshData = MeshAsset ? MeshAsset->GetMeshData() : nullptr;
+		if (MeshData == nullptr || SectionIndex < 0 || SectionIndex >= static_cast<int32>(MeshData->Sections.size()))
+		{
+			return;
+		}
+
+		const int32 SlotIdx = MeshData->Sections[SectionIndex].MaterialSlotIndex;
+		if (SlotIdx < 0 || SlotIdx >= static_cast<int32>(MeshData->MaterialSlots.size()))
+		{
+			return;
+		}
+
+		MeshData->MaterialSlots[SlotIdx].Material = Material;
+		const FString& MeshPath = MeshAsset->GetAssetPathFileName();
+		if (!MeshPath.empty())
+		{
+			FResourceManager::Get().SaveSkeletalMeshMaterialOverrides(MeshPath, MeshAsset);
 		}
 	}
 }
@@ -166,24 +238,9 @@ void FEditorMaterialWidget::RenderSectionList(UPrimitiveComponent* PrimitiveComp
 	ImGui::Text("Materials (%d)", NumMaterials);
 	ImGui::Separator();
 
-	UStaticMeshComponent* MeshComp = Cast<UStaticMeshComponent>(PrimitiveComp);
-	UStaticMesh* MeshAsset = MeshComp ? MeshComp->GetStaticMesh() : nullptr;
-
 	for (int32 i = 0; i < NumMaterials; ++i)
 	{
-		// 슬롯 이름 가져오기
-		FString SlotName = "Slot";
-		if (MeshAsset)
-		{
-			const TArray<FStaticMeshSection>& Sections = MeshAsset->GetSections();
-			const TArray<FStaticMeshMaterialSlot>& MatSlots = MeshAsset->GetMaterialSlots();
-			if (i < static_cast<int32>(Sections.size()))
-			{
-				int32 SlotIdx = Sections[i].MaterialSlotIndex;
-				if (SlotIdx >= 0 && SlotIdx < static_cast<int32>(MatSlots.size()))
-					SlotName = MatSlots[SlotIdx].SlotName;
-			}
-		}
+		FString SlotName = GetMaterialSlotName(PrimitiveComp, i);
 
 		UMaterialInterface* Material = PrimitiveComp->GetMaterial(i);
 		bool bMissing = (Material == nullptr);
@@ -221,20 +278,7 @@ void FEditorMaterialWidget::RenderMaterialDetails(UPrimitiveComponent* Primitive
 	}
 
 	// 슬롯 이름 표시
-	UStaticMeshComponent* MeshComp = Cast<UStaticMeshComponent>(PrimitiveComp);
-	UStaticMesh* MeshAsset = MeshComp ? MeshComp->GetStaticMesh() : nullptr;
-	FString SlotName = "Slot";
-	if (MeshAsset) 
-	{
-		const TArray<FStaticMeshSection>& Sections = MeshAsset->GetSections();
-		const TArray<FStaticMeshMaterialSlot>& MatSlots = MeshAsset->GetMaterialSlots();
-		if (SelectedSectionIndex < static_cast<int32>(Sections.size())) 
-		{
-			int32 SlotIdx = Sections[SelectedSectionIndex].MaterialSlotIndex;
-			if (SlotIdx >= 0 && SlotIdx < static_cast<int32>(MatSlots.size()))
-				SlotName = MatSlots[SlotIdx].SlotName;
-		}
-	}
+	FString SlotName = GetMaterialSlotName(PrimitiveComp, SelectedSectionIndex);
 	ImGui::Text("Slot [%d]  |  Name: %s", SelectedSectionIndex, SlotName.c_str());
 
 	// MTL 못 읽어 머테리얼 없는 경우 경고
@@ -270,6 +314,7 @@ void FEditorMaterialWidget::RenderMaterialDetails(UPrimitiveComponent* Primitive
 			{
 				PrimitiveComp->SetMaterial(SelectedSectionIndex, NewInstance);
 				SelectedMaterialPtr = NewInstance;
+				PersistSkeletalMeshDefaultMaterial(PrimitiveComp, SelectedSectionIndex, NewInstance);
 
 				FResourceManager::Get().SerializeMaterialInstance(InstancePath, NewInstance);
 			}
@@ -311,6 +356,7 @@ void FEditorMaterialWidget::RenderMaterialDetails(UPrimitiveComponent* Primitive
 			{
 				PrimitiveComp->SetMaterial(SelectedSectionIndex, Materials[i]);
 				SelectedMaterialPtr = Materials[i];
+				PersistSkeletalMeshDefaultMaterial(PrimitiveComp, SelectedSectionIndex, Materials[i]);
 				break;
 			}
 
