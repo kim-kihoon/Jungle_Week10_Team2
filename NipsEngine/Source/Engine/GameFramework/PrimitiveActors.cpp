@@ -27,7 +27,7 @@
 namespace
 {
 	// FBX 화면 출력 테스트용 하드코딩 경로.
-	constexpr const char* GTestSkeletalMeshPath = "Asset/Fbx/Quinn_UE5/SKM_Quinn_Simple.fbx";
+	constexpr const char* GTestSkeletalMeshPath = "Asset/Fbx/Hip_Hop_Dancing/Hip_Hop_Dancing.fbx";
 	constexpr float GTestSkeletalMeshScale = 1.0f;
 }
 

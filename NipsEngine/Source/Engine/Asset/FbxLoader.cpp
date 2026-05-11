@@ -392,6 +392,21 @@ namespace
 			FSkeletalMeshMaterialSlot Slot;
 			Slot.SlotName = GetFbxObjectName(FbxMaterial, "Material");
 			Slot.Material = nullptr;
+			
+			FbxProperty lProperty = FbxMaterial->FindProperty(FbxSurfaceMaterial::sDiffuse);
+			if (lProperty.IsValid() && lProperty.GetSrcObjectCount<FbxFileTexture>() > 0)
+			{
+				FbxFileTexture* lTexture = lProperty.GetSrcObject<FbxFileTexture>(0);
+				if (lTexture)
+				{
+					Slot.ExtractedDiffusePath = lTexture->GetRelativeFileName();
+					if (Slot.ExtractedDiffusePath.empty())
+					{
+						Slot.ExtractedDiffusePath = lTexture->GetFileName();
+					}
+				}
+			}
+
 			Context.LoadedMesh.MaterialSlots.push_back(Slot);
 		}
 

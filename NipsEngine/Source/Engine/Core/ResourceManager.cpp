@@ -2359,11 +2359,60 @@ USkeletalMesh* FResourceManager::LoadSkeletalMesh(const FString& Path)
 
     LoadSkeletalMeshMaterialOverrides(Path, LoadedMesh);
 
+    std::filesystem::path MeshPath(FPaths::ToAbsolute(FPaths::ToWide(Path)));
+    std::filesystem::path MeshDir = MeshPath.parent_path();
+
     for (FSkeletalMeshMaterialSlot& Slot : LoadedMesh->GetMeshData()->MaterialSlots)
     {
         if (Slot.Material == nullptr)
         {
             Slot.Material = GetMaterialInterface(Slot.SlotName);
+        }
+
+        // FbxLoader에서 추출한 텍스처가 있다면 Material 자동 생성
+        if (Slot.Material == nullptr && !Slot.ExtractedDiffusePath.empty())
+        {
+            std::filesystem::path TexRelativePath(FPaths::ToWide(Slot.ExtractedDiffusePath));
+            std::filesystem::path FullTexPath = MeshDir / TexRelativePath.filename(); // 같은 폴더(혹은 .fbm) 안에서 텍스처 찾기
+
+            if (!std::filesystem::exists(FullTexPath)) 
+            {
+                 // 혹시 fbm 폴더 안에 있는지 확인
+                 std::wstring fbmFolderName = MeshPath.stem().wstring() + L".fbm";
+                 std::filesystem::path fbmTexPath = MeshDir / fbmFolderName / TexRelativePath.filename();
+                 if (std::filesystem::exists(fbmTexPath))
+                 {
+                     FullTexPath = fbmTexPath;
+                 }
+            }
+
+            if (std::filesystem::exists(FullTexPath))
+            {
+                FString RelativeTexPath = FPaths::ToRelativeString(FullTexPath.wstring().c_str());
+                
+                // 새로운 머테리얼 인스턴스 경로 (Asset/Fbx/.../SlotName.matinst)
+                std::filesystem::path NewMatPath = MeshDir / (FPaths::ToWide(Slot.SlotName) + L".matinst");
+                FString RelativeMatPath = FPaths::ToRelativeString(NewMatPath.wstring().c_str());
+
+                // DefaultUberLit을 Base로 하는 Instance 생성
+                UMaterial* BaseMat = GetMaterial("DefaultWhite"); // 혹은 DefaultUberLit 기반 머테리얼
+                if (BaseMat)
+                {
+                    UMaterialInstance* NewInst = CreateMaterialInstance(RelativeMatPath, BaseMat);
+                    if (NewInst)
+                    {
+                        // Diffuse 텍스처 할당
+                        UTexture* Tex = LoadTexture(RelativeTexPath, CachedDevice.Get());
+                        if (Tex)
+                        {
+                            NewInst->SetParam("DiffuseMap", FMaterialParamValue(Tex));
+                            NewInst->SetParam("bHasDiffuseMap", FMaterialParamValue(true));
+                            SerializeMaterialInstance(RelativeMatPath, NewInst);
+                            Slot.Material = NewInst;
+                        }
+                    }
+                }
+            }
         }
 
         if (Slot.Material == nullptr)
