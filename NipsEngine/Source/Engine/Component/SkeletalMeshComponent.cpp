@@ -15,12 +15,18 @@ REGISTER_FACTORY(USkeletalMeshComponent)
 
 namespace
 {
+/*
 	constexpr int32 DebugRotateBoneIndex = 19;
 	constexpr float DebugRotateDegrees = 45.0f;
+*/
 }
 
 void USkeletalMeshComponent::SetSkeletalMesh(USkeletalMesh* InSkeletalMesh)
 {
+	LocalBoneTransforms.clear();
+	GlobalBoneMatrices.clear();
+	SkinningMatrices.clear();
+
     USkinnedMeshComponent::SetSkeletalMesh(InSkeletalMesh);
 	InitializeBonePoses();
 
@@ -29,6 +35,7 @@ void USkeletalMeshComponent::SetSkeletalMesh(USkeletalMesh* InSkeletalMesh)
 		return;
 	}
 
+/*
 	const TArray<FSkeletalBone>& Bones = SkeletalMeshAsset->GetBones();
 	if (DebugRotateBoneIndex < 0 || DebugRotateBoneIndex >= static_cast<int32>(Bones.size()))
 	{
@@ -49,6 +56,7 @@ void USkeletalMeshComponent::SetSkeletalMesh(USkeletalMesh* InSkeletalMesh)
 	PerformCPUSkinning();
 	MarkBoundsDirty();
 	bPoseDirty = false;
+*/
 }
 
 void USkeletalMeshComponent::SetBoneLocalTransform(int32 BoneIndex, const FTransform& NewTransform)

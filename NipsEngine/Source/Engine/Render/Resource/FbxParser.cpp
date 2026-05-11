@@ -612,6 +612,16 @@ FSkeletalMesh* FbxParser::ParseFbx(const std::string& FilePath)
 	Importer->Import(Scene);
 	Importer->Destroy();
 
+	FbxAxisSystem EngineAxisSystem;
+	if (FbxAxisSystem::ParseAxisSystem("yzx", EngineAxisSystem))
+	{
+		EngineAxisSystem.DeepConvertScene(Scene);
+	}
+	else
+	{
+		UE_LOG("Fbx Parser 엔진 축계 파싱 실패: yzx");
+	}
+
 	// 다각형 삼각형화
 	FbxGeometryConverter GeometryConverter(SdkManager);
 	GeometryConverter.Triangulate(Scene, true);

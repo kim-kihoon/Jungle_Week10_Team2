@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cwctype>
 #include <cstring>
 #include <cstdio>
 #include <cstdint>
@@ -33,6 +34,16 @@
 namespace
 {
 	constexpr const char* DefaultUberLitShaderPath = "Shaders/UberLit.hlsl";
+
+	std::wstring ToLowerExtension(std::wstring Extension)
+	{
+		std::transform(Extension.begin(), Extension.end(), Extension.begin(),
+			[](wchar_t Ch)
+			{
+				return static_cast<wchar_t>(std::towlower(Ch));
+			});
+		return Extension;
+	}
 
 	bool TryLoadKnownMaterialShader(FResourceManager& ResourceManager, const FString& ShaderName)
 	{
@@ -486,6 +497,7 @@ void FResourceManager::LoadFromAssetDirectory(const FString& Path)
 {
 	//	초기화
 	ObjFilePaths.clear();
+	SkeletalMeshFilePaths.clear();
 	FontFilePaths.clear();
 	TextureFilePaths.clear();
 	MaterialFilePaths.clear();
@@ -517,7 +529,7 @@ void FResourceManager::LoadFromAssetDirectory(const FString& Path)
 		}
 
 		const fs::path& FilePath = Entry.path();
-		const std::wstring Extension = FilePath.extension().wstring();
+		const std::wstring Extension = ToLowerExtension(FilePath.extension().wstring());
 
 		if (Extension == L".meta")
 		{
@@ -610,6 +622,7 @@ void FResourceManager::RefreshFromAssetDirectory(const FString& Path)
 	namespace fs = std::filesystem;
 
 	ObjFilePaths.clear();
+	SkeletalMeshFilePaths.clear();
 	FontFilePaths.clear();
 	TextureFilePaths.clear();
 	MaterialFilePaths.clear();
@@ -637,7 +650,7 @@ void FResourceManager::RefreshFromAssetDirectory(const FString& Path)
 			}
 
 			const fs::path& FilePath = Entry.path();
-			const std::wstring Extension = FilePath.extension().wstring();
+			const std::wstring Extension = ToLowerExtension(FilePath.extension().wstring());
 
 			if (Extension == L".meta" || Extension == L".bin")
 			{
@@ -666,6 +679,10 @@ void FResourceManager::RefreshFromAssetDirectory(const FString& Path)
 			{
 				MaterialFilePaths.push_back(RelativePath);
 				DeserializeMaterial(RelativePath);
+			}
+			else if (Extension == L".fbx")
+			{
+				SkeletalMeshFilePaths.push_back(RelativePath);
 			}
 			else if (Extension == L".matinst")
 			{
@@ -2259,6 +2276,8 @@ USkeletalMesh* FResourceManager::LoadSkeletalMesh(const FString& Path)
 		}
 		return nullptr;
 	}
+
+	LoadedMeshData->PathFileName = Path;
 
 	for (FSkeletalMeshMaterialSlot& Slot : LoadedMeshData->Slots)
 	{

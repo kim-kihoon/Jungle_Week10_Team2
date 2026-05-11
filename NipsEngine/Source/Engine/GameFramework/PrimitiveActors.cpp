@@ -185,15 +185,6 @@ void ASkeletalMeshActor::InitDefaultComponents()
 {
 	auto* SkeletalMesh = AddComponent<USkeletalMeshComponent>();
 	SetRootComponent(SkeletalMesh);
-
-	const FString DefaultFbxPath = "Asset/Fbx/SKM_Quinn_Simple.FBX";
-
-	USkeletalMesh* MeshAsset = FResourceManager::Get().LoadSkeletalMesh(DefaultFbxPath);
-
-	if (MeshAsset)
-	{
-		SkeletalMesh->SetSkeletalMesh(MeshAsset);
-	}
 }
 
 void ASubUVActor::InitDefaultComponents()

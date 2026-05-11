@@ -129,7 +129,8 @@ void USkinnedMeshComponent::PerformCPUSkinning()
 
 	const TArray<FSkeletalMeshVertex>& SourceVertices = SkeletalMeshAsset->GetVertices();
 
-	for (int32 i = 0; i < SourceVertices.size(); ++i)
+	const int32 VertexCount = static_cast<int32>(std::min(SourceVertices.size(), RenderVertices.size()));
+	for (int32 i = 0; i < VertexCount; ++i)
 	{
 		const FSkeletalMeshVertex& SrcV = SourceVertices[i];
 		FNormalVertex& DestV = RenderVertices[i];
@@ -143,6 +144,10 @@ void USkinnedMeshComponent::PerformCPUSkinning()
 			if (Weight > 0.0f)
 			{
 				int32 BoneIdx = SrcV.BoneIndices[w];
+				if (BoneIdx < 0 || BoneIdx >= static_cast<int32>(SkinningMatrices.size()))
+				{
+					continue;
+				}
 
 				const FMatrix& SkinMat = SkinningMatrices[BoneIdx];
 
