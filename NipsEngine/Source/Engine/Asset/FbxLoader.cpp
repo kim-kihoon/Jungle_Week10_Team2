@@ -342,6 +342,13 @@ FFbxImportPath BuildImportPathForFbxSdk(const FString& SourcePath)
     return Result;
 }
 
+// Gets the directory path for embedded media extraction based on the source FBX file path.
+std::filesystem::path GetEmbeddedMediaExtractionDir(const FString& SourcePath)
+{
+    const std::filesystem::path SourceAbsolutePath(FPaths::ToAbsolute(FPaths::ToWide(SourcePath)));
+    return SourceAbsolutePath.parent_path() / (SourceAbsolutePath.stem().wstring() + L".fbm");
+}
+
 FMatrix ConvertFbxMatrixToEngineMatrix(const FbxAMatrix& Matrix)
 {
     return FMatrix(
@@ -922,13 +929,17 @@ USkeletalMesh* FFbxImporter::ImportSkeletalMesh(const FString& Path, const FSkel
     // Create an IOSettings object. This object holds all import/export settings.
     FbxIOSettings* IOSettings = FbxIOSettings::Create(Manager, IOSROOT);
     Manager->SetIOSettings(IOSettings);
+    
+	// Configure import settings to optimize for skeletal mesh data and embedded media.
+	IOSettings->SetBoolProp(IMP_FBX_MATERIAL, true);
+    IOSettings->SetBoolProp(IMP_FBX_TEXTURE, true);
+    IOSettings->SetBoolProp(IMP_FBX_EXTRACT_EMBEDDED_DATA, true);
 
     // Create an importer using the SDK manager.
     FbxImporter* Importer = FbxImporter::Create(Manager, "");
 
     // Build the import path, creating a temporary ASCII path if necessary for the FBX SDK.
     FFbxImportPath ImportPath = BuildImportPathForFbxSdk(Path);
-
 
     // Initialize the importer by providing a filename.
     if (Importer == nullptr || !Importer->Initialize(ImportPath.ImportPath.c_str(), -1, Manager->GetIOSettings()))
@@ -940,6 +951,21 @@ USkeletalMesh* FFbxImporter::ImportSkeletalMesh(const FString& Path, const FSkel
         }
         Manager->Destroy();
         return nullptr;
+    }
+
+	// Ensure the embedded media extraction directory exists and set it for the importer.
+    const std::filesystem::path EmbeddedMediaDir = GetEmbeddedMediaExtractionDir(Path);
+    std::error_code ErrorCode;
+    std::filesystem::create_directories(EmbeddedMediaDir, ErrorCode);
+    if (!ErrorCode)
+    {
+        const FString EmbeddedMediaDirUtf8 = FPaths::ToUtf8(EmbeddedMediaDir.generic_wstring());
+        Importer->SetEmbeddingExtractionFolder(EmbeddedMediaDirUtf8.c_str());
+        IOSettings->SetStringProp(IMP_EXTRACT_FOLDER, EmbeddedMediaDirUtf8.c_str());
+    }
+    else
+    {
+        UE_LOG("[FbxImporter] Failed to create embedded media folder: %s", FPaths::ToUtf8(EmbeddedMediaDir.generic_wstring()).c_str());
     }
 
     // Create an FbxScene.
