@@ -37,10 +37,10 @@ public:
 	virtual void PerformCPUSkinning();
 
 protected:
-	virtual void RebuildRenderVertices();
+	virtual void RebuildReferencePoseRenderVertices();
 	virtual void RebuildMeshBuffer();
 	void MarkBoundsDirty();
-	void MarkRenderBufferDirty();
+	void MarkMeshBufferDirty();
 	void EnsureBoundsUpdated() const;
 
 protected:
@@ -53,5 +53,5 @@ protected:
 	FDynamicMeshBuffer MeshBuffer;
 
 	mutable bool bBoundsDirty = true;
-	bool bRenderBufferDirty = true;
+	bool bMeshBufferDirty = true;
 };

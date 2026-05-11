@@ -14,7 +14,7 @@ void USkinnedMeshComponent::PostDuplicate(UObject* Original)
 	SkeletalMeshAssetPath = Orig->SkeletalMeshAssetPath;
 	RenderVertices = Orig->RenderVertices;
 	bBoundsDirty = true;
-	bRenderBufferDirty = true;
+	bMeshBufferDirty = true;
 
 	Materials = TArray<UMaterialInterface*>(Orig->Materials.size());
 	for (int32 i = 0; i < static_cast<int32>(Orig->Materials.size()); ++i)
@@ -108,14 +108,15 @@ void USkinnedMeshComponent::SetSkeletalMesh(USkeletalMesh* InSkeletalMesh)
 	else
 	{
 		SkeletalMeshAssetPath.clear();
+		RenderVertices.clear();
 	}
 
 	MarkBoundsDirty();
-	MarkRenderBufferDirty();
+	MarkMeshBufferDirty();
 
 	if (HasValidMesh())
 	{
-		RebuildRenderVertices();
+		RebuildReferencePoseRenderVertices();
 		RebuildMeshBuffer();
 
 		PerformCPUSkinning();
@@ -170,9 +171,8 @@ bool USkinnedMeshComponent::HasValidMesh() const
 
 FDynamicMeshBuffer* USkinnedMeshComponent::GetRenderBuffer()
 {
-	if (bRenderBufferDirty)
+	if (bMeshBufferDirty || !MeshBuffer.IsValid())
 	{
-		RebuildRenderVertices();
 		RebuildMeshBuffer();
 	}
 
@@ -347,7 +347,7 @@ const FAABB& USkinnedMeshComponent::GetWorldAABB() const
 	return WorldAABB;
 }
 
-void USkinnedMeshComponent::RebuildRenderVertices()
+void USkinnedMeshComponent::RebuildReferencePoseRenderVertices()
 {
 	RenderVertices.clear();
 
@@ -376,7 +376,7 @@ void USkinnedMeshComponent::UpdateRenderVertices(ID3D11DeviceContext* InContext,
 {
 	RenderVertices = InVertices;
 
-	if (bRenderBufferDirty || !MeshBuffer.IsValid())
+	if (bMeshBufferDirty || !MeshBuffer.IsValid())
 	{
 		RebuildMeshBuffer();
 		return;
@@ -391,24 +391,24 @@ void USkinnedMeshComponent::RebuildMeshBuffer()
 
 	if (!HasValidMesh())
 	{
-		bRenderBufferDirty = false;
+		bMeshBufferDirty = false;
 		return;
 	}
 
 	ID3D11Device* Device = FResourceManager::Get().GetCachedDevice();
 	if (Device == nullptr)
 	{
-		bRenderBufferDirty = true;
+		bMeshBufferDirty = true;
 		return;
 	}
 
 	MeshBuffer.Create(Device, RenderVertices, SkeletalMeshAsset->GetMeshData()->Indices);
-	bRenderBufferDirty = false;
+	bMeshBufferDirty = false;
 }
 
-void USkinnedMeshComponent::MarkRenderBufferDirty()
+void USkinnedMeshComponent::MarkMeshBufferDirty()
 {
-	bRenderBufferDirty = true;
+	bMeshBufferDirty = true;
 }
 
 void USkinnedMeshComponent::MarkBoundsDirty()

@@ -13,16 +13,42 @@
 DEFINE_CLASS(USkeletalMeshComponent, USkinnedMeshComponent)
 REGISTER_FACTORY(USkeletalMeshComponent)
 
+namespace
+{
+	constexpr int32 DebugRotateBoneIndex = 19;
+	constexpr float DebugRotateDegrees = 45.0f;
+}
 
 void USkeletalMeshComponent::SetSkeletalMesh(USkeletalMesh* InSkeletalMesh)
 {
     USkinnedMeshComponent::SetSkeletalMesh(InSkeletalMesh);
 	InitializeBonePoses();
 
-	/*LocalBoneTransforms[3].SetRotation(FQuat::MakeFromEuler(FVector(0, 0, 45.0f)));
-	UpdateBoneMatrices();
+	if (!HasValidMesh())
+	{
+		return;
+	}
 
-	PerformCPUSkinning();*/
+	const TArray<FSkeletalBone>& Bones = SkeletalMeshAsset->GetBones();
+	if (DebugRotateBoneIndex < 0 || DebugRotateBoneIndex >= static_cast<int32>(Bones.size()))
+	{
+		UE_LOG("Debug bone index is invalid. BoneIndex: %d, BoneCount: %zu", DebugRotateBoneIndex, Bones.size());
+		return;
+	}
+
+	UE_LOG("Debug rotate Bone[%d] Name: %s Parent: %d",
+		DebugRotateBoneIndex,
+		Bones[DebugRotateBoneIndex].Name.c_str(),
+		Bones[DebugRotateBoneIndex].ParentIndex);
+
+	FTransform TestPose = Bones[DebugRotateBoneIndex].RefLocalTransform;
+	TestPose.SetRotation(TestPose.GetRotation() * FQuat::MakeFromEuler(FVector(0.0f, 0.0f, DebugRotateDegrees)));
+	SetBoneLocalTransform(DebugRotateBoneIndex, TestPose);
+
+	UpdateBoneMatrices();
+	PerformCPUSkinning();
+	MarkBoundsDirty();
+	bPoseDirty = false;
 }
 
 void USkeletalMeshComponent::SetBoneLocalTransform(int32 BoneIndex, const FTransform& NewTransform)
@@ -95,7 +121,7 @@ void USkeletalMeshComponent::TickComponent(float DeltaTime)
 		PerformCPUSkinning();
 
 		bPoseDirty = false;         
-		MarkRenderBufferDirty();
+		MarkBoundsDirty();
 	}
 }
 
@@ -105,7 +131,7 @@ void USkeletalMeshComponent::InitializeBonePoses()
 	if (!HasValidMesh()) return;
 
 	const TArray<FSkeletalBone>& Bones = SkeletalMeshAsset->GetBones();
-	int32 BoneCount = Bones.size();
+	const int32 BoneCount = static_cast<int32>(Bones.size());
 
 	LocalBoneTransforms.resize(BoneCount);
 	GlobalBoneMatrices.resize(BoneCount);
