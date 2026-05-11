@@ -9,6 +9,7 @@
 #include <cstring>
 #include <cstdio>
 #include <cstdint>
+#include <cwctype>
 #include <filesystem>
 #include <fstream>
 #include <ranges>
@@ -61,6 +62,15 @@ namespace
 		}
 
 		return ResourceManager.GetShader(ShaderName);
+	}
+
+	std::wstring ToLowerPathToken(std::wstring Value)
+	{
+		std::transform(Value.begin(), Value.end(), Value.begin(), [](wchar_t Ch)
+		{
+			return static_cast<wchar_t>(std::towlower(Ch));
+		});
+		return Value;
 	}
 
 	TArray<FShaderMacro> NormalizeShaderMacros(TArray<FShaderMacro> Macros)
@@ -429,6 +439,11 @@ FString FResourceManager::MakeStaticMeshBinaryPath(const FString& SourcePath, bo
 	return FPaths::ToString(BinaryPath.wstring());
 }
 
+FString FResourceManager::MakeSkeletalMeshMaterialOverridePath(const FString& SourcePath) const
+{
+	return SourcePath + ".skelmat.json";
+}
+
 bool FResourceManager::IsStaticMeshBinaryValid(const FString& SourcePath, const FString& BinaryPath) const
 {
 	FStaticMeshBinaryHeader Header;
@@ -515,7 +530,7 @@ void FResourceManager::LoadFromAssetDirectory(const FString& Path)
 		}
 
 		const fs::path& FilePath = Entry.path();
-		const std::wstring Extension = FilePath.extension().wstring();
+		const std::wstring Extension = ToLowerPathToken(FilePath.extension().wstring());
 
 		if (Extension == L".meta")
 		{
@@ -635,7 +650,7 @@ void FResourceManager::RefreshFromAssetDirectory(const FString& Path)
 			}
 
 			const fs::path& FilePath = Entry.path();
-			const std::wstring Extension = FilePath.extension().wstring();
+			const std::wstring Extension = ToLowerPathToken(FilePath.extension().wstring());
 
 			if (Extension == L".meta" || Extension == L".bin")
 			{
@@ -808,17 +823,17 @@ FTextureAssetMeta FResourceManager::LoadOrCreateTextureMeta(const std::filesyste
 	}
 
 	// 2. 없으면 기본 생성
-	const std::wstring ParentDir = FilePath.parent_path().filename().wstring();
+	const std::wstring ParentDir = ToLowerPathToken(FilePath.parent_path().filename().wstring());
 
-	if (ParentDir == L"Font")
+	if (ParentDir == L"font")
 	{
 		Meta.Type = EAssetMetaType::Font;
 	}
-	else if (ParentDir == L"Particle")
+	else if (ParentDir == L"particle")
 	{
 		Meta.Type = EAssetMetaType::Particle;
 	}
-	else if (ParentDir == L"Texture")
+	else if (ParentDir == L"texture" || ParentDir == L"textures")
 	{
 		Meta.Type = EAssetMetaType::Texture;
 	}
@@ -2232,6 +2247,101 @@ TArray<FString> FResourceManager::GetStaticMeshPaths() const
 	return ObjFilePaths;
 }
 
+bool FResourceManager::LoadSkeletalMeshMaterialOverrides(const FString& Path, USkeletalMesh* Mesh)
+{
+	using json::JSON;
+
+	if (Mesh == nullptr || Mesh->GetMeshData() == nullptr)
+	{
+		return false;
+	}
+
+	const FString OverridePath = MakeSkeletalMeshMaterialOverridePath(Path);
+	std::ifstream OverrideFile(FPaths::ToWide(OverridePath));
+	if (!OverrideFile.is_open())
+	{
+		return false;
+	}
+
+	FString FileContent((std::istreambuf_iterator<char>(OverrideFile)), std::istreambuf_iterator<char>());
+	JSON Root = JSON::Load(FileContent);
+	if (Root.JSONType() != JSON::Class::Object || !Root.hasKey("Slots"))
+	{
+		return false;
+	}
+
+	JSON& SlotsNode = Root["Slots"];
+	if (SlotsNode.JSONType() != JSON::Class::Array)
+	{
+		return false;
+	}
+
+	TMap<FString, FString> MaterialBySlotName;
+	for (JSON& SlotNode : SlotsNode.ArrayRange())
+	{
+		if (SlotNode.JSONType() != JSON::Class::Object ||
+			!SlotNode.hasKey("SlotName") ||
+			!SlotNode.hasKey("Material"))
+		{
+			continue;
+		}
+
+		MaterialBySlotName[SlotNode["SlotName"].ToString()] = SlotNode["Material"].ToString();
+	}
+
+	bool bAppliedAny = false;
+	for (FSkeletalMeshMaterialSlot& Slot : Mesh->GetMeshData()->MaterialSlots)
+	{
+		auto It = MaterialBySlotName.find(Slot.SlotName);
+		if (It == MaterialBySlotName.end() || It->second.empty())
+		{
+			continue;
+		}
+
+		if (UMaterialInterface* Material = GetMaterialInterface(It->second))
+		{
+			Slot.Material = Material;
+			bAppliedAny = true;
+		}
+	}
+
+	return bAppliedAny;
+}
+
+bool FResourceManager::SaveSkeletalMeshMaterialOverrides(const FString& Path, const USkeletalMesh* Mesh) const
+{
+	using json::JSON;
+
+	if (Mesh == nullptr || Mesh->GetMeshData() == nullptr)
+	{
+		return false;
+	}
+
+	JSON Root = JSON::Make(JSON::Class::Object);
+	Root["Source"] = Path;
+
+	JSON Slots = JSON::Make(JSON::Class::Array);
+	for (const FSkeletalMeshMaterialSlot& Slot : Mesh->GetMeshData()->MaterialSlots)
+	{
+		JSON SlotNode = JSON::Make(JSON::Class::Object);
+		SlotNode["SlotName"] = Slot.SlotName;
+		SlotNode["Material"] = Slot.Material ? Slot.Material->GetName() : "";
+		Slots.append(SlotNode);
+	}
+	Root["Slots"] = Slots;
+
+	const FString OverridePath = MakeSkeletalMeshMaterialOverridePath(Path);
+	std::ofstream OverrideFile(FPaths::ToWide(OverridePath));
+	if (!OverrideFile.is_open())
+	{
+		UE_LOG("[SkeletalMeshMaterial] Failed to write override file: %s", OverridePath.c_str());
+		return false;
+	}
+
+	OverrideFile << Root.dump(4);
+	return true;
+}
+
 USkeletalMesh* FResourceManager::LoadSkeletalMesh(const FString& Path)
 {
     if (USkeletalMesh* FoundMesh = FindSkeletalMesh(Path))
@@ -2247,9 +2357,14 @@ USkeletalMesh* FResourceManager::LoadSkeletalMesh(const FString& Path)
         return nullptr;
     }
 
+    LoadSkeletalMeshMaterialOverrides(Path, LoadedMesh);
+
     for (FSkeletalMeshMaterialSlot& Slot : LoadedMesh->GetMeshData()->MaterialSlots)
     {
-        Slot.Material = GetMaterial(Slot.SlotName);
+        if (Slot.Material == nullptr)
+        {
+            Slot.Material = GetMaterialInterface(Slot.SlotName);
+        }
 
         if (Slot.Material == nullptr)
         {
