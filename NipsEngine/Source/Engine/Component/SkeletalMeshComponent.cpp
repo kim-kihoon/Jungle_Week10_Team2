@@ -16,10 +16,6 @@ void USkeletalMeshComponent::TickComponent(float DeltaTime)
 {
     UMeshComponent::TickComponent(DeltaTime);
 
-    // [TEST] Force skinning update every frame for the hardcoded bone transform test.
-    bBoneTransformsDirty = true;
-    bSkinningDirty = true;
-
     if (bBoneTransformsDirty || bSkinningDirty)
     {
         ComputeSkinnedVertices();
