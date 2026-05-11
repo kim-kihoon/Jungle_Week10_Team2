@@ -412,13 +412,13 @@ void BuildControlPointBoneInfluences(
                 continue;
             }
 
-            FbxAMatrix TransformLinkMatrix;
-            Cluster->GetTransformLinkMatrix(TransformLinkMatrix);
+            FbxAMatrix BindGlobalMatrix;
+            Cluster->GetTransformLinkMatrix(BindGlobalMatrix);
             if (BoneIndex >= static_cast<int32>(OutMesh.InverseBindGlobalMatrices.size()))
             {
                 OutMesh.InverseBindGlobalMatrices.resize(BoneIndex + 1, FMatrix::Identity);
             }
-            OutMesh.InverseBindGlobalMatrices[BoneIndex] = ConvertFbxMatrixToEngineMatrix(TransformLinkMatrix).GetInverse();
+            OutMesh.InverseBindGlobalMatrices[BoneIndex] = ConvertFbxMatrixToEngineMatrix(BindGlobalMatrix).GetInverse();
 
             const int32* ControlPointIndices = Cluster->GetControlPointIndices();
             const double* ControlPointWeights = Cluster->GetControlPointWeights();
