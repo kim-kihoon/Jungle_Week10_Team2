@@ -199,6 +199,7 @@ void FEditorRenderPipeline::RenderSkeletalMeshPreviewViewport(FRenderer& Rendere
 
 	const FViewportRect& Rect = PreviewScene.GetSceneViewport().GetRect();
 	if (Rect.Width <= 0 || Rect.Height <= 0) return;
+	if (PreviewScene.GetWorld() == nullptr) return;
 
 	FViewportRenderResource& ViewportResource = Renderer.AcquireViewportResource(Rect.Width, Rect.Height, PreviewScene.GetViewportIndex());
 	PreviewScene.GetSceneViewport().SetRenderTargetSet(&ViewportResource.GetView());

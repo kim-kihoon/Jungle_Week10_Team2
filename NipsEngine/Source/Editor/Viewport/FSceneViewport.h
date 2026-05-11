@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "Viewport/Viewport.h"
+#include "Viewport/ViewportClient.h"
 #include "Slate/ISlateViewport.h"
 #include "Editor/Utility/EditorUIUtils.h"
 #include "Editor/Viewport/EditorViewportClient.h"
@@ -16,7 +17,7 @@ class FViewportClient;
 class FSceneViewport : public FViewport, public ISlateViewport
 {
 public:
-	void SetClient(FEditorViewportClient* InClient) { Client = InClient; }
+	void SetClient(FViewportClient* InClient) { Client = InClient; }
 	FViewportClient* GetClient() { return Client; }
 	const FViewportClient* GetClient() const { return Client; }
 

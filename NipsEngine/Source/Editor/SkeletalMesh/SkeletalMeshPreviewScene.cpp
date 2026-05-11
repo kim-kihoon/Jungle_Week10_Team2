@@ -3,7 +3,6 @@
 #include "GameFramework/World.h"
 #include "GameFramework/WorldContext.h"
 #include "GameFramework/PrimitiveActors.h"
-#include "Component/SkeletalMeshComponent.h"
 
 static int32 GPreviewWorldCounter = 0;
 
@@ -22,6 +21,7 @@ void FSkeletalMeshPreviewScene::Initialize(UEditorEngine* InEditor)
 	Editor = InEditor;
 
 	ViewportClient.SetPreviewScene(this);
+	PreviewViewport.SetClient(&ViewportClient);
 
 	// 월드 생성
 	std::string ContextName = "SkeletalMeshViewer_Preview_" + std::to_string(GPreviewWorldCounter++);
@@ -29,10 +29,11 @@ void FSkeletalMeshPreviewScene::Initialize(UEditorEngine* InEditor)
 
 	FWorldContext& Context = Editor->CreateWorldContext(EWorldType::ViewerPreview, WorldHandle, ContextName);
 	PreviewWorld = Context.World;
+	PreviewWorld->SetWorldType(EWorldType::ViewerPreview);
+	PreviewWorld->SetActiveCamera(ViewportClient.GetCamera());
 
 	// Preview용 액터 스폰
-	PreviewActor = PreviewWorld->SpawnActor<ASkeletalMeshActor>();
-	PreviewMeshComponent = static_cast<USkeletalMeshComponent*>(PreviewActor->GetRootComponent());
+	PreviewActor = PreviewWorld->SpawnActor<ASceneActor>();
 
 	// Directional Light 액터 스폰
 	auto* LightActor = PreviewWorld->SpawnActor<ADirectionalLightActor>();
@@ -46,7 +47,7 @@ void FSkeletalMeshPreviewScene::Shutdown()
 
 		PreviewWorld = nullptr;
 		PreviewActor = nullptr;
-		PreviewMeshComponent = nullptr;
+		PreviewViewport.SetClient(nullptr);
 		Editor = nullptr;
 	}
 }
@@ -70,20 +71,13 @@ void FSkeletalMeshPreviewScene::SetVisible(bool bInVisible)
 
 void FSkeletalMeshPreviewScene::SetSkeletalMesh(USkeletalMesh* Mesh)
 {
-	if (PreviewMeshComponent)
-	{
-		PreviewMeshComponent->SetSkeletalMesh(Mesh);
-		ResetPose();
-	}
+	(void)Mesh;
+	ResetPose();
 }
 
 void FSkeletalMeshPreviewScene::ResetPose()
 {
-	if (PreviewMeshComponent)
-	{
-		// 본 포즈를 레퍼런스 포즈로 리셋하는 로직 호출
-		// PreviewMeshComponent->ResetBonePose(); 
-	}
+	// SkeletalMesh runtime component가 추가되면 여기에서 reference pose로 리셋합니다.
 }
 
 void FSkeletalMeshPreviewScene::SetViewportSize(uint32 Width, uint32 Height)

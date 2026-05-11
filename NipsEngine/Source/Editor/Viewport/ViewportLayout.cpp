@@ -44,21 +44,22 @@ void FEditorViewportLayout::Init(FWindowsWindow* InWindow, UWorld* World, FSelec
 	// 4개 뷰포트 클라이언트 초기화
 	for (int32 i = 0; i < MaxViewports; ++i)
 	{
-		SceneViewports[i].GetClient()->SetSettings(&FEditorSettings::Get());
-		SceneViewports[i].GetClient()->Initialize(Window, EditorEngine);
-		SceneViewports[i].GetClient()->SetWorld(World);
-		SceneViewports[i].GetClient()->SetGizmo(SelectionManager->GetGizmo());
-		SceneViewports[i].GetClient()->SetSelectionManager(SelectionManager);
+		FEditorViewportClient* Client = GetViewportClient(i);
+		Client->SetSettings(&FEditorSettings::Get());
+		Client->Initialize(Window, EditorEngine);
+		Client->SetWorld(World);
+		Client->SetGizmo(SelectionManager->GetGizmo());
+		Client->SetSelectionManager(SelectionManager);
 		
 		// 상호 참조 연결
-		SceneViewports[i].GetClient()->SetViewport(&SceneViewports[i]);
-		SceneViewports[i].GetClient()->SetState(&SceneViewports[i].GetState());
+		Client->SetViewport(&SceneViewports[i]);
+		Client->SetState(&SceneViewports[i].GetState());
 
 		// 뷰포트 타입 설정 후 카메라 생성
-		SceneViewports[i].GetClient()->SetViewportType(kViewportTypes[i]);
-		SceneViewports[i].GetClient()->CreateCamera();
-		SceneViewports[i].GetClient()->ApplyCameraMode();
-		SceneViewports[i].GetClient()->SetMoveSpeed(S.CameraZoomSpeed);
+		Client->SetViewportType(kViewportTypes[i]);
+		Client->CreateCamera();
+		Client->ApplyCameraMode();
+		Client->SetMoveSpeed(S.CameraZoomSpeed);
 	}
 }
 
@@ -84,7 +85,7 @@ void FEditorViewportLayout::UpdateHoverStates()
 	// 1 - 1. 특정 뷰포트에서 기즈모 홀딩중이라면 스킵합니다.
 	for (int i = 0; i < MaxViewports; ++i)
 	{
-		if (SceneViewports[i].GetClient()->GetGizmo()->IsHolding())
+		if (GetViewportClient(i)->GetGizmo()->IsHolding())
 			return;
 	}
 
@@ -227,7 +228,7 @@ void FEditorViewportLayout::InitViewportRect(uint32 Width, uint32 Height)
 	for (int32 i = 0; i < MaxViewports; ++i)
 	{
 		SceneViewports[i].SetRect(Rects[i]);
-		SceneViewports[i].GetClient()->SetViewportSize(static_cast<float>(Rects[i].Width), static_cast<float>(Rects[i].Height));
+		GetViewportClient(i)->SetViewportSize(static_cast<float>(Rects[i].Width), static_cast<float>(Rects[i].Height));
 	}
 }
 
@@ -242,11 +243,9 @@ void FEditorViewportLayout::BuildViewportLayout(int32 Width, int32 Height)
 		FSceneViewport& VP = SceneViewports[i];
 		// Build 시 DestroyViewportLayout()에서 끊어진 Client-Viewport-State 연결을 복구한다.
 		VP.SetClient(&ViewportClients[i]);
-		if (FEditorViewportClient* VC = SceneViewports[i].GetClient())
-		{
-			VC->SetViewport(&SceneViewports[i]);
-			VC->SetState(&SceneViewports[i].GetState());
-		}
+		FEditorViewportClient* VC = GetViewportClient(i);
+		VC->SetViewport(&SceneViewports[i]);
+		VC->SetState(&SceneViewports[i].GetState());
 
 		FViewportRenderResource RenderResource = Editor->GetRenderer().AcquireViewportResource(VP.GetRect().Width, VP.GetRect().Height, i);
 		VP.SetRenderTargetSet(&RenderResource.GetView());
@@ -346,7 +345,7 @@ void FEditorViewportLayout::SyncViewportRects()
 					static_cast<int32>(Full.Width),
 					static_cast<int32>(Full.Height));
 				SceneViewports[i].SetRect(VR);
-				SceneViewports[i].GetClient()->SetViewportSize(Full.Width, Full.Height);
+				GetViewportClient(i)->SetViewportSize(Full.Width, Full.Height);
 			}
 			else
 			{
@@ -373,7 +372,7 @@ void FEditorViewportLayout::SyncViewportRects()
 		// 스플리터 드래그로 바뀐 크기를 ViewportState, SceneViewport,
 		// ViewportClient 카메라 종횡비에 모두 반영합니다.
 		SceneViewports[i].SetRect(VR);
-		SceneViewports[i].GetClient()->SetViewportSize(R.Width, R.Height);
+		GetViewportClient(i)->SetViewportSize(R.Width, R.Height);
 	}
 }
 
@@ -403,11 +402,9 @@ void FEditorViewportLayout::DestroyViewportLayout()
 	{
 		// delete ViewportWidgets[i];
 		// ViewportWidgets[i] = nullptr;
-		if (FEditorViewportClient* VC = SceneViewports[i].GetClient())
-		{
-			VC->SetViewport(nullptr);
-			VC->SetState(nullptr);
-		}
+		FEditorViewportClient* VC = GetViewportClient(i);
+		VC->SetViewport(nullptr);
+		VC->SetState(nullptr);
 
 		FSceneViewport& VP = SceneViewports[i];
 		Editor->GetRenderer().ReleaseViewportResource(i);

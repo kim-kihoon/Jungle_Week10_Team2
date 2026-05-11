@@ -1,6 +1,6 @@
 ﻿#include "EditorSkeletalMeshViewerWidget.h"
 #include "d3d11.h"
-#include "imgui.h"
+#include "ImGui/imgui.h"
 
 void FEditorSkeletalMeshViewerWidget::Initialize(UEditorEngine* InEditorEngine)
 {

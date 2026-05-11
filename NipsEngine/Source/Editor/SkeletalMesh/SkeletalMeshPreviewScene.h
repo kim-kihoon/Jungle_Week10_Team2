@@ -7,8 +7,7 @@
 
 class UEditorEngine;
 class UWorld;
-class ASkeletalMeshActor;
-class USkeletalMeshComponent;
+class AActor;
 class USkeletalMesh;
 
 class FSkeletalMeshPreviewScene
@@ -34,7 +33,7 @@ public:
 	void SetViewportSize(uint32 Width, uint32 Height);
 
 	UWorld* GetWorld() const { return PreviewWorld; }
-	ASkeletalMeshActor* GetPreviewActor() const { return PreviewActor; }
+	AActor* GetPreviewActor() const { return PreviewActor; }
 	FSkeletalMeshPreviewViewportClient& GetViewportClient() { return ViewportClient; }
 
 private:
@@ -45,6 +44,5 @@ private:
 	FSceneViewport PreviewViewport;
 
 	UWorld* PreviewWorld = nullptr;
-	ASkeletalMeshActor* PreviewActor = nullptr;
-	USkeletalMeshComponent* PreviewMeshComponent = nullptr;
+	AActor* PreviewActor = nullptr;
 };
