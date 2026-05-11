@@ -32,11 +32,22 @@ public:
 
 	// 마우스 입력을 통한 Orbit 카메라 제어용 함수
 	void AddOrbitInput(float DeltaYaw, float DeltaPitch);
-	void AddZoomInput(float DeltaZoom);
+	void AddZoomInput(float Notch, float DeltaTime);
+	void AddPanInput(float DeltaX, float DeltaY, float DeltaTime);
+	void BeginCameraControl();
+	void AddLookInput(float DeltaYaw, float DeltaPitch);
+	void AddMoveInput(float Forward, float Right, float Up, float DeltaTime);
+	void AdjustMoveSpeedScale(float Notch);
 	void ResetCamera();
+
+	void SetMoveSpeed(float InSpeed) { MoveSpeed = InSpeed; }
+	void SetMoveSensitivity(float InSensitivity) { MoveSensitivity = InSensitivity; }
+	void SetRotateSensitivity(float InSensitivity) { RotateSensitivity = InSensitivity; }
+	void SetZoomSpeed(float InSpeed) { ZoomSpeed = InSpeed; }
 
 private:
 	void UpdateCameraTransform();
+	void UpdateCameraRotation();
 
 private:
 	FSkeletalMeshPreviewScene* PreviewScene = nullptr;
@@ -49,4 +60,11 @@ private:
 	float OrbitPitch = 15.0f;
 	float OrbitYaw = 45.0f;
 	float OrbitDistance = 300.0f;
+	float Yaw = 0.0f;
+	float Pitch = 0.0f;
+	float MoveSpeed = 15.0f;
+	float MoveSensitivity = 1.0f;
+	float RotateSensitivity = 1.0f;
+	float ZoomSpeed = 15.0f;
+	float MoveSpeedScale = 1.0f;
 };

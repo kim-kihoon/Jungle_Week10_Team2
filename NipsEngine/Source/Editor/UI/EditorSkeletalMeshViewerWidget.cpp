@@ -2,6 +2,7 @@
 
 #include "d3d11.h"
 #include "Engine/Core/ResourceManager.h"
+#include "Editor/Settings/EditorSettings.h"
 #include "ImGui/imgui.h"
 
 namespace
@@ -76,14 +77,94 @@ void FEditorSkeletalMeshViewerWidget::Render(float DeltaTime)
 			if (ID3D11ShaderResourceView* SRV = PreviewScene.GetSceneViewport().GetOutSRV())
 			{
 				ImGui::Image(reinterpret_cast<ImTextureID>(SRV), ViewportSize);
+				HandleViewportInput(DeltaTime, ImGui::IsItemHovered());
 			}
 			else
 			{
 				ImGui::Dummy(ViewportSize); // 텍스처가 아직 없으면 빈 공간
+				HandleViewportInput(DeltaTime, ImGui::IsItemHovered());
 			}
 		}
 	}
 	ImGui::End();
+}
+
+void FEditorSkeletalMeshViewerWidget::HandleViewportInput(float DeltaTime, bool bViewportHovered)
+{
+	ImGuiIO& IO = ImGui::GetIO();
+	FSkeletalMeshPreviewViewportClient& Client = PreviewScene.GetViewportClient();
+	const FEditorSettings& Settings = FEditorSettings::Get();
+	Client.SetMoveSpeed(Settings.CameraSpeed);
+	Client.SetMoveSensitivity(Settings.CameraMoveSensitivity);
+	Client.SetRotateSensitivity(Settings.CameraRotateSensitivity);
+	Client.SetZoomSpeed(Settings.CameraZoomSpeed);
+
+	const bool bMouseControlDown =
+		ImGui::IsMouseDown(ImGuiMouseButton_Right) ||
+		ImGui::IsMouseDown(ImGuiMouseButton_Middle);
+	const bool bRightMouseDown = ImGui::IsMouseDown(ImGuiMouseButton_Right);
+	const bool bBeginCapture = bViewportHovered && bMouseControlDown && !bViewportInputCaptured;
+
+	if (bBeginCapture)
+	{
+		bViewportInputCaptured = true;
+		if (bRightMouseDown)
+		{
+			Client.BeginCameraControl();
+		}
+	}
+	else if (!bMouseControlDown)
+	{
+		bViewportInputCaptured = false;
+	}
+
+	if (!bViewportHovered && !bViewportInputCaptured)
+	{
+		return;
+	}
+
+	if ((bViewportHovered || bViewportInputCaptured) && IO.MouseWheel != 0.0f)
+	{
+		if (bRightMouseDown && Client.GetViewportType() == EVT_Perspective)
+		{
+			Client.AdjustMoveSpeedScale(IO.MouseWheel);
+		}
+		else
+		{
+			Client.AddZoomInput(IO.MouseWheel, DeltaTime);
+		}
+	}
+
+	const bool bMiddleMouseDown = ImGui::IsMouseDown(ImGuiMouseButton_Middle);
+	const bool bHasMouseDelta = IO.MouseDelta.x != 0.0f || IO.MouseDelta.y != 0.0f;
+	if (bRightMouseDown && bHasMouseDelta && (IO.KeyShift || Client.GetViewportType() != EVT_Perspective))
+	{
+		Client.AddPanInput(IO.MouseDelta.x, IO.MouseDelta.y, DeltaTime);
+	}
+	else if (bRightMouseDown && bHasMouseDelta)
+	{
+		Client.AddLookInput(IO.MouseDelta.x, IO.MouseDelta.y);
+	}
+	else if (bMiddleMouseDown && bHasMouseDelta)
+	{
+		Client.AddPanInput(IO.MouseDelta.x, IO.MouseDelta.y, DeltaTime);
+	}
+
+	if (bRightMouseDown)
+	{
+		float Forward = 0.0f;
+		float Right = 0.0f;
+		float Up = 0.0f;
+
+		if (ImGui::IsKeyDown(ImGuiKey_W)) Forward += 1.0f;
+		if (ImGui::IsKeyDown(ImGuiKey_S)) Forward -= 1.0f;
+		if (ImGui::IsKeyDown(ImGuiKey_D)) Right += 1.0f;
+		if (ImGui::IsKeyDown(ImGuiKey_A)) Right -= 1.0f;
+		if (ImGui::IsKeyDown(ImGuiKey_E)) Up += 1.0f;
+		if (ImGui::IsKeyDown(ImGuiKey_Q)) Up -= 1.0f;
+
+		Client.AddMoveInput(Forward, Right, Up, DeltaTime);
+	}
 }
 
 void FEditorSkeletalMeshViewerWidget::RenderToolbar()

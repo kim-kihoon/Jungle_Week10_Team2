@@ -5,18 +5,14 @@ FSkeletalMeshPreviewViewportClient::FSkeletalMeshPreviewViewportClient()
 	Camera.SetProjectionType(EViewportProjectionType::Perspective);
 	Camera.SetFOV(MathUtil::DegreesToRadians(90.0f));
 	Camera.SetNearPlane(1.0f);
-	Camera.SetFarPlane(100.0f);
+	Camera.SetFarPlane(1000.0f);
 
 	ResetCamera();
 }
 
 void FSkeletalMeshPreviewViewportClient::Tick(float DeltaTime)
 {
-	// 필요시 보간(Lerp) 로직을 여기에 추가할 수 있습니다.
-	if (ViewportType == EVT_Perspective)
-	{
-		UpdateCameraTransform();
-	}
+	(void)DeltaTime;
 }
 
 void FSkeletalMeshPreviewViewportClient::BuildSceneView(FSceneView& OutView) const
@@ -43,17 +39,104 @@ void FSkeletalMeshPreviewViewportClient::AddOrbitInput(float DeltaYaw, float Del
 	UpdateCameraTransform();
 }
 
-void FSkeletalMeshPreviewViewportClient::AddZoomInput(float DeltaZoom)
+void FSkeletalMeshPreviewViewportClient::AddZoomInput(float Notch, float DeltaTime)
 {
+	if (Notch == 0.0f)
+	{
+		return;
+	}
+
 	if (ViewportType == EVT_Perspective)
 	{
-		OrbitDistance = MathUtil::Clamp(OrbitDistance - DeltaZoom, 0.5f, 20.0f);
-		UpdateCameraTransform();
+		const FVector Forward = Camera.GetForwardVector().GetSafeNormal();
+		const FVector NewLocation = Camera.GetLocation() + Forward * Notch * ZoomSpeed;
+		Camera.SetLocation(NewLocation);
+		ViewTarget = NewLocation + Forward * OrbitDistance;
 	}
 	else
 	{
-		Camera.SetOrthoHeight(MathUtil::Clamp(Camera.GetOrthoHeight() - DeltaZoom, 0.1f, 100.0f));
+		const float NewHeight = Camera.GetOrthoHeight() - Notch * 300.0f * MoveSensitivity * DeltaTime;
+		Camera.SetOrthoHeight(MathUtil::Clamp(NewHeight, 0.1f, 1000.0f));
 	}
+}
+
+void FSkeletalMeshPreviewViewportClient::AddPanInput(float DeltaX, float DeltaY, float DeltaTime)
+{
+	const float PanScale = (Camera.IsOrthographic()
+		? Camera.GetOrthoHeight() * 0.002f
+		: 20.0f) * MoveSensitivity;
+
+	const FVector Right = Camera.GetEffectiveRight().GetSafeNormal();
+	const FVector Up = Camera.GetEffectiveUp().GetSafeNormal();
+	const FVector PanDelta = Right * (-DeltaX * PanScale * DeltaTime) + Up * (DeltaY * PanScale * DeltaTime);
+	ViewTarget += PanDelta;
+	Camera.SetLocation(Camera.GetLocation() + PanDelta);
+
+	if (ViewportType != EVT_Perspective)
+	{
+		ApplyCameraMode();
+	}
+}
+
+void FSkeletalMeshPreviewViewportClient::BeginCameraControl()
+{
+	if (ViewportType != EVT_Perspective)
+	{
+		return;
+	}
+
+	const FVector Forward = Camera.GetForwardVector().GetSafeNormal();
+	Pitch = MathUtil::RadiansToDegrees(std::asin(MathUtil::Clamp(Forward.Z, -1.0f, 1.0f)));
+	Yaw = MathUtil::RadiansToDegrees(std::atan2(Forward.Y, Forward.X));
+}
+
+void FSkeletalMeshPreviewViewportClient::AddLookInput(float DeltaYaw, float DeltaPitch)
+{
+	if (ViewportType != EVT_Perspective)
+	{
+		return;
+	}
+
+	Camera.ClearCustomLookDir();
+	const float RotationSpeed = 0.15f * RotateSensitivity;
+	Yaw += DeltaYaw * RotationSpeed;
+	Pitch -= DeltaPitch * RotationSpeed;
+	Pitch = MathUtil::Clamp(Pitch, -89.0f, 89.0f);
+	UpdateCameraRotation();
+	ViewTarget = Camera.GetLocation() + Camera.GetForwardVector().GetSafeNormal() * OrbitDistance;
+}
+
+void FSkeletalMeshPreviewViewportClient::AddMoveInput(float Forward, float Right, float Up, float DeltaTime)
+{
+	if (ViewportType != EVT_Perspective)
+	{
+		return;
+	}
+
+	FVector MoveDelta = FVector::ZeroVector;
+	MoveDelta += Camera.GetEffectiveForward().GetSafeNormal() * Forward;
+	MoveDelta += Camera.GetEffectiveRight().GetSafeNormal() * Right;
+	MoveDelta += FVector::UpVector * Up;
+
+	if (MoveDelta.IsNearlyZero())
+	{
+		return;
+	}
+
+	MoveDelta = MoveDelta.GetSafeNormal() * MoveSpeed * MoveSpeedScale * MoveSensitivity * DeltaTime;
+	Camera.SetLocation(Camera.GetLocation() + MoveDelta);
+	ViewTarget += MoveDelta;
+}
+
+void FSkeletalMeshPreviewViewportClient::AdjustMoveSpeedScale(float Notch)
+{
+	if (Notch == 0.0f)
+	{
+		return;
+	}
+
+	MoveSpeedScale *= std::pow(1.25f, Notch);
+	MoveSpeedScale = MathUtil::Clamp(MoveSpeedScale, 0.05f, 20.0f);
 }
 
 void FSkeletalMeshPreviewViewportClient::ResetCamera()
@@ -62,6 +145,8 @@ void FSkeletalMeshPreviewViewportClient::ResetCamera()
 	OrbitYaw = -45.0f;
 	OrbitDistance = 3.0f;
 	ViewTarget = FVector(0.0f, 0.0f, 1.0f); // 1미터 정도 높이를 타겟으로
+	Camera.SetOrthoHeight(10.0f);
+	MoveSpeedScale = 1.0f;
 	UpdateCameraTransform();
 }
 
@@ -130,4 +215,28 @@ void FSkeletalMeshPreviewViewportClient::UpdateCameraTransform()
 
 	Camera.SetRotation(CameraRot);
 	Camera.SetLocation(CameraLoc);
+}
+
+void FSkeletalMeshPreviewViewportClient::UpdateCameraRotation()
+{
+	const float PitchRad = MathUtil::DegreesToRadians(Pitch);
+	const float YawRad = MathUtil::DegreesToRadians(Yaw);
+
+	FVector Forward(std::cos(PitchRad) * std::cos(YawRad), std::cos(PitchRad) * std::sin(YawRad), std::sin(PitchRad));
+	Forward = Forward.GetSafeNormal();
+
+	FVector Right = FVector::CrossProduct(FVector::UpVector, Forward).GetSafeNormal();
+	if (Right.IsNearlyZero())
+	{
+		return;
+	}
+
+	FVector Up = FVector::CrossProduct(Forward, Right).GetSafeNormal();
+
+	FMatrix RotationMatrix = FMatrix::Identity;
+	RotationMatrix.SetAxes(Forward, Right, Up);
+
+	FQuat NewRotation(RotationMatrix);
+	NewRotation.Normalize();
+	Camera.SetRotation(NewRotation);
 }

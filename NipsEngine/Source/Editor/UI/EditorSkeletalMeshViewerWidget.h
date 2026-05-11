@@ -9,8 +9,6 @@ public:
 	virtual void Initialize(UEditorEngine* InEditorEngine) override;
 	virtual void Render(float DeltaTime) override;
 
-	void Open() { bIsOpen = true; }
-	void Close() { bIsOpen = false; }
 	void SetOpen(bool bInOpen) { bIsOpen = bInOpen; }
 	bool IsOpen() const { return bIsOpen; }
 
@@ -18,8 +16,10 @@ public:
 
 private:
 	void RenderToolbar();
+	void HandleViewportInput(float DeltaTime, bool bViewportHovered);
 
 	bool bIsOpen = false;
+	bool bViewportInputCaptured = false;
 	int32 SelectedMeshPathIndex = -1;
 	TArray<FString> CachedSkeletalMeshPaths;
 

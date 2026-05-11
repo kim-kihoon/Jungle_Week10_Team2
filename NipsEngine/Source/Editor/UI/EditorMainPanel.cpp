@@ -152,7 +152,6 @@ void FEditorMainPanel::Create(FWindowsWindow* InWindow, FRenderer& InRenderer, U
 	ToolbarWidget.SetPanelVisibilityRefs(&bShowConsole, &bShowControl, &bShowProperty, &bShowSceneManager,
 										 &bShowMaterialEditor, &bShowStatProfiler, &bShowSkeletalMeshViewer);
 
-	SkeletalMeshViewerWidget.SetOpen(bShowSkeletalMeshViewer);
 }
 
 void FEditorMainPanel::Release()
