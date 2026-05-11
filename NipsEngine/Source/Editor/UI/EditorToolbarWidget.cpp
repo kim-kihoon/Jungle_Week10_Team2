@@ -120,7 +120,8 @@ void FEditorToolbarWidget::SetPanelVisibilityRefs(
 	bool* InShowProperty,
 	bool* InShowSceneManager,
 	bool* InShowMaterialEditor,
-	bool* InShowStatProfiler)
+	bool* InShowStatProfiler,
+	bool* InShowSkeletalMeshViewer)
 {
 	bShowConsole = InShowConsole;
 	bShowControl = InShowControl;
@@ -128,6 +129,7 @@ void FEditorToolbarWidget::SetPanelVisibilityRefs(
 	bShowSceneManager = InShowSceneManager;
 	bShowMaterialEditor = InShowMaterialEditor;
 	bShowStatProfiler = InShowStatProfiler;
+	bShowSkeletalMeshViewer = InShowSkeletalMeshViewer;
 }
 
 void FEditorToolbarWidget::Render(float DeltaTime)
@@ -252,6 +254,7 @@ void FEditorToolbarWidget::RenderViewMenu()
 	if (bShowSceneManager) ImGui::MenuItem("Scene Manager", nullptr, bShowSceneManager);
 	if (bShowMaterialEditor) ImGui::MenuItem("Material Editor", nullptr, bShowMaterialEditor);
 	if (bShowStatProfiler) ImGui::MenuItem("Stat Profiler", nullptr, bShowStatProfiler);
+	if (bShowSkeletalMeshViewer) ImGui::MenuItem("SkeletalMesh Viewer", nullptr, bShowSkeletalMeshViewer);
 
 	if (ViewportOverlayWidget)
 	{

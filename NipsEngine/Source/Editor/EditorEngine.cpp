@@ -28,6 +28,7 @@
 #include "Settings/EditorSettings.h"
 #include "Settings/EngineSettings.h"
 #include <algorithm>
+#include <utility>
 
 DEFINE_CLASS(UEditorEngine, UEngine)
 REGISTER_FACTORY(UEditorEngine)
@@ -924,13 +925,23 @@ void UEditorEngine::ClearScene()
 {
 	SelectionManager.ClearSelection();
 
+	TArray<FWorldContext> PreservedPreviewContexts;
 	for (FWorldContext& Ctx : WorldList)
 	{
-		Ctx.World->EndPlay(EEndPlayReason::Type::LevelTransition);
-		UObjectManager::Get().DestroyObject(Ctx.World);
+		if (Ctx.WorldType == EWorldType::ViewerPreview)
+		{
+			PreservedPreviewContexts.push_back(Ctx);
+			continue;
+		}
+
+		if (Ctx.World)
+		{
+			Ctx.World->EndPlay(EEndPlayReason::Type::LevelTransition);
+			UObjectManager::Get().DestroyObject(Ctx.World);
+		}
 	}
 
-	WorldList.clear();
+	WorldList = std::move(PreservedPreviewContexts);
 	ActiveWorldHandle = FName::None;
 
 	for (int32 i = 0; i < FEditorViewportLayout::MaxViewports; ++i)

@@ -5,6 +5,7 @@
 
 class UEditorEngine;
 class FEditorViewportClient;
+class FSkeletalMeshPreviewScene;
 struct FSceneView;
 
 class FEditorRenderPipeline : public IRenderPipeline
@@ -25,6 +26,7 @@ private:
 	 * Execute 루프에서 4번 호출됩니다.
 	 */
 	void RenderViewport(FRenderer& Renderer, int32 ViewportIndex);
+	void RenderSkeletalMeshPreview(FRenderer& Renderer, FSkeletalMeshPreviewScene& PreviewScene);
 	bool PrepareViewport(FRenderer& Renderer, int32 ViewportIndex, FSceneView& OutSceneView, FEditorViewportClient*& OutViewportClient);
 
 	UEditorEngine* Editor = nullptr;

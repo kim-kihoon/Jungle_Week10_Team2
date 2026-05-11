@@ -11,6 +11,7 @@
 #include "Editor/UI/EditorToolbarWidget.h"
 #include "Editor/UI/EditorPlayStreamWidget.h"
 #include "Editor/UI/EditorCameraShakeWidget.h"
+#include "Editor/UI/EditorSkeletalMeshViewerWidget.h"
 
 class FRenderer;
 class UEditorEngine;
@@ -28,6 +29,8 @@ public:
 	FEditorMaterialWidget& GetMaterialWidget() { return MaterialWidget; }
 	FEditorSceneWidget& GetSceneWidget() { return SceneWidget; }
 	const FEditorSceneWidget& GetSceneWidget() const { return SceneWidget; }
+	FSkeletalMeshPreviewScene* GetSkeletalMeshPreviewScene() { return SkeletalMeshViewerWidget.GetPreviewScene(); }
+	const FSkeletalMeshPreviewScene* GetSkeletalMeshPreviewScene() const { return SkeletalMeshViewerWidget.GetPreviewScene(); }
 
 	void ResetWidgetSelections()
 	{
@@ -55,6 +58,7 @@ private:
 	FEditorToolbarWidget ToolbarWidget;
 	FEditorPlayStreamWidget PlayStreamWidget;
 	FEditorCameraShakeWidget CameraShakeWidget;
+	FEditorSkeletalMeshViewerWidget SkeletalMeshViewerWidget;
 
 	bool bShowConsole = true;
 	bool bShowCameraShake = true;
@@ -64,5 +68,6 @@ private:
 	bool bShowMaterialEditor = true;
 	bool bShowStatProfiler = true;
 	bool bShowPlayStream = true;
+	bool bShowSkeletalMeshViewer = false;
 	bool bDefaultDockLayoutChecked = false;
 };

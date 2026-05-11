@@ -1,8 +1,8 @@
 ﻿#pragma once
 #include "Viewport/Viewport.h"
+#include "Viewport/ViewportClient.h"
 #include "Slate/ISlateViewport.h"
 #include "Editor/Utility/EditorUIUtils.h"
-#include "Editor/Viewport/EditorViewportClient.h"
 #include "Render/Device/D3DDevice.h"  // FRenderTargetSet 때문에 포함했는데 따로 분리 필요할듯
 
 class FViewportClient;
@@ -16,9 +16,9 @@ class FViewportClient;
 class FSceneViewport : public FViewport, public ISlateViewport
 {
 public:
-	void SetClient(FEditorViewportClient* InClient) { Client = InClient; }
-	FEditorViewportClient* GetClient() { return Client; }
-	const FEditorViewportClient* GetClient() const { return Client; }
+	void SetClient(FViewportClient* InClient) { Client = InClient; }
+	FViewportClient* GetClient() { return Client; }
+	const FViewportClient* GetClient() const { return Client; }
 
 	/*
 	* ISlateViewport Interface
@@ -56,8 +56,7 @@ public:
 	FRenderTargetSet* GetRenderTargetSet() const { return RenderTargetSet; }
 
 private:
-	// FViewport 내에서 FViewportClient 로 추상화하는 것이 맞지만, 현재로썬 다형성을 제대로 활용하지 않는 상태라 임시로 다음과 같이 구성
-	FEditorViewportClient* Client = nullptr;
+	FViewportClient* Client = nullptr;
 	FEditorViewportState State;
 
 	// Renderer 의 자원을 참조

@@ -77,8 +77,8 @@ public:
 	void SetLastFocusedViewportIndex(int32 Index);
 
 	// Viewport Get Set
-	FEditorViewportClient* GetViewportClient(int32 Index) { return SceneViewports[Index].GetClient(); }
-	const FEditorViewportClient* GetViewportClient(int32 Index) const { return SceneViewports[Index].GetClient(); }
+	FEditorViewportClient* GetViewportClient(int32 Index) { return &ViewportClients[Index]; }
+	const FEditorViewportClient* GetViewportClient(int32 Index) const { return &ViewportClients[Index]; }
 
 	FSceneViewport& GetSceneViewport(int32 Index) { return SceneViewports[Index]; }
 	const FSceneViewport& GetSceneViewport(int32 Index) const { return SceneViewports[Index]; }
