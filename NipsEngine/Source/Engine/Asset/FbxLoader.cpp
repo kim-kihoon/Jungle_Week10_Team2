@@ -26,7 +26,6 @@ namespace
 		FbxManager* Manager = nullptr;
 		FbxIOSettings* IOSettings = nullptr;
 		FbxScene* Scene = nullptr;
-		bool bFlipTriangleWinding = false;
 
 		//아래 두 항목은 Collect Skeleton 에서 채워짐
 		FSkeletalMesh LoadedMesh;
@@ -143,9 +142,6 @@ namespace
 		const FbxAxisSystem CurrentAxisSystem =
 			Context.Scene->GetGlobalSettings().GetAxisSystem();
 
-		Context.bFlipTriangleWinding =
-			CurrentAxisSystem.GetCoorSystem() != EngineAxisSystem.GetCoorSystem();
-
 		if (CurrentAxisSystem != EngineAxisSystem)
 		{
 			EngineAxisSystem.ConvertScene(Context.Scene);
@@ -177,14 +173,14 @@ namespace
 		// 여기서까지 오류 검사? Context에 문제가 있었으면 진작에 위에서 걸렸겠지요
 
 		FbxGeometryConverter GeometryConverter(Context.Manager);
-		bool bConvertResult = GeometryConverter.Triangulate(Context.Scene, true);
+		bool bConvertResult = GeometryConverter.Triangulate(Context.Scene, true); //true: 변환한 결과로 기존 geometry를 교체
 		if (!bConvertResult)
 		{
 			UE_LOG("FBX triangulation failed. Path: %s", Context.SourcePath.c_str());
 			return false;
 		}
 
-		UE_LOG("FBX triangulation completed. Path: %s", Context.SourcePath.c_str());
+		//UE_LOG("FBX triangulation completed. Path: %s", Context.SourcePath.c_str());
 		return true;
 	}
 
@@ -267,12 +263,16 @@ namespace
 			return -1;
 		}
 
+		// 이미 등록된 bone이면, 해당 bone의 index 반환.
 		auto ExistingIt = Context.BoneIndexMap.find(BoneNode);
 		if (ExistingIt != Context.BoneIndexMap.end())
 		{
 			return ExistingIt->second;
 		}
 
+		// bone의 부모 노드가 skeleton 노드라면, 부모 노드도 bone으로 등록.
+		// 재귀적으로 올라가면서 등록하다가, skeleton이 아닌 노드 만나거나 부모 노드가 없으면 종료.
+		// 부모 bone이 항상 자식 bone보다 먼저 들어가게 만드는 구조
 		int32 ParentIndex = -1;
 		FbxNode* ParentNode = BoneNode->GetParent();
 		if (IsSkeletonNode(ParentNode))
@@ -308,6 +308,7 @@ namespace
 			return;
 		}
 
+		//mesh가 가진 skin deformer, 즉 skin의 개수
 		const int32 SkinCount = static_cast<int32>(Mesh->GetDeformerCount(FbxDeformer::eSkin));
 		for (int32 SkinIndex = 0; SkinIndex < SkinCount; ++SkinIndex)
 		{
@@ -317,6 +318,7 @@ namespace
 				continue;
 			}
 
+			//skin이 가진 cluster, 즉 skinning에 관여하는 bone의 개수
 			const int32 ClusterCount = static_cast<int32>(Skin->GetClusterCount());
 			for (int32 ClusterIndex = 0; ClusterIndex < ClusterCount; ++ClusterIndex)
 			{
@@ -344,6 +346,13 @@ namespace
 			return;
 		}
 
+		/*
+		씬 전체를 돈다
+		→ Mesh가 있는 노드를 찾는다
+		→ 그 Mesh에 Skin이 있는지 본다
+		→ Skin 안의 Cluster들을 본다
+		→ 각 Cluster의 Link Node를 bone으로 등록한다
+		*/
 		FbxNode* RootNode = Context.Scene->GetRootNode();
 		TraverseFbxNodes(RootNode, [&Context](FbxNode* Node)
 		{
@@ -430,6 +439,9 @@ namespace
 		return MaterialIndex;
 	}
 
+	/**
+	 * FBX의 Control Point에 어떤 Bone들이 얼마나 영향을 주는지 목록을 만들어줌.
+	 */
 	void BuildControlPointInfluences(FFbxLoadContext& Context, FbxMesh* Mesh, TArray<FControlPointInfluenceList>& OutControlPointInfluences)
 	{
 		OutControlPointInfluences.clear();
@@ -451,6 +463,8 @@ namespace
 				continue;
 			}
 
+			//가져온 skin(skin은 보통 1개임)에서 cluster을 꺼내고
+			// 이 bone에 해당하는 control point와 weight를 읽음
 			const int32 ClusterCount = static_cast<int32>(Skin->GetClusterCount());
 			for (int32 ClusterIndex = 0; ClusterIndex < ClusterCount; ++ClusterIndex)
 			{
@@ -466,11 +480,12 @@ namespace
 					continue;
 				}
 
+				//control point index, weight를 읽음
 				const int32 BoneIndex = BoneIt->second;
-				const int32 InfluenceCount = static_cast<int32>(Cluster->GetControlPointIndicesCount());
 				const int* ControlPointIndices = Cluster->GetControlPointIndices();
 				const double* ControlPointWeights = Cluster->GetControlPointWeights();
 
+				const int32 InfluenceCount = static_cast<int32>(Cluster->GetControlPointIndicesCount());
 				for (int32 InfluenceIndex = 0; InfluenceIndex < InfluenceCount; ++InfluenceIndex)
 				{
 					const int32 ControlPointIndex = static_cast<int32>(ControlPointIndices[InfluenceIndex]);
@@ -676,11 +691,6 @@ namespace
 				Context.LoadedMesh.Vertices.push_back(Vertex);
 			}
 
-			if (Context.bFlipTriangleWinding)
-			{
-				std::swap(TriangleIndices[1], TriangleIndices[2]);
-			}
-
 			CalculateTriangleTangent(
 				Context.LoadedMesh.Vertices[TriangleIndices[0]],
 				Context.LoadedMesh.Vertices[TriangleIndices[1]],
@@ -779,7 +789,7 @@ USkeletalMesh* FFbxLoader::Load(const FString& Path)
 	//3. 씬 정규화
 	ConvertSceneToEngineSpace(Context);
 
-	//4. 삼각형화
+	// 4. 삼각형화(fbx 내에 triangle이 아닌 quad나 N-gon이 섞여 있을 수 있기 때문.)
     if (!TriangulateFbxScene(Context))
     {
         DestroyFbxSdkContext(Context);
