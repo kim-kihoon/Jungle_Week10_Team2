@@ -46,6 +46,7 @@ private:
 	void RenderLuaScriptControls(class ULuaScriptComponent* Comp);
 	void RenderLuaCameraModifierControls(class ULuaCameraModifierComponent* Comp);
 	void RenderAudioControls(class UAudioComponent* Comp);
+	void RenderSkeletalMeshControls(class USkeletalMeshComponent* Comp, FString& AssetPath);
 	void RenderLuaScriptCreatePopup();
 
 	// 유틸리티

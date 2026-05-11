@@ -25,6 +25,7 @@
 #include "Component/AudioComponent.h"
 #include "Component/AudioZoneComponent.h"
 #include "Component/PrimitiveComponent.h"
+#include "Component/SkeletalMeshComponent.h"
 #include "Component/StaticMeshComponent.h"
 #include "Component/GizmoComponent.h"
 #include "Component/Light/LightComponent.h"
@@ -659,6 +660,23 @@ void FEditorPropertyWidget::RenderComponentProperties()
 	SelectedComponent->GetEditableProperties(Props);
 
 	AActor* Owner = SelectedComponent->GetOwner();
+	FString* SkeletalMeshAssetPath = nullptr;
+	for (FPropertyDescriptor& Prop : Props)
+	{
+		if (strcmp(Prop.Name, "SkeletalMesh") == 0 && Prop.Type == EPropertyType::String)
+		{
+			SkeletalMeshAssetPath = static_cast<FString*>(Prop.ValuePtr);
+			break;
+		}
+	}
+
+	if (USkeletalMeshComponent* SkeletalMeshComp = Cast<USkeletalMeshComponent>(SelectedComponent))
+	{
+		if (SkeletalMeshAssetPath != nullptr)
+		{
+			RenderSkeletalMeshControls(SkeletalMeshComp, *SkeletalMeshAssetPath);
+		}
+	}
 
 	if (ULuaScriptComponent* LuaComp = Cast<ULuaScriptComponent>(SelectedComponent))
 	{
@@ -678,8 +696,13 @@ void FEditorPropertyWidget::RenderComponentProperties()
 	const bool bIsLuaCameraModifierComponent = SelectedComponent->IsA<ULuaCameraModifierComponent>();
 	const bool bIsAudioComponent = SelectedComponent->IsA<UAudioComponent>();
 	const bool bIsAudioZoneComponent = SelectedComponent->IsA<UAudioZoneComponent>();
+	const bool bIsSkeletalMeshComponent = SelectedComponent->IsA<USkeletalMeshComponent>();
 	for (auto& Prop : Props)
 	{
+		if (bIsSkeletalMeshComponent && strcmp(Prop.Name, "SkeletalMesh") == 0)
+		{
+			continue;
+		}
 		if (bIsLuaScriptComponent && strcmp(Prop.Name, "Script Path") == 0)
 		{
 			continue;
@@ -1119,6 +1142,34 @@ void FEditorPropertyWidget::RenderLuaScriptCreatePopup()
 	ImGui::PopStyleColor();
 }
 
+void FEditorPropertyWidget::RenderSkeletalMeshControls(USkeletalMeshComponent* Comp, FString& AssetPath)
+{
+	if (Comp == nullptr)
+	{
+		return;
+	}
+
+	const FString DisplayPath = AssetPath.empty() ? FString("(None)") : AssetPath;
+	char PathBuffer[512];
+	strncpy_s(PathBuffer, sizeof(PathBuffer), DisplayPath.c_str(), _TRUNCATE);
+
+	ImGui::Spacing();
+	ImGui::InputText("SkeletalMesh", PathBuffer, sizeof(PathBuffer), ImGuiInputTextFlags_ReadOnly);
+
+	if (ImGui::Button("Import FBX##SkeletalMesh", ImVec2(-1, 0)))
+	{
+		FString SelectedFbxPath;
+		if (OpenSkeletalMeshFbxFileDialog(SelectedFbxPath))
+		{
+			AssetPath = SelectedFbxPath;
+			FResourceManager::Get().RefreshFromAssetDirectory("Asset");
+			Comp->PostEditProperty("SkeletalMesh");
+		}
+	}
+
+	ImGui::Spacing();
+}
+
 // 다른 씬 컴포넌트를 참조할 수 있도록 액터 내 컴포넌트 목록을 드롭다운으로 보여줍니다.
 void FEditorPropertyWidget::RenderSceneComponentRefWidget(FPropertyDescriptor& Prop, AActor* Owner)
 {
@@ -1226,22 +1277,7 @@ bool FEditorPropertyWidget::RenderPropertyWidget(FPropertyDescriptor& Prop)
 			Options = FResourceManager::Get().GetTextureFilePath();
 		else if (strcmp(Prop.Name, "StaticMesh") == 0)
 			Options = FResourceManager::Get().GetStaticMeshPaths();
-		else if (strcmp(Prop.Name, "SkeletalMesh") == 0)
-			Options = FResourceManager::Get().GetSkeletalMeshPaths();
 		bChanged = EditorUIUtils::RenderStringComboOrInput(Prop.Name, *Val, Options);
-		if (strcmp(Prop.Name, "SkeletalMesh") == 0)
-		{
-			if (ImGui::Button("Import FBX##SkeletalMesh", ImVec2(-1, 0)))
-			{
-				FString SelectedFbxPath;
-				if (OpenSkeletalMeshFbxFileDialog(SelectedFbxPath))
-				{
-					*Val = SelectedFbxPath;
-					FResourceManager::Get().RefreshFromAssetDirectory("Asset");
-					bChanged = true;
-				}
-			}
-		}
 		break;
 	}
 	case EPropertyType::Name:
@@ -1736,7 +1772,8 @@ namespace
 		OutFilePath.clear();
 
 		std::filesystem::path AssetDir(FPaths::RootDir());
-		AssetDir /= L"Asset";
+		// temporary asset directory for FBX import test.
+		AssetDir /= L"Asset/Source/Models";
 		AssetDir = AssetDir.lexically_normal();
 		AssetDir.make_preferred();
 

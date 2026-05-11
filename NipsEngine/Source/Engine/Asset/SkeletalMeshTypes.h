@@ -48,6 +48,9 @@ struct FSkeletalMeshSection
 struct FSkeletalMaterial
 {
     FString MaterialSlotName;
+    FString DiffuseTexturePath;
+    FString SpecularTexturePath;
+    FString NormalTexturePath;
     UMaterialInterface* Material = nullptr;
 };
 

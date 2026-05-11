@@ -122,7 +122,8 @@ void APawnActor::EnsureDefaultComponents()
 	RigidBody->SetUseGravity(false);
 	RigidBody->SetCanBePickedUp(false);
 
-	if (CharacterMovement == nullptr)
+	const bool bCreatedCharacterMovement = CharacterMovement == nullptr;
+	if (bCreatedCharacterMovement)
 	{
 		CharacterMovement = AddComponent<UCharacterMovementComponent>();
 	}

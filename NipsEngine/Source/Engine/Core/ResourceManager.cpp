@@ -63,6 +63,78 @@ namespace
 		return ResourceManager.GetShader(ShaderName);
 	}
 
+	void ConfigureImportedSkeletalMaterial(FResourceManager& ResourceManager, FSkeletalMaterial& Slot, const FString& MeshPath)
+	{
+		if (Slot.Material != nullptr)
+		{
+			return;
+		}
+
+		Slot.Material = ResourceManager.GetMaterialInterface(Slot.MaterialSlotName);
+		if (Slot.Material != nullptr)
+		{
+			return;
+		}
+
+		const bool bHasDiffuse = !Slot.DiffuseTexturePath.empty();
+		const bool bHasSpecular = !Slot.SpecularTexturePath.empty();
+		const bool bHasNormal = !Slot.NormalTexturePath.empty();
+		if (!bHasDiffuse && !bHasSpecular && !bHasNormal)
+		{
+			Slot.Material = ResourceManager.GetMaterialInterface("DefaultWhite");
+			return;
+		}
+
+		UMaterial* ParentMaterial = ResourceManager.GetMaterial("DefaultWhite");
+		if (ParentMaterial == nullptr)
+		{
+			Slot.Material = ResourceManager.GetMaterialInterface("DefaultWhite");
+			return;
+		}
+
+		const FString InstanceName = MeshPath + ":" + Slot.MaterialSlotName;
+		UMaterialInstance* Instance = ResourceManager.CreateMaterialInstance(InstanceName, ParentMaterial);
+		if (Instance == nullptr)
+		{
+			Slot.Material = ResourceManager.GetMaterialInterface("DefaultWhite");
+			return;
+		}
+
+		if (bHasDiffuse)
+		{
+			if (UTexture* DiffuseTexture = ResourceManager.LoadTexture(Slot.DiffuseTexturePath, ResourceManager.GetCachedDevice()))
+			{
+				Instance->SetParam("DiffuseMap", FMaterialParamValue(DiffuseTexture));
+				Instance->SetParam("bHasDiffuseMap", FMaterialParamValue(true));
+			}
+		}
+
+		if (bHasSpecular)
+		{
+			if (UTexture* SpecularTexture = ResourceManager.LoadTexture(Slot.SpecularTexturePath, ResourceManager.GetCachedDevice()))
+			{
+				Instance->SetParam("SpecularMap", FMaterialParamValue(SpecularTexture));
+				Instance->SetParam("bHasSpecularMap", FMaterialParamValue(true));
+			}
+		}
+
+		if (bHasNormal)
+		{
+			if (UTexture* NormalTexture = ResourceManager.LoadTexture(Slot.NormalTexturePath, ResourceManager.GetCachedDevice()))
+			{
+				Instance->SetParam("NormalMap", FMaterialParamValue(NormalTexture));
+				Instance->SetParam("bHasNormalMap", FMaterialParamValue(true));
+			}
+		}
+
+		Slot.Material = Instance;
+		UE_LOG("[SkeletalMeshLoad] Auto material | Slot=%s Diffuse=%s Specular=%s Normal=%s",
+		       Slot.MaterialSlotName.c_str(),
+		       Slot.DiffuseTexturePath.empty() ? "(none)" : Slot.DiffuseTexturePath.c_str(),
+		       Slot.SpecularTexturePath.empty() ? "(none)" : Slot.SpecularTexturePath.c_str(),
+		       Slot.NormalTexturePath.empty() ? "(none)" : Slot.NormalTexturePath.c_str());
+	}
+
 	TArray<FShaderMacro> NormalizeShaderMacros(TArray<FShaderMacro> Macros)
 	{
 		std::sort(Macros.begin(), Macros.end(), [](const FShaderMacro& Left, const FShaderMacro& Right)
@@ -2256,11 +2328,7 @@ USkeletalMesh* FResourceManager::LoadSkeletalMesh(const FString& Path)
 
 	for (FSkeletalMaterial& Slot : LoadedMesh->GetSkeletalMeshData()->Materials)
 	{
-		Slot.Material = GetMaterialInterface(Slot.MaterialSlotName);
-		if (Slot.Material == nullptr)
-		{
-			Slot.Material = GetMaterialInterface("DefaultWhite");
-		}
+		ConfigureImportedSkeletalMaterial(*this, Slot, Path);
 	}
 
 	SkeletalMeshes.insert({ Path, LoadedMesh });

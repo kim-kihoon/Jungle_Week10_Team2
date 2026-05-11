@@ -156,7 +156,13 @@ void UCharacterMovementComponent::TickComponent(float DeltaTime)
 	Velocity.X = MoveToward(Velocity.X, DesiredHorizontalVelocity.X, HorizontalStep);
 	Velocity.Y = MoveToward(Velocity.Y, DesiredHorizontalVelocity.Y, HorizontalStep);
 
-	if (bGrounded && Velocity.Z <= 0.0f)
+	const bool bApplyGravity = RigidBody != nullptr && RigidBody->IsGravityEnabled();
+	if (!bApplyGravity)
+	{
+		Velocity.Z = 0.0f;
+		bGrounded = false;
+	}
+	else if (bGrounded && Velocity.Z <= 0.0f)
 	{
 		Velocity.Z = 0.0f;
 	}
@@ -266,6 +272,11 @@ void UCharacterMovementComponent::Jump()
 void UCharacterMovementComponent::SetSpeedMultiplier(float InSpeedMultiplier)
 {
 	SpeedMultiplier = std::max(0.0f, InSpeedMultiplier);
+}
+
+void UCharacterMovementComponent::SetGravityScale(float InGravityScale)
+{
+	GravityScale = std::max(0.0f, InGravityScale);
 }
 
 void UCharacterMovementComponent::ClampEditableValues()

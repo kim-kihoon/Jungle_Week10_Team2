@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <fbxsdk.h>
@@ -65,6 +66,207 @@ struct FVertexKeyHash
 FString FbxNameToString(const char* Name)
 {
     return Name ? FString(Name) : FString();
+}
+
+std::string ToLowerAscii(FString Value)
+{
+    std::transform(Value.begin(), Value.end(), Value.begin(), [](unsigned char Character)
+    {
+        return static_cast<char>(std::tolower(Character));
+    });
+    return Value;
+}
+
+std::string ToLowerAscii(const std::filesystem::path& Path)
+{
+    return ToLowerAscii(FPaths::ToUtf8(Path.generic_wstring()));
+}
+
+bool IsSupportedTextureFile(const std::filesystem::path& Path)
+{
+    const std::string Extension = ToLowerAscii(Path.extension());
+    return Extension == ".png" ||
+           Extension == ".jpg" ||
+           Extension == ".jpeg" ||
+           Extension == ".tga" ||
+           Extension == ".dds";
+}
+
+bool HasTextureSemanticSuffix(const std::filesystem::path& Path, const TArray<FString>& Suffixes)
+{
+    const std::string Stem = ToLowerAscii(Path.stem());
+    for (const FString& Suffix : Suffixes)
+    {
+        const std::string LowerSuffix = ToLowerAscii(Suffix);
+        if (Stem.ends_with(LowerSuffix))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+FString FindFbmTextureBySemantic(const FString& SourcePath, const FString& SlotName, int32 SlotIndex, const TArray<FString>& Suffixes)
+{
+    const std::filesystem::path SourceAbsolutePath(FPaths::ToAbsolute(FPaths::ToWide(SourcePath)));
+    const std::filesystem::path EmbeddedMediaDir = SourceAbsolutePath.parent_path() / (SourceAbsolutePath.stem().wstring() + L".fbm");
+    std::error_code ErrorCode;
+    if (!std::filesystem::exists(EmbeddedMediaDir, ErrorCode))
+    {
+        return {};
+    }
+
+    TArray<std::filesystem::path> Candidates;
+    for (const std::filesystem::directory_entry& Entry :
+         std::filesystem::recursive_directory_iterator(EmbeddedMediaDir, std::filesystem::directory_options::skip_permission_denied, ErrorCode))
+    {
+        if (ErrorCode)
+        {
+            break;
+        }
+
+        if (!Entry.is_regular_file(ErrorCode) || !IsSupportedTextureFile(Entry.path()))
+        {
+            continue;
+        }
+
+        if (HasTextureSemanticSuffix(Entry.path(), Suffixes))
+        {
+            Candidates.push_back(Entry.path().lexically_normal());
+        }
+    }
+
+    if (Candidates.empty())
+    {
+        return {};
+    }
+
+    std::sort(Candidates.begin(), Candidates.end(), [](const std::filesystem::path& Left, const std::filesystem::path& Right)
+    {
+        return Left.generic_wstring() < Right.generic_wstring();
+    });
+
+    const std::string LowerSlotName = ToLowerAscii(SlotName);
+    for (const std::filesystem::path& Candidate : Candidates)
+    {
+        const std::string LowerStem = ToLowerAscii(Candidate.stem());
+        if (!LowerSlotName.empty() && LowerStem.find(LowerSlotName) != std::string::npos)
+        {
+            return FPaths::Normalize(FPaths::ToRelativeString(Candidate.generic_wstring()));
+        }
+    }
+
+    if (SlotIndex >= 0 && SlotIndex < static_cast<int32>(Candidates.size()))
+    {
+        return FPaths::Normalize(FPaths::ToRelativeString(Candidates[SlotIndex].generic_wstring()));
+    }
+
+    return FPaths::Normalize(FPaths::ToRelativeString(Candidates.front().generic_wstring()));
+}
+
+std::filesystem::path GetResolvedFbxTexturePath(const FString& SourcePath, FbxFileTexture* Texture)
+{
+    if (Texture == nullptr)
+    {
+        return {};
+    }
+
+    const std::filesystem::path SourceAbsolutePath(FPaths::ToAbsolute(FPaths::ToWide(SourcePath)));
+    const std::filesystem::path SourceDir = SourceAbsolutePath.parent_path();
+    const std::filesystem::path EmbeddedMediaDir = SourceDir / (SourceAbsolutePath.stem().wstring() + L".fbm");
+
+    TArray<std::filesystem::path> Candidates;
+    auto AddCandidate = [&Candidates](const char* Path)
+    {
+        if (Path != nullptr && Path[0] != '\0')
+        {
+            Candidates.emplace_back(FPaths::ToWide(Path));
+        }
+    };
+
+    AddCandidate(Texture->GetFileName());
+    AddCandidate(Texture->GetRelativeFileName());
+
+    std::error_code ErrorCode;
+    for (const std::filesystem::path& Candidate : Candidates)
+    {
+        if (Candidate.empty())
+        {
+            continue;
+        }
+
+        if (Candidate.is_absolute() && std::filesystem::exists(Candidate, ErrorCode))
+        {
+            return Candidate.lexically_normal();
+        }
+
+        const std::filesystem::path SourceRelative = (SourceDir / Candidate).lexically_normal();
+        if (std::filesystem::exists(SourceRelative, ErrorCode))
+        {
+            return SourceRelative;
+        }
+
+        const std::filesystem::path EmbeddedRelative = (EmbeddedMediaDir / Candidate.filename()).lexically_normal();
+        if (std::filesystem::exists(EmbeddedRelative, ErrorCode))
+        {
+            return EmbeddedRelative;
+        }
+
+        for (const std::filesystem::directory_entry& Entry :
+             std::filesystem::recursive_directory_iterator(SourceDir, std::filesystem::directory_options::skip_permission_denied, ErrorCode))
+        {
+            if (ErrorCode)
+            {
+                break;
+            }
+
+            if (!Entry.is_regular_file(ErrorCode))
+            {
+                continue;
+            }
+
+            if (Entry.path().filename() == Candidate.filename())
+            {
+                return Entry.path().lexically_normal();
+            }
+        }
+
+        const std::filesystem::path RootRelative = std::filesystem::path(FPaths::RootDir()) / Candidate;
+        if (std::filesystem::exists(RootRelative, ErrorCode))
+        {
+            return RootRelative.lexically_normal();
+        }
+    }
+
+    return {};
+}
+
+FString GetFbxTexturePath(FbxSurfaceMaterial* Material, const char* PropertyName, const FString& SourcePath)
+{
+    if (Material == nullptr || PropertyName == nullptr)
+    {
+        return {};
+    }
+
+    FbxProperty Property = Material->FindProperty(PropertyName);
+    if (!Property.IsValid())
+    {
+        return {};
+    }
+
+    const int32 TextureCount = Property.GetSrcObjectCount<FbxTexture>();
+    for (int32 TextureIndex = 0; TextureIndex < TextureCount; ++TextureIndex)
+    {
+        FbxTexture* Texture = Property.GetSrcObject<FbxTexture>(TextureIndex);
+        FbxFileTexture* FileTexture = FbxCast<FbxFileTexture>(Texture);
+        const std::filesystem::path ResolvedPath = GetResolvedFbxTexturePath(SourcePath, FileTexture);
+        if (!ResolvedPath.empty())
+        {
+            return FPaths::Normalize(FPaths::ToRelativeString(ResolvedPath.generic_wstring()));
+        }
+    }
+
+    return {};
 }
 
 bool IsAsciiString(const FString& Text)
@@ -247,7 +449,7 @@ void CollectSkeletonNodes(FbxNode* Node, FSkeletalMesh& OutMesh)
     }
 }
 
-int32 GetOrAddMaterial(FSkeletalMesh& OutMesh, FbxSurfaceMaterial* Material)
+int32 GetOrAddMaterial(FSkeletalMesh& OutMesh, FbxSurfaceMaterial* Material, const FString& SourcePath)
 {
     FString SlotName = Material ? FbxNameToString(Material->GetName()) : FString("DefaultWhite");
     if (SlotName.empty())
@@ -265,11 +467,27 @@ int32 GetOrAddMaterial(FSkeletalMesh& OutMesh, FbxSurfaceMaterial* Material)
 
     FSkeletalMaterial NewMaterial;
     NewMaterial.MaterialSlotName = SlotName;
+    const int32 NewMaterialIndex = static_cast<int32>(OutMesh.Materials.size());
+    NewMaterial.DiffuseTexturePath = GetFbxTexturePath(Material, FbxSurfaceMaterial::sDiffuse, SourcePath);
+    NewMaterial.SpecularTexturePath = GetFbxTexturePath(Material, FbxSurfaceMaterial::sSpecular, SourcePath);
+    NewMaterial.NormalTexturePath = GetFbxTexturePath(Material, FbxSurfaceMaterial::sNormalMap, SourcePath);
+    if (NewMaterial.NormalTexturePath.empty())
+    {
+        NewMaterial.NormalTexturePath = GetFbxTexturePath(Material, FbxSurfaceMaterial::sBump, SourcePath);
+    }
+    if (NewMaterial.DiffuseTexturePath.empty())
+    {
+        NewMaterial.DiffuseTexturePath = FindFbmTextureBySemantic(SourcePath, SlotName, NewMaterialIndex, { "_d", "_diffuse", "_basecolor", "_base_color", "_albedo" });
+    }
+    if (NewMaterial.NormalTexturePath.empty())
+    {
+        NewMaterial.NormalTexturePath = FindFbmTextureBySemantic(SourcePath, SlotName, NewMaterialIndex, { "_n", "_normal", "_norm" });
+    }
     OutMesh.Materials.push_back(NewMaterial);
     return static_cast<int32>(OutMesh.Materials.size() - 1);
 }
 
-int32 GetPolygonMaterialSlotIndex(FbxMesh* Mesh, FbxNode* Node, int32 PolygonIndex, FSkeletalMesh& OutMesh)
+int32 GetPolygonMaterialSlotIndex(FbxMesh* Mesh, FbxNode* Node, int32 PolygonIndex, FSkeletalMesh& OutMesh, const FString& SourcePath)
 {
     int32 NodeMaterialIndex = 0;
     FbxLayerElementMaterial* MaterialElement = Mesh->GetElementMaterial();
@@ -295,7 +513,7 @@ int32 GetPolygonMaterialSlotIndex(FbxMesh* Mesh, FbxNode* Node, int32 PolygonInd
     }
 
     FbxSurfaceMaterial* Material = Node ? Node->GetMaterial(NodeMaterialIndex) : nullptr;
-    return GetOrAddMaterial(OutMesh, Material);
+    return GetOrAddMaterial(OutMesh, Material, SourcePath);
 }
 
 FVector GetPolygonNormal(FbxMesh* Mesh, int32 PolygonIndex, int32 VertexInPolygon, int32& OutNormalIndex)
@@ -561,7 +779,7 @@ void ValidateBindPoseSkinningMatrices(const FSkeletalMesh& Mesh, const FString& 
     }
 }
 
-void ImportSkeletalMeshData(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh, const FSkeletalMeshImportOptions& ImportOptions)
+void ImportSkeletalMeshData(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh, const FSkeletalMeshImportOptions& ImportOptions, const FString& SourcePath)
 {
     if (Node == nullptr || Mesh == nullptr)
     {
@@ -596,7 +814,7 @@ void ImportSkeletalMeshData(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh
         }
 
         // Determine material slot index for this polygon.
-        const int32 MaterialSlotIndex = GetPolygonMaterialSlotIndex(Mesh, Node, PolygonIndex, OutMesh);
+        const int32 MaterialSlotIndex = GetPolygonMaterialSlotIndex(Mesh, Node, PolygonIndex, OutMesh, SourcePath);
         if (MaterialSlotIndex >= static_cast<int32>(IndicesByMaterial.size()))
         {
             IndicesByMaterial.resize(MaterialSlotIndex + 1);
@@ -671,7 +889,7 @@ void ImportSkeletalMeshData(FbxNode* Node, FbxMesh* Mesh, FSkeletalMesh& OutMesh
     BuildBoundsAndFallbackTangents(LODData);
 }
 
-void ImportSkeletalMeshDataRecursive(FbxNode* Node, FSkeletalMesh& OutMesh, const FSkeletalMeshImportOptions& ImportOptions)
+void ImportSkeletalMeshDataRecursive(FbxNode* Node, FSkeletalMesh& OutMesh, const FSkeletalMeshImportOptions& ImportOptions, const FString& SourcePath)
 {
     if (Node == nullptr)
     {
@@ -681,12 +899,12 @@ void ImportSkeletalMeshDataRecursive(FbxNode* Node, FSkeletalMesh& OutMesh, cons
     FbxMesh* Mesh = Node->GetMesh();
     if (Mesh != nullptr)
     {
-        ImportSkeletalMeshData(Node, Mesh, OutMesh, ImportOptions);
+        ImportSkeletalMeshData(Node, Mesh, OutMesh, ImportOptions, SourcePath);
     }
 
     for (int32 ChildIndex = 0; ChildIndex < Node->GetChildCount(); ++ChildIndex)
     {
-        ImportSkeletalMeshDataRecursive(Node->GetChild(ChildIndex), OutMesh, ImportOptions);
+        ImportSkeletalMeshDataRecursive(Node->GetChild(ChildIndex), OutMesh, ImportOptions, SourcePath);
     }
 }
 } // namespace
@@ -753,7 +971,7 @@ USkeletalMesh* FFbxImporter::ImportSkeletalMesh(const FString& Path, const FSkel
 
     // Recursively import mesh data for all nodes.
     // This allows for multiple meshes in the same FBX to be merged into one skeletal mesh asset.
-    ImportSkeletalMeshDataRecursive(RootNode, *ImportedMesh, ImportOptions);
+    ImportSkeletalMeshDataRecursive(RootNode, *ImportedMesh, ImportOptions, Path);
 
     // Ensure there is at least a root bone in the skeleton, as some FBX files may not have any skeleton data.
     if (ImportedMesh->RefSkeleton.GetNum() == 0)

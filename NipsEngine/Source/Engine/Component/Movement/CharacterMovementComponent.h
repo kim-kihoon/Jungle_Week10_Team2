@@ -21,6 +21,7 @@ public:
 	bool IsGrounded() const { return bGrounded; }
 	void Jump();
 	void SetSpeedMultiplier(float InSpeedMultiplier);
+	void SetGravityScale(float InGravityScale);
 	void SetRigidBody(URigidBodyComponent* InRigidBody) { RigidBody = InRigidBody; }
 
 protected:
