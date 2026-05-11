@@ -100,16 +100,28 @@ void USkinnedMeshComponent::RefreshBoneTransforms()
     {
         const FSkeletalBone& Bone = Bones[BoneIndex];
         const int32 ParentIndex = Bone.ParentIndex;
+        FTransform ModifiedLocalTransform = Bone.ReferenceLocalTransform;
+
+        // [TEST] Hardcoded single-bone skinning test. Remove after verification.
+        if (BoneIndex == 1)
+        {
+            static float TestAngleDegrees = 0.0f;
+            TestAngleDegrees += 1.0f;
+
+            const FQuat TestRotation = FRotator(0.0f, TestAngleDegrees, 0.0f).Quaternion();
+            const FTransform TestOffset(TestRotation, FVector::ZeroVector, FVector::OneVector);
+            ModifiedLocalTransform = TestOffset * ModifiedLocalTransform;
+        }
 
         if (ParentIndex >= 0 && ParentIndex < BoneIndex)
         {
 			//현재 bone에 부모 bone의 transform을 반영.
-            ComponentSpaceBoneTransforms[BoneIndex] = Bone.ReferenceLocalTransform * ComponentSpaceBoneTransforms[ParentIndex];
+            ComponentSpaceBoneTransforms[BoneIndex] = ModifiedLocalTransform * ComponentSpaceBoneTransforms[ParentIndex];
         }
         else
         {
 			//루트 이거나 데이터가 잘못 들어와서 현재 본보다 부모의 인덱스가 뒤에 있을 때
-            ComponentSpaceBoneTransforms[BoneIndex] = Bone.ReferenceLocalTransform;
+            ComponentSpaceBoneTransforms[BoneIndex] = ModifiedLocalTransform;
         }
     }
 
