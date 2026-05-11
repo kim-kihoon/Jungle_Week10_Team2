@@ -210,13 +210,14 @@ void FEditorRenderPipeline::RenderSkeletalMeshPreviewViewport(FRenderer& Rendere
 	Bus.SetSceneView(SceneView);
 
 	// 뷰어는 복잡한 그림자/FXAA 생략하거나 기본값 사용
-	Bus.SetRenderSettings(EViewMode::Lit, Editor->GetSettings().ShowFlags);
+	const EViewMode PreviewViewMode = SceneView.ViewMode;
+	Bus.SetRenderSettings(PreviewViewMode, Editor->GetSettings().ShowFlags);
 
 	Renderer.GetEditorLineBatcher().Clear();
 	Collector.SetLineBatcher(&Renderer.GetEditorLineBatcher());
 
 	// 메인 월드가 아니라 PreviewWorld를 수집
-	Collector.CollectWorld(PreviewScene.GetWorld(), Editor->GetSettings().ShowFlags, EViewMode::Lit, Bus, &SceneView.CameraFrustum);
+	Collector.CollectWorld(PreviewScene.GetWorld(), Editor->GetSettings().ShowFlags, PreviewViewMode, Bus, &SceneView.CameraFrustum);
 
 	// 나중에 여기에 Gizmo, Bone Debug Line Collect 추가
 

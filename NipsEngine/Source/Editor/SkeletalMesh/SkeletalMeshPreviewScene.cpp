@@ -25,6 +25,9 @@ void FSkeletalMeshPreviewScene::Initialize(UEditorEngine* InEditor)
 
 	ViewportClient.SetPreviewScene(this);
 	PreviewViewport.SetClient(&ViewportClient);
+	ViewportClient.SetState(&PreviewViewport.GetState());
+	ViewportClient.SetViewportType(EVT_Perspective);
+	ViewportClient.ApplyCameraMode();
 
 	// 월드 생성
 	std::string ContextName = "SkeletalMeshViewer_Preview_" + std::to_string(GPreviewWorldCounter++);
@@ -59,6 +62,7 @@ void FSkeletalMeshPreviewScene::Shutdown()
 
 		PreviewWorld = nullptr;
 		PreviewActor = nullptr;
+		ViewportClient.SetState(nullptr);
 		PreviewViewport.SetClient(nullptr);
 		Editor = nullptr;
 	}
@@ -83,7 +87,13 @@ void FSkeletalMeshPreviewScene::SetVisible(bool bInVisible)
 
 void FSkeletalMeshPreviewScene::SetSkeletalMesh(USkeletalMesh* Mesh)
 {
-	(void)Mesh;
+	if (PreviewActor)
+	{
+		if (USkeletalMeshComponent* PreviewMeshComponent = static_cast<USkeletalMeshComponent*>(PreviewActor->GetRootComponent()))
+		{
+			PreviewMeshComponent->SetSkeletalMesh(Mesh);
+		}
+	}
 	ResetPose();
 }
 

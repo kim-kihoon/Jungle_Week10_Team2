@@ -67,5 +67,6 @@ private:
 	bool bShowMaterialEditor = true;
 	bool bShowStatProfiler = true;
 	bool bShowPlayStream = true;
+	bool bShowSkeletalMeshViewer = true;
 	bool bDefaultDockLayoutChecked = false;
 };

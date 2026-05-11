@@ -11,12 +11,17 @@ public:
 
 	void Open() { bIsOpen = true; }
 	void Close() { bIsOpen = false; }
+	void SetOpen(bool bInOpen) { bIsOpen = bInOpen; }
 	bool IsOpen() const { return bIsOpen; }
 
 	FSkeletalMeshPreviewScene* GetPreviewScene() { return &PreviewScene; }
 
 private:
+	void RenderToolbar();
+
 	bool bIsOpen = false;
+	int32 SelectedMeshPathIndex = -1;
+	TArray<FString> CachedSkeletalMeshPaths;
 
 	FSkeletalMeshPreviewScene PreviewScene;
 };

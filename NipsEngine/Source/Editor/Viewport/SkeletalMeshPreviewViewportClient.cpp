@@ -13,13 +13,16 @@ FSkeletalMeshPreviewViewportClient::FSkeletalMeshPreviewViewportClient()
 void FSkeletalMeshPreviewViewportClient::Tick(float DeltaTime)
 {
 	// 필요시 보간(Lerp) 로직을 여기에 추가할 수 있습니다.
-	UpdateCameraTransform();
+	if (ViewportType == EVT_Perspective)
+	{
+		UpdateCameraTransform();
+	}
 }
 
 void FSkeletalMeshPreviewViewportClient::BuildSceneView(FSceneView& OutView) const
 {
 	const FViewportRect Rect(0, 0, static_cast<int32>(WindowWidth), static_cast<int32>(WindowHeight));
-	Camera.BuildSceneView(OutView, Rect, EViewMode::Lit);
+	Camera.BuildSceneView(OutView, Rect, State ? State->ViewMode : EViewMode::Lit);
 }
 
 void FSkeletalMeshPreviewViewportClient::SetViewportSize(float InWidth, float InHeight)
@@ -30,6 +33,11 @@ void FSkeletalMeshPreviewViewportClient::SetViewportSize(float InWidth, float In
 
 void FSkeletalMeshPreviewViewportClient::AddOrbitInput(float DeltaYaw, float DeltaPitch)
 {
+	if (ViewportType != EVT_Perspective)
+	{
+		return;
+	}
+
 	OrbitYaw += DeltaYaw;
 	OrbitPitch = MathUtil::Clamp(OrbitPitch + DeltaPitch, -85.0f, 85.0f); // 위아래로 완전히 넘어가지 않게 제한
 	UpdateCameraTransform();
@@ -37,8 +45,15 @@ void FSkeletalMeshPreviewViewportClient::AddOrbitInput(float DeltaYaw, float Del
 
 void FSkeletalMeshPreviewViewportClient::AddZoomInput(float DeltaZoom)
 {
-	OrbitDistance = MathUtil::Clamp(OrbitDistance - DeltaZoom, 0.5f, 20.0f);
-	UpdateCameraTransform();
+	if (ViewportType == EVT_Perspective)
+	{
+		OrbitDistance = MathUtil::Clamp(OrbitDistance - DeltaZoom, 0.5f, 20.0f);
+		UpdateCameraTransform();
+	}
+	else
+	{
+		Camera.SetOrthoHeight(MathUtil::Clamp(Camera.GetOrthoHeight() - DeltaZoom, 0.1f, 100.0f));
+	}
 }
 
 void FSkeletalMeshPreviewViewportClient::ResetCamera()
@@ -48,6 +63,59 @@ void FSkeletalMeshPreviewViewportClient::ResetCamera()
 	OrbitDistance = 3.0f;
 	ViewTarget = FVector(0.0f, 0.0f, 1.0f); // 1미터 정도 높이를 타겟으로
 	UpdateCameraTransform();
+}
+
+void FSkeletalMeshPreviewViewportClient::ApplyCameraMode()
+{
+	Camera.SetRotation(FRotator(0.f, 0.f, 0.f));
+
+	switch (ViewportType)
+	{
+	case EVT_Perspective:
+		Camera.SetProjectionType(EViewportProjectionType::Perspective);
+		Camera.ClearCustomLookDir();
+		UpdateCameraTransform();
+		break;
+
+	case EVT_OrthoTop:
+		Camera.SetProjectionType(EViewportProjectionType::Orthographic);
+		Camera.SetLocation(ViewTarget + FVector(0.f, 0.f, OrbitDistance));
+		Camera.SetCustomLookDir(FVector(0.f, 0.f, -1.f), FVector(1.f, 0.f, 0.f));
+		break;
+
+	case EVT_OrthoBottom:
+		Camera.SetProjectionType(EViewportProjectionType::Orthographic);
+		Camera.SetLocation(ViewTarget + FVector(0.f, 0.f, -OrbitDistance));
+		Camera.SetCustomLookDir(FVector(0.f, 0.f, 1.f), FVector(1.f, 0.f, 0.f));
+		break;
+
+	case EVT_OrthoFront:
+		Camera.SetProjectionType(EViewportProjectionType::Orthographic);
+		Camera.SetLocation(ViewTarget + FVector(OrbitDistance, 0.f, 0.f));
+		Camera.SetCustomLookDir(FVector(-1.f, 0.f, 0.f), FVector(0.f, 0.f, 1.f));
+		break;
+
+	case EVT_OrthoBack:
+		Camera.SetProjectionType(EViewportProjectionType::Orthographic);
+		Camera.SetLocation(ViewTarget + FVector(-OrbitDistance, 0.f, 0.f));
+		Camera.SetCustomLookDir(FVector(1.f, 0.f, 0.f), FVector(0.f, 0.f, 1.f));
+		break;
+
+	case EVT_OrthoLeft:
+		Camera.SetProjectionType(EViewportProjectionType::Orthographic);
+		Camera.SetLocation(ViewTarget + FVector(0.f, -OrbitDistance, 0.f));
+		Camera.SetCustomLookDir(FVector(0.f, 1.f, 0.f), FVector(0.f, 0.f, 1.f));
+		break;
+
+	case EVT_OrthoRight:
+		Camera.SetProjectionType(EViewportProjectionType::Orthographic);
+		Camera.SetLocation(ViewTarget + FVector(0.f, OrbitDistance, 0.f));
+		Camera.SetCustomLookDir(FVector(0.f, -1.f, 0.f), FVector(0.f, 0.f, 1.f));
+		break;
+
+	default:
+		break;
+	}
 }
 
 void FSkeletalMeshPreviewViewportClient::UpdateCameraTransform()

@@ -18,7 +18,8 @@ public:
 		bool* InShowProperty,
 		bool* InShowSceneManager,
 		bool* InShowMaterialEditor,
-		bool* InShowStatProfiler);
+		bool* InShowStatProfiler,
+		bool* InShowSkeletalMeshViewer);
 	virtual void Render(float DeltaTime) override;
 
 private:
@@ -39,4 +40,5 @@ private:
 	bool* bShowSceneManager = nullptr;
 	bool* bShowMaterialEditor = nullptr;
 	bool* bShowStatProfiler = nullptr;
+	bool* bShowSkeletalMeshViewer = nullptr;
 };
