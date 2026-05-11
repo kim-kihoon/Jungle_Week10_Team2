@@ -24,6 +24,13 @@
 #include "GameFramework/World.h"
 #include <format>
 
+namespace
+{
+	// FBX 화면 출력 테스트용 하드코딩 경로.
+	constexpr const char* GTestSkeletalMeshPath = "Asset/Mesh/Quinn_UE5/SKM_Quinn_Simple.fbx";
+	constexpr float GTestSkeletalMeshScale = 1.0f;
+}
+
 DEFINE_CLASS(APawnActor, AActor)
 REGISTER_FACTORY(APawnActor)
 
@@ -182,8 +189,19 @@ void AStaticMeshActor::InitDefaultComponents()
 
 void ASkeletalMeshActor::InitDefaultComponents()
 {
-    auto* SkinnedMesh = AddComponent<USkeletalMeshComponent>();
-	SetRootComponent(SkinnedMesh);
+	auto* SkeletalMeshComp = AddComponent<USkeletalMeshComponent>();
+	SetRootComponent(SkeletalMeshComp);
+
+	SkeletalMeshComp->SetRelativeScale(FVector(
+		GTestSkeletalMeshScale,
+		GTestSkeletalMeshScale,
+		GTestSkeletalMeshScale));
+
+	USkeletalMesh* TestMesh = FResourceManager::Get().LoadSkeletalMesh(GTestSkeletalMeshPath);
+	if (TestMesh != nullptr)
+	{
+		SkeletalMeshComp->SetSkeletalMesh(TestMesh);
+	}
 }
 
 void ASubUVActor::InitDefaultComponents()

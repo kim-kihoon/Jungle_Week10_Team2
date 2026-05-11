@@ -26,6 +26,7 @@ namespace
 		FbxManager* Manager = nullptr;
 		FbxIOSettings* IOSettings = nullptr;
 		FbxScene* Scene = nullptr;
+		bool bFlipTriangleWinding = false;
 
 		//아래 두 항목은 Collect Skeleton 에서 채워짐
 		FSkeletalMesh LoadedMesh;
@@ -142,6 +143,9 @@ namespace
 		const FbxAxisSystem CurrentAxisSystem =
 			Context.Scene->GetGlobalSettings().GetAxisSystem();
 
+		Context.bFlipTriangleWinding =
+			CurrentAxisSystem.GetCoorSystem() != EngineAxisSystem.GetCoorSystem();
+
 		if (CurrentAxisSystem != EngineAxisSystem)
 		{
 			EngineAxisSystem.ConvertScene(Context.Scene);
@@ -163,7 +167,7 @@ namespace
 			EngineUnitSystem.ConvertScene(Context.Scene);
 
 			UE_LOG(
-				"FBX unit system converted to centimeter. Path: %s",
+				"FBX unit system converted to meter. Path: %s",
 				Context.SourcePath.c_str());
 		}
 	}
@@ -654,8 +658,8 @@ namespace
 				}
 
 				FSkeletalMeshVertex Vertex;
-				const FVector LocalPosition = ToEngineVector(Mesh->GetControlPointAt(ControlPointIndex));
-				Vertex.Position = MeshGlobalMatrix.TransformPosition(LocalPosition);
+                const FVector LocalPosition = ToEngineVector(Mesh->GetControlPointAt(ControlPointIndex));
+                Vertex.Position = LocalPosition;
 				Vertex.Normal = GetPolygonVertexNormal(Mesh, PolygonIndex, PolygonVertexIndex, MeshGlobalMatrix);
 				Vertex.UVs = GetPolygonVertexUV(Mesh, PolygonIndex, PolygonVertexIndex, UVSetName);
 
@@ -670,6 +674,11 @@ namespace
 
 				TriangleIndices[PolygonVertexIndex] = static_cast<uint32>(Context.LoadedMesh.Vertices.size());
 				Context.LoadedMesh.Vertices.push_back(Vertex);
+			}
+
+			if (Context.bFlipTriangleWinding)
+			{
+				std::swap(TriangleIndices[1], TriangleIndices[2]);
 			}
 
 			CalculateTriangleTangent(
