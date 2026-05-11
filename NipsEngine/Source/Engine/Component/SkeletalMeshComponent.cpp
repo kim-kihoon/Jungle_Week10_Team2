@@ -36,7 +36,7 @@ void USkeletalMeshComponent::PostDuplicate(UObject* Original)
 	const USkeletalMeshComponent* Origin = Cast<USkeletalMeshComponent>(Original);
 	SkeletalMesh = Origin->SkeletalMesh;
 	SkeletalMeshAssetPath = Origin->SkeletalMeshAssetPath;
-	CurrentLocalTransforms = Origin->CurrentLocalTransforms;
+	LocalTransforms = Origin->LocalTransforms;
 	CurrentGlobalMatrices = Origin->CurrentGlobalMatrices;
 	SkinningMatrices = Origin->SkinningMatrices;
 	SkinnedVertices = Origin->SkinnedVertices;

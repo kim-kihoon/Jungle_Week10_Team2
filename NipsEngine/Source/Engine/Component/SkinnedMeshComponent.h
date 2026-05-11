@@ -12,7 +12,7 @@ public:
 	USkeletalMesh* GetSkeletalMesh() const { return SkeletalMesh; }
 	bool HasValidMesh() const;
 
-	const TArray<FTransform>& GetCurrentLocalTransforms() const { return CurrentLocalTransforms; }
+	const TArray<FTransform>& GetLocalTransforms() const { return LocalTransforms; }
 	const TArray<FMatrix>& GetCurrentGlobalMatrices() const { return CurrentGlobalMatrices; }
 	const TArray<FMatrix>& GetSkinningMatrices() const { return SkinningMatrices; }
 
@@ -29,7 +29,7 @@ protected:
 	USkeletalMesh* SkeletalMesh = nullptr;
 	FString SkeletalMeshAssetPath;
 
-	TArray<FTransform> CurrentLocalTransforms;
+	TArray<FTransform> LocalTransforms;
 	TArray<FMatrix> CurrentGlobalMatrices;
 	TArray<FMatrix> SkinningMatrices;
 
