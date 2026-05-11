@@ -359,8 +359,29 @@ namespace
 			AppendClusterBonesFromMesh(Context, Node ? Node->GetMesh() : nullptr);
 		});
 
+		const int32 BoneCount = static_cast<int32>(Context.LoadedMesh.Bones.size());
+		Context.LoadedMesh.InverseBindPoseMatrices.clear();
+		Context.LoadedMesh.InverseBindPoseMatrices.resize(BoneCount, FMatrix::Identity);
+
+		TArray<FTransform> ComponentSpaceRefPose;
+		ComponentSpaceRefPose.resize(BoneCount, FTransform::Identity);
+
+		for (int32 BoneIndex = 0; BoneIndex < BoneCount; ++BoneIndex)
+		{
+			const FSkeletalBone& Bone = Context.LoadedMesh.Bones[BoneIndex];
+			if (Bone.ParentIndex >= 0 && Bone.ParentIndex < BoneIndex)
+			{
+				ComponentSpaceRefPose[BoneIndex] = Bone.ReferenceLocalTransform * ComponentSpaceRefPose[Bone.ParentIndex];
+			}
+			else
+			{
+				ComponentSpaceRefPose[BoneIndex] = Bone.ReferenceLocalTransform;
+			}
+			Context.LoadedMesh.InverseBindPoseMatrices[BoneIndex] = ComponentSpaceRefPose[BoneIndex].ToMatrixWithScale().GetInverse();
+		}
+
 		UE_LOG("FBX skeleton collected. BoneCount: %d, Path: %s",
-			static_cast<int32>(Context.LoadedMesh.Bones.size()),
+			BoneCount,
 			Context.SourcePath.c_str());
 	}
 
@@ -495,8 +516,22 @@ namespace
 					continue;
 				}
 
-				//control point index, weight를 읽음
 				const int32 BoneIndex = BoneIt->second;
+
+				// --- Bind Pose Correction ---
+				// Mesh의 Bind 상태 Transform과 Bone의 Bind 상태 Transform을 각각 읽어, Mesh Local -> Bone Local 역행렬 계산
+				FbxAMatrix FbxMeshMatrix;
+				Cluster->GetTransformMatrix(FbxMeshMatrix);
+				FbxAMatrix FbxLinkMatrix;
+				Cluster->GetTransformLinkMatrix(FbxLinkMatrix);
+
+				FMatrix MeshBindMatrix = ToEngineMatrix(FbxMeshMatrix);
+				FMatrix BoneBindMatrix = ToEngineMatrix(FbxLinkMatrix);
+
+				Context.LoadedMesh.InverseBindPoseMatrices[BoneIndex] = MeshBindMatrix * BoneBindMatrix.GetInverse();
+				// ----------------------------
+
+				//control point index, weight를 읽음
 				const int* ControlPointIndices = Cluster->GetControlPointIndices();
 				const double* ControlPointWeights = Cluster->GetControlPointWeights();
 
@@ -563,7 +598,7 @@ namespace
 		}
 	}
 
-	FVector GetPolygonVertexNormal(FbxMesh* Mesh, int32 PolygonIndex, int32 PolygonVertexIndex, const FMatrix& MeshGlobalMatrix)
+	FVector GetPolygonVertexNormal(FbxMesh* Mesh, int32 PolygonIndex, int32 PolygonVertexIndex)
 	{
 		FbxVector4 FbxNormal(0.0, 0.0, 1.0, 0.0);
 		if (Mesh != nullptr)
@@ -571,7 +606,7 @@ namespace
 			Mesh->GetPolygonVertexNormal(PolygonIndex, PolygonVertexIndex, FbxNormal);
 		}
 
-		return MeshGlobalMatrix.TransformVector(ToEngineVector(FbxNormal)).GetSafeNormal();
+		return ToEngineVector(FbxNormal).GetSafeNormal();
 	}
 
 	FVector2 GetPolygonVertexUV(FbxMesh* Mesh, int32 PolygonIndex, int32 PolygonVertexIndex, const char* UVSetName)
@@ -690,7 +725,7 @@ namespace
 				FSkeletalMeshVertex Vertex;
                 const FVector LocalPosition = ToEngineVector(Mesh->GetControlPointAt(ControlPointIndex));
                 Vertex.Position = LocalPosition;
-				Vertex.Normal = GetPolygonVertexNormal(Mesh, PolygonIndex, PolygonVertexIndex, MeshGlobalMatrix);
+				Vertex.Normal = GetPolygonVertexNormal(Mesh, PolygonIndex, PolygonVertexIndex);
 				Vertex.UVs = GetPolygonVertexUV(Mesh, PolygonIndex, PolygonVertexIndex, UVSetName);
 
 				if (ControlPointIndex < static_cast<int32>(ControlPointInfluences.size()))

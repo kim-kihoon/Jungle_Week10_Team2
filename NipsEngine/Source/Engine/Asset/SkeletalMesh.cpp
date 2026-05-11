@@ -104,13 +104,19 @@ void USkeletalMesh::CalculateInvRefMatrices()
 
     const int32 BoneCount = static_cast<int32>(MeshData->Bones.size());
 
-    MeshData->InverseBindPoseMatrices.clear();
-    MeshData->InverseBindPoseMatrices.resize(BoneCount, FMatrix::Identity);
-
     if (BoneCount == 0)
     {
         return;
     }
+
+    // FBX 로더에서 정밀한 바인드 포즈 역행렬(클러스터 기반)을 이미 채워두었다면 덮어쓰지 않고 넘어갑니다.
+    if (MeshData->InverseBindPoseMatrices.size() == BoneCount)
+    {
+        return;
+    }
+
+    MeshData->InverseBindPoseMatrices.clear();
+    MeshData->InverseBindPoseMatrices.resize(BoneCount, FMatrix::Identity);
 
     TArray<FTransform> ComponentSpaceRefPose;
     ComponentSpaceRefPose.resize(BoneCount, FTransform::Identity);
