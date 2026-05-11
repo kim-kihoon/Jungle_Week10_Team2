@@ -103,6 +103,7 @@ namespace
 		{ "Pawn", SpawnActorAt<APawnActor> },
 		{ "Scene", SpawnActorAt<ASceneActor> },
 		{ "StaticMesh", SpawnActorAt<AStaticMeshActor> },
+		{ "SkeletalMesh", SpawnActorAt<ASkeletalMeshActor> },
 		{ "TextRender", SpawnActorAt<ATextRenderActor> },
 		{ "SubUV", SpawnActorAt<ASubUVActor> },
 		{ "Billboard", SpawnActorAt<ABillboardActor> },

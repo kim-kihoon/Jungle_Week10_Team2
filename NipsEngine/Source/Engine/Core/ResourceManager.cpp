@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cwctype>
 #include <cstring>
 #include <cstdio>
 #include <cstdint>
@@ -27,10 +28,22 @@
 #include "Asset/StaticMeshSimplifier.h"
 #include "Render/Scene/RenderCommand.h"
 #include "Render/Resource/ObjMtlLoader.h"
+#include "Asset/SkeletalMesh.h"
+#include "Render/Resource/FbxParser.h"
 
 namespace
 {
 	constexpr const char* DefaultUberLitShaderPath = "Shaders/UberLit.hlsl";
+
+	std::wstring ToLowerExtension(std::wstring Extension)
+	{
+		std::transform(Extension.begin(), Extension.end(), Extension.begin(),
+			[](wchar_t Ch)
+			{
+				return static_cast<wchar_t>(std::towlower(Ch));
+			});
+		return Extension;
+	}
 
 	bool TryLoadKnownMaterialShader(FResourceManager& ResourceManager, const FString& ShaderName)
 	{
@@ -484,6 +497,7 @@ void FResourceManager::LoadFromAssetDirectory(const FString& Path)
 {
 	//	초기화
 	ObjFilePaths.clear();
+	SkeletalMeshFilePaths.clear();
 	FontFilePaths.clear();
 	TextureFilePaths.clear();
 	MaterialFilePaths.clear();
@@ -515,7 +529,7 @@ void FResourceManager::LoadFromAssetDirectory(const FString& Path)
 		}
 
 		const fs::path& FilePath = Entry.path();
-		const std::wstring Extension = FilePath.extension().wstring();
+		const std::wstring Extension = ToLowerExtension(FilePath.extension().wstring());
 
 		if (Extension == L".meta")
 		{
@@ -545,6 +559,10 @@ void FResourceManager::LoadFromAssetDirectory(const FString& Path)
 		{
 			MaterialFilePaths.push_back(RelativePath);
 			MaterialFiles.push_back(RelativePath);
+		}
+		else if (Extension == L".fbx")
+		{
+			SkeletalMeshFilePaths.push_back(RelativePath);
 		}
 		else if (Extension == L".matinst")
 		{
@@ -604,6 +622,7 @@ void FResourceManager::RefreshFromAssetDirectory(const FString& Path)
 	namespace fs = std::filesystem;
 
 	ObjFilePaths.clear();
+	SkeletalMeshFilePaths.clear();
 	FontFilePaths.clear();
 	TextureFilePaths.clear();
 	MaterialFilePaths.clear();
@@ -631,7 +650,7 @@ void FResourceManager::RefreshFromAssetDirectory(const FString& Path)
 			}
 
 			const fs::path& FilePath = Entry.path();
-			const std::wstring Extension = FilePath.extension().wstring();
+			const std::wstring Extension = ToLowerExtension(FilePath.extension().wstring());
 
 			if (Extension == L".meta" || Extension == L".bin")
 			{
@@ -660,6 +679,10 @@ void FResourceManager::RefreshFromAssetDirectory(const FString& Path)
 			{
 				MaterialFilePaths.push_back(RelativePath);
 				DeserializeMaterial(RelativePath);
+			}
+			else if (Extension == L".fbx")
+			{
+				SkeletalMeshFilePaths.push_back(RelativePath);
 			}
 			else if (Extension == L".matinst")
 			{
@@ -1075,6 +1098,12 @@ void FResourceManager::ReleaseGPUResources()
 	}
 	StaticMeshes.clear();
 	StaticMeshRegistry.clear();
+
+	for (auto& [Path, SkeletalMeshAsset] : SkeletalMeshes)
+	{
+		UObjectManager::Get().DestroyObject(SkeletalMeshAsset);
+	}
+	SkeletalMeshes.clear();
 
 	// D3D state object caches
 	SamplerStates.clear();
@@ -2227,6 +2256,63 @@ TArray<FString> FResourceManager::GetStaticMeshPaths() const
 {
 	return ObjFilePaths;
 }
+
+USkeletalMesh* FResourceManager::LoadSkeletalMesh(const FString& Path)
+{
+	if (USkeletalMesh* FoundMesh = FindSkeletalMesh(Path))
+	{
+		return FoundMesh;
+	}
+
+	FString AbsolutePath = FPaths::ToString(std::filesystem::path(FPaths::RootDir()) / FPaths::ToWide(Path));
+	FSkeletalMesh* LoadedMeshData = FbxParser::ParseFbx(AbsolutePath.c_str());
+
+	if (!LoadedMeshData || !LoadedMeshData->HasValidRenderData())
+	{
+		UE_LOG("[SkeletalMeshLoad] Failed to load or invalid data: %s", Path.c_str());
+		if (LoadedMeshData)
+		{
+			delete LoadedMeshData;
+		}
+		return nullptr;
+	}
+
+	LoadedMeshData->PathFileName = Path;
+
+	for (FSkeletalMeshMaterialSlot& Slot : LoadedMeshData->Slots)
+	{
+		Slot.Material = GetMaterial(Slot.SlotName);
+		if (Slot.Material == nullptr)
+		{
+			Slot.Material = GetMaterial("DefaultWhite");
+		}
+	}
+
+	USkeletalMesh* LoadedMesh = UObjectManager::Get().CreateObject<USkeletalMesh>();
+	LoadedMesh->SetMeshData(LoadedMeshData);
+
+	SkeletalMeshes.insert({ Path, LoadedMesh });
+
+	UE_LOG("[SkeletalMeshLoad] Successfully loaded and cached: %s", Path.c_str());
+	return LoadedMesh;
+}
+
+USkeletalMesh* FResourceManager::FindSkeletalMesh(const FString& Path) const
+{
+	auto It = SkeletalMeshes.find(Path);
+	if (It == SkeletalMeshes.end())
+	{
+		return nullptr;
+	}
+
+	return It->second;
+}
+
+TArray<FString> FResourceManager::GetSkeletalMeshPaths() const
+{
+	return SkeletalMeshFilePaths;
+}
+
 
 const TArray<FString>& FResourceManager::GetTextureFilePath() const
 {

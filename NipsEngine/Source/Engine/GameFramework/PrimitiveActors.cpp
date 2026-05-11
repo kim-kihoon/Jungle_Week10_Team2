@@ -2,6 +2,7 @@
 
 #include "Component/DecalComponent.h"
 #include "Component/CameraComponent.h"
+#include "Component/SkeletalMeshComponent.h"
 #include "Component/StaticMeshComponent.h"
 #include "Component/TextRenderComponent.h"
 #include "Component/HeightFogComponent.h"
@@ -20,6 +21,7 @@
 #include "Component/Collision/CapsuleComponent.h"
 #include "Component/SubUVComponent.h"
 #include "Core/ResourceManager.h"
+#include "Engine/Core/Paths.h"
 #include "GameFramework/World.h"
 #include <format>
 
@@ -31,6 +33,9 @@ REGISTER_FACTORY(ASceneActor)
 
 DEFINE_CLASS(AStaticMeshActor, AActor)
 REGISTER_FACTORY(AStaticMeshActor)
+
+DEFINE_CLASS(ASkeletalMeshActor, AActor)
+REGISTER_FACTORY(ASkeletalMeshActor)
 
 DEFINE_CLASS(ASubUVActor, AActor)
 REGISTER_FACTORY(ASubUVActor)
@@ -174,6 +179,12 @@ void AStaticMeshActor::InitDefaultComponents()
 {
 	auto* StaticMesh = AddComponent<UStaticMeshComponent>();
 	SetRootComponent(StaticMesh);
+}
+
+void ASkeletalMeshActor::InitDefaultComponents()
+{
+	auto* SkeletalMesh = AddComponent<USkeletalMeshComponent>();
+	SetRootComponent(SkeletalMesh);
 }
 
 void ASubUVActor::InitDefaultComponents()
