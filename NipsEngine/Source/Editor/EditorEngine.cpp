@@ -320,12 +320,15 @@ void UEditorEngine::Init(FWindowsWindow* InWindow)
 	FEditorSettings::Get().LoadFromFile(FEditorSettings::GetDefaultSettingsPath());
 	SyncEngineSettings();
 
-	MainPanel.Create(Window, Renderer, this);
-	if (WorldList.empty())
+	FName EditorWorldHandle = GetEditorWorldHandle();
+	if (EditorWorldHandle == FName::None)
 	{
-		CreateWorldContext(EWorldType::Editor, FName("Default"));
+		FWorldContext& EditorContext = CreateWorldContext(EWorldType::Editor, FName("Default"));
+		EditorWorldHandle = EditorContext.ContextHandle;
 	}
-	SetActiveWorld(WorldList[0].ContextHandle);
+	SetActiveWorld(EditorWorldHandle);
+
+	MainPanel.Create(Window, Renderer, this);
 	ApplySpatialIndexMaintenanceSettings();
 
 	// Selection & Gizmo

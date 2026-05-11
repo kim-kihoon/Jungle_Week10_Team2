@@ -68,6 +68,6 @@ private:
 	bool bShowMaterialEditor = true;
 	bool bShowStatProfiler = true;
 	bool bShowPlayStream = true;
-	bool bShowSkeletalMeshViewer = false;
+	bool bShowSkeletalMeshViewer = true;
 	bool bDefaultDockLayoutChecked = false;
 };

@@ -231,10 +231,12 @@ void FEditorMainPanel::Update()
 	}
 
 	const bool bPropertyModalBlockingInput = PropertyWidget.IsModalInputBlocking();
+	const bool bSkeletalMeshViewerBlockingInput = SkeletalMeshViewerWidget.IsViewportInputActive();
 	FGuiInputState& GuiState = FInputRouter::GetGuiInputState();
-	GuiState.bBlockViewportInput = bPropertyModalBlockingInput;
-	GuiState.bUsingMouse = bPropertyModalBlockingInput || (bViewportOperationActive ? false : IO.WantCaptureMouse);
-	GuiState.bUsingKeyboard = bPropertyModalBlockingInput || IO.WantCaptureKeyboard;
+	GuiState.bBlockViewportInput = bPropertyModalBlockingInput || bSkeletalMeshViewerBlockingInput;
+	GuiState.bUsingMouse =
+		bPropertyModalBlockingInput || bSkeletalMeshViewerBlockingInput || (bViewportOperationActive ? false : IO.WantCaptureMouse);
+	GuiState.bUsingKeyboard = bPropertyModalBlockingInput || bSkeletalMeshViewerBlockingInput || IO.WantCaptureKeyboard;
 
 	// IME는 ImGui가 텍스트 입력을 원할 때만 활성화.
 	// 그 외에는 OS 수준에서 IME 컨텍스트를 NULL로 연결해 한글 조합이

@@ -11,7 +11,7 @@ public:
 
 	void SetOpen(bool bInOpen) { bIsOpen = bInOpen; }
 	bool IsOpen() const { return bIsOpen; }
-	bool IsViewportInputActive() const { return PreviewScene.IsInputCaptured(); }
+	bool IsViewportInputActive() const { return bIsOpen && PreviewScene.IsInputActive(); }
 
 	FSkeletalMeshPreviewScene* GetPreviewScene() { return &PreviewScene; }
 	const FSkeletalMeshPreviewScene* GetPreviewScene() const { return &PreviewScene; }

@@ -1,5 +1,31 @@
 ﻿#include "Editor/Viewport/SkeletalMeshPreviewViewportClient.h"
 
+namespace
+{
+bool BuildRotationFromForward(const FVector& InForward, FQuat& OutRotation)
+{
+	FVector Forward = InForward.GetSafeNormal();
+	if (Forward.IsNearlyZero())
+	{
+		return false;
+	}
+
+	FVector Right = FVector::CrossProduct(FVector::UpVector, Forward).GetSafeNormal();
+	if (Right.IsNearlyZero())
+	{
+		Right = FVector::RightVector;
+	}
+
+	FVector Up = FVector::CrossProduct(Forward, Right).GetSafeNormal();
+	FMatrix RotationMatrix = FMatrix::Identity;
+	RotationMatrix.SetAxes(Forward, Right, Up);
+
+	OutRotation = FQuat(RotationMatrix);
+	OutRotation.Normalize();
+	return true;
+}
+}
+
 FSkeletalMeshPreviewViewportClient::FSkeletalMeshPreviewViewportClient()
 {
 	Camera.SetProjectionType(EViewportProjectionType::Perspective);
@@ -198,10 +224,17 @@ void FSkeletalMeshPreviewViewportClient::UpdateCameraTransform()
 {
 	FQuat PitchQuat(FVector::RightVector, MathUtil::DegreesToRadians(OrbitPitch));
 	FQuat YawQuat(FVector::UpVector, MathUtil::DegreesToRadians(OrbitYaw));
-	FQuat CameraRot = YawQuat * PitchQuat;
+	const FQuat OrbitRot = YawQuat * PitchQuat;
+	const FVector Forward = OrbitRot.GetForwardVector().GetSafeNormal();
+
+	FQuat CameraRot;
+	if (!BuildRotationFromForward(Forward, CameraRot))
+	{
+		return;
+	}
 
 	Camera.SetRotation(CameraRot);
-	Camera.SetLocation(ViewTarget - CameraRot.GetForwardVector() * OrbitDistance);
+	Camera.SetLocation(ViewTarget - Forward * OrbitDistance);
 }
 
 void FSkeletalMeshPreviewViewportClient::UpdateCameraRotation()
@@ -212,17 +245,10 @@ void FSkeletalMeshPreviewViewportClient::UpdateCameraRotation()
 	FVector Forward(std::cos(PitchRad) * std::cos(YawRad), std::cos(PitchRad) * std::sin(YawRad), std::sin(PitchRad));
 	Forward = Forward.GetSafeNormal();
 
-	FVector Right = FVector::CrossProduct(FVector::UpVector, Forward).GetSafeNormal();
-	if (Right.IsNearlyZero())
+	FQuat NewRotation;
+	if (!BuildRotationFromForward(Forward, NewRotation))
 	{
 		return;
 	}
-
-	FVector Up = FVector::CrossProduct(Forward, Right).GetSafeNormal();
-	FMatrix RotationMatrix = FMatrix::Identity;
-	RotationMatrix.SetAxes(Forward, Right, Up);
-
-	FQuat NewRotation(RotationMatrix);
-	NewRotation.Normalize();
 	Camera.SetRotation(NewRotation);
 }

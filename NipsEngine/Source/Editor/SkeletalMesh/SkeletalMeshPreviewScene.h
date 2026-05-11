@@ -40,6 +40,7 @@ public:
 	void SetInputRectFromScreenRect(float MinX, float MinY, float MaxX, float MaxY);
 	void SetViewportHovered(bool bHovered) { bPreviewHovered = bHovered; }
 	bool IsInputCaptured() const { return bPreviewInputCaptured; }
+	bool IsInputActive() const { return bPreviewHovered || bPreviewInputCaptured; }
 
 private:
 	UEditorEngine* Editor = nullptr;
