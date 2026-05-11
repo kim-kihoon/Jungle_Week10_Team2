@@ -219,7 +219,7 @@ void FPrimitiveRenderCollector::CollectFromComponent(
 			const FSkeletalMeshSection& Section = Sections[SectionIdx];
 			UMaterialInterface* Material = bDebugCollisionHighlight
 				? FResourceManager::Get().GetMaterial("DefaultRed")
-				: Cast<UMaterialInterface>(SkeletalMeshComp->GetMaterial(SectionIdx));
+				: Cast<UMaterialInterface>(SkeletalMeshComp->GetMaterial(Section.MaterialSlotIndex));
 
 			if (Material == nullptr)
 			{

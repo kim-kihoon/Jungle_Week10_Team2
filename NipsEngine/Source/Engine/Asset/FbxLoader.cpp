@@ -957,7 +957,7 @@ USkeletalMesh* FFbxImporter::ImportSkeletalMesh(const FString& Path, const FSkel
     const std::filesystem::path EmbeddedMediaDir = GetEmbeddedMediaExtractionDir(Path);
     std::error_code ErrorCode;
     std::filesystem::create_directories(EmbeddedMediaDir, ErrorCode);
-    if (!ErrorCode)
+    if (!ErrorCode)     
     {
         const FString EmbeddedMediaDirUtf8 = FPaths::ToUtf8(EmbeddedMediaDir.generic_wstring());
         Importer->SetEmbeddingExtractionFolder(EmbeddedMediaDirUtf8.c_str());
@@ -969,7 +969,7 @@ USkeletalMesh* FFbxImporter::ImportSkeletalMesh(const FString& Path, const FSkel
     }
 
     // Create an FbxScene.
-    FbxScene* Scene = FbxScene::Create(Manager, "ImportedScene");
+    FbxScene* Scene = FbxScene::Create(Manager, "ImportedScene");  
     if (Scene == nullptr || !Importer->Import(Scene))
     {
         UE_LOG("[FbxImporter] Failed to import scene: %s", Path.c_str());
@@ -1002,6 +1002,7 @@ USkeletalMesh* FFbxImporter::ImportSkeletalMesh(const FString& Path, const FSkel
     // Ensure there is at least a root bone in the skeleton, as some FBX files may not have any skeleton data.
     if (ImportedMesh->RefSkeleton.GetNum() == 0)
     {
+        UE_LOG("[FbxImporter] No skeleton found in %s. Creating a single Root bone fallback.", Path.c_str());
         FBoneInfo RootBone;
         RootBone.Name = "Root";
         RootBone.ParentIndex = -1;

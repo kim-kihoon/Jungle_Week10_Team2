@@ -129,8 +129,13 @@ FMeshBuffer* FMeshBufferManager::GetSkeletalMeshBuffer(const USkeletalMeshCompon
     }
 
     FMeshBuffer& Buffer = SkeletalMeshBufferMap[SkeletalMeshComponent];
-    Buffer.Release();
-    Buffer.Create(Device, Vertices, Indices);
+    USkeletalMeshComponent* MutableComponent = const_cast<USkeletalMeshComponent*>(SkeletalMeshComponent);
+    const bool bNeedsRebuild = !Buffer.IsValid() || MutableComponent->ConsumeRenderStateDirty();
+    if (bNeedsRebuild)
+    {
+        Buffer.Release();
+        Buffer.Create(Device, Vertices, Indices);
+    }
 
     return Buffer.IsValid() ? &Buffer : nullptr;
 }
