@@ -13,7 +13,7 @@ public:
 	bool HasValidMesh() const;
 
 	const TArray<FTransform>& GetCurrentLocalTransforms() const { return CurrentLocalTransforms; }
-	const TArray<FMatrix>& GetCurrentComponentSpaceMatrices() const { return CurrentComponentSpaceMatrices; }
+	const TArray<FMatrix>& GetCurrentGlobalMatrices() const { return CurrentGlobalMatrices; }
 	const TArray<FMatrix>& GetSkinningMatrices() const { return SkinningMatrices; }
 
 	void RefreshBoneTransforms();
@@ -30,7 +30,7 @@ protected:
 	FString SkeletalMeshAssetPath;
 
 	TArray<FTransform> CurrentLocalTransforms;
-	TArray<FMatrix> CurrentComponentSpaceMatrices;
+	TArray<FMatrix> CurrentGlobalMatrices;
 	TArray<FMatrix> SkinningMatrices;
 
 	bool bBoneTransformsDirty = true;
