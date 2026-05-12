@@ -232,8 +232,42 @@ bool UGizmoComponent::RaycastMesh(const FRay& Ray, FHitResult& OutHitResult)
     OutHitResult.bHit = bHit;
     if (!bHit)
     {
-        UpdateHoveredAxis(-1);
-        return false;
+        // Fallback: Forgiving cylinder intersection for Translate/Scale mode
+        if (CurMode == EGizmoMode::Translate || CurMode == EGizmoMode::Scale)
+        {
+            float BestT = FLT_MAX;
+            int BestAxis = -1;
+            float T = 0.0f;
+            
+            if (IntersectRayAxis(Ray, GetWorldLocation() + GetWorldMatrix().GetRightVector() * AxisLength, T) && T < BestT)
+            { BestT = T; BestAxis = 0; }
+            if (IntersectRayAxis(Ray, GetWorldLocation() + GetWorldMatrix().GetUpVector() * AxisLength, T) && T < BestT)
+            { BestT = T; BestAxis = 1; }
+            if (IntersectRayAxis(Ray, GetWorldLocation() + GetWorldMatrix().GetForwardVector() * AxisLength, T) && T < BestT)
+            { BestT = T; BestAxis = 2; }
+            
+            if (BestAxis != -1)
+            {
+                bHit = true;
+                OutHitResult.bHit = true;
+                ClosestT = BestT;
+                // Find a FaceIndex that corresponds to this axis to satisfy UpdateHoveredAxis
+                for (size_t i = 0; i + 2 < MeshData->Indices.size(); i += 3)
+                {
+                    if (MeshData->Vertices[MeshData->Indices[i]].SubID == BestAxis)
+                    {
+                        OutHitResult.FaceIndex = static_cast<int32>(i);
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!bHit)
+        {
+            UpdateHoveredAxis(-1);
+            return false;
+        }
     }
 
     const FVector LocalHitPoint = LocalOrigin + (LocalDirection * ClosestT);

@@ -89,6 +89,7 @@ public:
 
 	inline void SetPressedOnHandle(bool bPressed) { bPressedOnHandle = bPressed; }
 	inline bool IsPressedOnHandle() const { return bPressedOnHandle; }
+	inline bool IsInteracting() const { return bPressedOnHandle || bIsHolding; }
 
 	void UpdateHoveredAxis(int Index);
 	void UpdateDrag(const FRay& Ray);
