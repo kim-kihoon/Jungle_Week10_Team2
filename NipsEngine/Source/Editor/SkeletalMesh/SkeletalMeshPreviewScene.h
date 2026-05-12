@@ -6,6 +6,7 @@
 #include "Editor/Viewport/SkeletalMeshPreviewViewportClient.h"
 #include "Editor/Input/SkeletalMeshPreviewController.h"
 #include "Engine/Input/InputRouter.h"
+#include "Engine/Geometry/Ray.h"
 
 class UEditorEngine;
 class UWorld;
@@ -33,6 +34,7 @@ public:
 
 	void SelectBone(int32 BoneIndex);
 	int32 GetSelectedBoneIndex() const;
+	bool PickBoneJoint(const FRay& Ray, int32& OutBoneIndex) const;
 
 	FSceneViewport& GetSceneViewport() { return PreviewViewport; }
 	const FSceneViewport& GetSceneViewport() const { return PreviewViewport; }
@@ -49,6 +51,12 @@ public:
 	void SetViewportHovered(bool bHovered) { bPreviewHovered = bHovered; }
 	bool IsInputCaptured() const { return bPreviewInputCaptured; }
 	bool IsInputActive() const { return bPreviewHovered || bPreviewInputCaptured; }
+
+	bool IsSkeletonVisible() const { return bShowSkeleton; }
+	void SetSkeletonVisible(bool bVisible) { bShowSkeleton = bVisible; }
+
+	bool IsFullSkeletonVisible() const { return bShowFullSkeleton; }
+	void SetFullSkeletonVisible(bool bVisible) { bShowFullSkeleton = bVisible; }
 
 	UGizmoComponent* GetPreviewGizmo() const { return PreviewGizmo; }
 
@@ -73,4 +81,7 @@ private:
 	bool bPreviewInputCaptured = false;
 
 	int32 SelectedBoneIndex = -1;
+
+	bool bShowSkeleton = true;
+	bool bShowFullSkeleton = false;
 };

@@ -188,9 +188,9 @@ void FRenderCollector::CollectGrid(float GridSpacing, int32 GridHalfLineCount, F
 	OverlayRenderCollector.CollectGrid(GridSpacing, GridHalfLineCount, RenderBus, bOrthographic);
 }
 
-void FRenderCollector::CollectSkeleton(USkeletalMeshComponent* MeshComp, int32 SelectedBoneIndex, FRenderBus& RenderBus, FLineBatcher* LineBatcher)
+void FRenderCollector::CollectSkeleton(USkeletalMeshComponent* MeshComp, int32 SelectedBoneIndex, bool bShowFullSkeleton, FRenderBus& RenderBus, FLineBatcher* LineBatcher)
 {
-	OverlayRenderCollector.CollectSkeleton(MeshComp, SelectedBoneIndex, RenderBus, LineBatcher);
+	OverlayRenderCollector.CollectSkeleton(MeshComp, SelectedBoneIndex, bShowFullSkeleton, RenderBus, LineBatcher);
 }
 
 void FRenderCollector::CollectGizmo(UGizmoComponent* Gizmo, const FShowFlags& ShowFlags, FRenderBus& RenderBus, bool bIsActiveOperation)

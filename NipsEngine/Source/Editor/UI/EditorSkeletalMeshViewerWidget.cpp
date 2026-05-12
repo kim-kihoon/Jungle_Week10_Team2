@@ -5,6 +5,7 @@
 #include "ImGui/imgui.h"
 
 #include <d3d11.h>
+#include <filesystem>
 
 #include "Component/SkeletalMeshComponent.h"
 
@@ -44,6 +45,7 @@ const char* GetPreviewViewModeName(EViewMode Mode)
 void FEditorSkeletalMeshViewerWidget::Initialize(UEditorEngine* InEditorEngine)
 {
 	FEditorWidget::Initialize(InEditorEngine);
+	bIsOpen = true;
 	PreviewScene.Initialize(InEditorEngine);
 	RefreshSkeletalMeshPathCache();
 	SyncCurrentMeshFromPreview();
@@ -51,6 +53,8 @@ void FEditorSkeletalMeshViewerWidget::Initialize(UEditorEngine* InEditorEngine)
 
 void FEditorSkeletalMeshViewerWidget::Render(float DeltaTime)
 {
+	bWindowFocused = false;
+
 	if (!bIsOpen)
 	{
 		PreviewScene.SetVisible(false);
@@ -59,8 +63,14 @@ void FEditorSkeletalMeshViewerWidget::Render(float DeltaTime)
 
 	PreviewScene.SetVisible(true);
 
-	if (ImGui::Begin("SkeletalMesh Viewer", &bIsOpen, ImGuiWindowFlags_MenuBar))
+	if (WindowName.empty())
 	{
+		WindowName = "SkeletalMesh Viewer##Viewer_" + std::to_string(InstanceId);
+	}
+
+	if (ImGui::Begin(WindowName.c_str(), &bIsOpen, ImGuiWindowFlags_MenuBar))
+	{
+		bWindowFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 		SyncCurrentMeshFromPreview();
 		RenderToolbar();
 
@@ -130,6 +140,28 @@ void FEditorSkeletalMeshViewerWidget::Render(float DeltaTime)
 		PreviewScene.Tick(DeltaTime);
 	}
 	ImGui::End();
+}
+
+void FEditorSkeletalMeshViewerWidget::SetInstanceId(int32 InInstanceId)
+{
+	InstanceId = InInstanceId;
+	WindowName = "SkeletalMesh Viewer##Viewer_" + std::to_string(InstanceId);
+}
+
+void FEditorSkeletalMeshViewerWidget::OpenMesh(const FString& MeshPath)
+{
+	USkeletalMesh* LoadedMesh = FResourceManager::Get().LoadSkeletalMesh(MeshPath);
+	if (LoadedMesh)
+	{
+		PreviewScene.SetSkeletalMesh(LoadedMesh);
+		RebuildBoneCache(LoadedMesh);
+	}
+
+	std::wstring WidePath = FPaths::ToWide(MeshPath.c_str());
+	std::filesystem::path PathObj(WidePath);
+	std::string FileName = FPaths::ToUtf8(PathObj.filename().generic_wstring());
+
+	WindowName = "SkeletalMesh Viewer - " + FileName + "##Viewer_" + std::to_string(InstanceId);
 }
 
 void FEditorSkeletalMeshViewerWidget::RenderToolbar()
@@ -233,6 +265,22 @@ void FEditorSkeletalMeshViewerWidget::RenderToolbar()
 		if (CachedSkeletalMeshPaths.empty())
 		{
 			ImGui::MenuItem("No SkeletalMesh assets", nullptr, false, false);
+		}
+		ImGui::EndMenu();
+	}
+
+	if (ImGui::BeginMenu("Skeleton"))
+	{
+		bool bShow = PreviewScene.IsSkeletonVisible();
+		if (ImGui::MenuItem("Show Skeleton", nullptr, &bShow))
+		{
+			PreviewScene.SetSkeletonVisible(bShow);
+		}
+
+		bool bShowFull = PreviewScene.IsFullSkeletonVisible();
+		if (ImGui::MenuItem("Show Full Skeleton", nullptr, &bShowFull))
+		{
+			PreviewScene.SetFullSkeletonVisible(bShowFull);
 		}
 		ImGui::EndMenu();
 	}

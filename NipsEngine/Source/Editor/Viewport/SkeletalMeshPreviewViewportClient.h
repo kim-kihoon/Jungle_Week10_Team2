@@ -21,6 +21,7 @@ public:
 	void SetPreviewScene(FSkeletalMeshPreviewScene* InScene) { PreviewScene = InScene; }
 	void SetViewportSize(float InWidth, float InHeight) override;
 	FViewportCamera* GetCamera() { return &Camera; }
+	const FViewportCamera* GetCamera() const { return &Camera; }
 
 	EEditorViewportType GetViewportType() const { return ViewportType; }
 	void SetViewportType(EEditorViewportType InType) { ViewportType = InType; }

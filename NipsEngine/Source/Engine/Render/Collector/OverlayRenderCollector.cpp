@@ -778,7 +778,7 @@ void FOverlayRenderCollector::CollectBVHInternalNodeAABBs(
 	}
 }
 
-void FOverlayRenderCollector::CollectSkeleton(USkeletalMeshComponent* MeshComp, int32 SelectedBoneIndex, FRenderBus& RenderBus, FLineBatcher* LineBatcher)
+void FOverlayRenderCollector::CollectSkeleton(USkeletalMeshComponent* MeshComp, int32 SelectedBoneIndex, bool bShowFullSkeleton, FRenderBus& RenderBus, FLineBatcher* LineBatcher)
 {
 	if (MeshComp == nullptr || LineBatcher == nullptr || !MeshComp->HasValidMesh())
 	{
@@ -787,23 +787,20 @@ void FOverlayRenderCollector::CollectSkeleton(USkeletalMeshComponent* MeshComp, 
 
 	const TArray<FSkeletalBone>& Bones = MeshComp->GetSkeletalMesh()->GetBones();
 	const int32 BoneCount = static_cast<int32>(Bones.size());
-	if (SelectedBoneIndex < 0 || SelectedBoneIndex >= BoneCount)
+
+	const bool bHasValidSelection = (SelectedBoneIndex >= 0 && SelectedBoneIndex < BoneCount);
+
+	if (!bHasValidSelection && !bShowFullSkeleton)
 	{
 		return;
 	}
 
-	const FTransform SelectedWorldTransform = MeshComp->GetBoneWorldTransform(SelectedBoneIndex);
-	const FVector SelectedPos = SelectedWorldTransform.GetLocation();
-	const FQuat SelectedRotation = SelectedWorldTransform.GetRotation();
-
-	const FVector CameraToBone = SelectedPos - RenderBus.GetCameraPosition();
-	const float DistanceScale = RenderBus.IsOrthographic()
-		? RenderBus.GetSceneView().CameraOrthoHeight * 0.006f
-		: CameraToBone.Size() * 0.012f;
-	const float JointRadius = std::max(0.025f, DistanceScale);
+	constexpr float JointRadius = 0.05f;
 	const float ConnectedJointRadius = JointRadius * 0.65f;
 	const float AxisLength = JointRadius * 4.0f;
-	const float TickLength = JointRadius * 2.0f;
+
+	const FColor BaseJointColor(100, 110, 125, 180U);
+	const FColor BaseBoneColor(85, 95, 110, 180U);
 
 	const FColor SelectedJointColor(255, 216, 64);
 	const FColor SelectedBoneColor(255, 176, 32);
@@ -812,74 +809,98 @@ void FOverlayRenderCollector::CollectSkeleton(USkeletalMeshComponent* MeshComp, 
 	const FColor ConnectedJointColor(120u, 135u, 155u, 210u);
 
 	auto DrawJoint = [&](const FVector& Position, float Radius, const FColor& Color)
-	{
-		const FVector Right = RenderBus.GetCameraRight().GetSafeNormal();
-		const FVector Up = RenderBus.GetCameraUp().GetSafeNormal();
-		LineBatcher->AddCircle(Position, Right, Up, Radius, Color.ToVector4());
-		LineBatcher->AddLine(Position - Right * Radius, Position + Right * Radius, Color.ToVector4());
-		LineBatcher->AddLine(Position - Up * Radius, Position + Up * Radius, Color.ToVector4());
-	};
+		{
+			const FVector Right = RenderBus.GetCameraRight().GetSafeNormal();
+			const FVector Up = RenderBus.GetCameraUp().GetSafeNormal();
+			LineBatcher->AddCircle(Position, Right, Up, Radius, Color.ToVector4());
+			LineBatcher->AddLine(Position - Right * Radius, Position + Right * Radius, Color.ToVector4());
+			LineBatcher->AddLine(Position - Up * Radius, Position + Up * Radius, Color.ToVector4());
+		};
 
 	auto DrawBoneSegment = [&](const FVector& Start, const FVector& End, const FColor& Color, bool bEmphasized)
+		{
+			LineBatcher->AddLine(Start, End, Color.ToVector4());
+
+			if (!bEmphasized)
+			{
+				return;
+			}
+
+			const FVector Segment = End - Start;
+			if (Segment.SizeSquared() <= 1.0e-6f)
+			{
+				return;
+			}
+
+			const FVector Direction = Segment.GetSafeNormal();
+			FVector Side = FVector::CrossProduct(Direction, RenderBus.GetCameraForward()).GetSafeNormal();
+			if (Side.IsNearlyZero())
+			{
+				Side = RenderBus.GetCameraRight().GetSafeNormal();
+			}
+
+			const float Offset = JointRadius * 0.22f;
+			LineBatcher->AddLine(Start + Side * Offset, End + Side * Offset, Color.ToVector4());
+			LineBatcher->AddLine(Start - Side * Offset, End - Side * Offset, Color.ToVector4());
+		};
+
+	if (bShowFullSkeleton)
 	{
-		LineBatcher->AddLine(Start, End, Color.ToVector4());
-
-		if (!bEmphasized)
+		for (int32 i = 0; i < BoneCount; ++i)
 		{
-			return;
+			const FVector Pos = MeshComp->GetBoneWorldTransform(i).GetLocation();
+
+			DrawJoint(Pos, ConnectedJointRadius * 0.8f, BaseJointColor);
+
+			const int32 ParentIdx = Bones[i].ParentIndex;
+			if (ParentIdx >= 0 && ParentIdx < BoneCount)
+			{
+				const FVector ParentPos = MeshComp->GetBoneWorldTransform(ParentIdx).GetLocation();
+				DrawBoneSegment(ParentPos, Pos, BaseBoneColor, false);
+			}
 		}
-
-		const FVector Segment = End - Start;
-		if (Segment.SizeSquared() <= 1.0e-6f)
-		{
-			return;
-		}
-
-		const FVector Direction = Segment.GetSafeNormal();
-		FVector Side = FVector::CrossProduct(Direction, RenderBus.GetCameraForward()).GetSafeNormal();
-		if (Side.IsNearlyZero())
-		{
-			Side = RenderBus.GetCameraRight().GetSafeNormal();
-		}
-
-		const float Offset = JointRadius * 0.22f;
-		LineBatcher->AddLine(Start + Side * Offset, End + Side * Offset, Color.ToVector4());
-		LineBatcher->AddLine(Start - Side * Offset, End - Side * Offset, Color.ToVector4());
-	};
-
-	const int32 ParentIndex = Bones[SelectedBoneIndex].ParentIndex;
-	if (ParentIndex >= 0 && ParentIndex < BoneCount)
-	{
-		const FVector ParentPos = MeshComp->GetBoneWorldTransform(ParentIndex).GetLocation();
-		DrawBoneSegment(ParentPos, SelectedPos, SelectedBoneColor, true);
-		DrawJoint(ParentPos, ConnectedJointRadius, ConnectedJointColor);
 	}
 
-	bool bHasChild = false;
-	for (int32 BoneIndex = 0; BoneIndex < BoneCount; ++BoneIndex)
+	if (bHasValidSelection)
 	{
-		if (Bones[BoneIndex].ParentIndex != SelectedBoneIndex)
+		const FTransform SelectedWorldTransform = MeshComp->GetBoneWorldTransform(SelectedBoneIndex);
+		const FVector SelectedPos = SelectedWorldTransform.GetLocation();
+		const FQuat SelectedRotation = SelectedWorldTransform.GetRotation();
+
+		const int32 ParentIndex = Bones[SelectedBoneIndex].ParentIndex;
+		if (ParentIndex >= 0 && ParentIndex < BoneCount)
 		{
-			continue;
+			const FVector ParentPos = MeshComp->GetBoneWorldTransform(ParentIndex).GetLocation();
+			DrawBoneSegment(ParentPos, SelectedPos, SelectedBoneColor, true);
+			DrawJoint(ParentPos, ConnectedJointRadius, ConnectedJointColor);
 		}
 
-		const FVector ChildPos = MeshComp->GetBoneWorldTransform(BoneIndex).GetLocation();
-		DrawBoneSegment(SelectedPos, ChildPos, ChildBoneColor, false);
-		DrawJoint(ChildPos, ConnectedJointRadius, ConnectedJointColor);
-		bHasChild = true;
+		bool bHasChild = false;
+		for (int32 BoneIndex = 0; BoneIndex < BoneCount; ++BoneIndex)
+		{
+			if (Bones[BoneIndex].ParentIndex != SelectedBoneIndex)
+			{
+				continue;
+			}
+
+			const FVector ChildPos = MeshComp->GetBoneWorldTransform(BoneIndex).GetLocation();
+			DrawBoneSegment(SelectedPos, ChildPos, ChildBoneColor, false);
+			DrawJoint(ChildPos, ConnectedJointRadius, ConnectedJointColor);
+			bHasChild = true;
+		}
+
+		DrawJoint(SelectedPos, JointRadius, SelectedJointColor);
+		if (!bHasChild && ParentIndex < 0)
+		{
+			LineBatcher->AddSphere(SelectedPos, JointRadius * 0.75f, RenderBus.GetCameraRight(), RenderBus.GetCameraUp(), SelectedJointColor);
+		}
+
+		const FVector Forward = SelectedRotation.GetForwardVector().GetSafeNormal();
+		const FVector Right = SelectedRotation.GetRightVector().GetSafeNormal();
+		const FVector Up = SelectedRotation.GetUpVector().GetSafeNormal();
+
+		LineBatcher->AddLine(SelectedPos, SelectedPos + Forward * AxisLength, FColor::Red().ToVector4());
+		LineBatcher->AddLine(SelectedPos, SelectedPos + Right * AxisLength, FColor::Green().ToVector4());
+		LineBatcher->AddLine(SelectedPos, SelectedPos + Up * AxisLength, FColor::Blue().ToVector4());
 	}
-
-	DrawJoint(SelectedPos, JointRadius, SelectedJointColor);
-	if (!bHasChild && ParentIndex < 0)
-	{
-		LineBatcher->AddSphere(SelectedPos, JointRadius * 0.75f, RenderBus.GetCameraRight(), RenderBus.GetCameraUp(), SelectedJointColor);
-	}
-
-	const FVector Forward = SelectedRotation.GetForwardVector().GetSafeNormal();
-	const FVector Right = SelectedRotation.GetRightVector().GetSafeNormal();
-	const FVector Up = SelectedRotation.GetUpVector().GetSafeNormal();
-
-	LineBatcher->AddLine(SelectedPos, SelectedPos + Forward * AxisLength, FColor::Red().ToVector4());
-	LineBatcher->AddLine(SelectedPos, SelectedPos + Right * AxisLength, FColor::Green().ToVector4());
-	LineBatcher->AddLine(SelectedPos, SelectedPos + Up * AxisLength, FColor::Blue().ToVector4());
 }

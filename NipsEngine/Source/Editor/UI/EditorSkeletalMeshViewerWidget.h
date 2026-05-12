@@ -10,8 +10,13 @@ public:
 	void Initialize(UEditorEngine* InEditorEngine) override;
 	void Render(float DeltaTime) override;
 
+	void SetInstanceId(int32 InInstanceId);
+	int32 GetInstanceId() const { return InstanceId; }
+	void OpenMesh(const FString& MeshPath);
+
 	void SetOpen(bool bInOpen) { bIsOpen = bInOpen; }
 	bool IsOpen() const { return bIsOpen; }
+	bool IsWindowFocused() const { return bWindowFocused; }
 	bool IsViewportInputActive() const { return bIsOpen && PreviewScene.IsInputActive(); }
 	bool IsViewportInputCaptured() const { return bIsOpen && PreviewScene.IsInputCaptured(); }
 
@@ -30,6 +35,10 @@ private:
 	void RefreshSkeletalMeshPathCache();
 
 	bool bIsOpen = false;
+	bool bWindowFocused = false;
+	int32 InstanceId = 0;
+	FString WindowName;
+
 	int32 SelectedMeshPathIndex = -1;
 	TArray<FString> CachedSkeletalMeshPaths;
 

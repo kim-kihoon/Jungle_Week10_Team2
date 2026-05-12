@@ -14,6 +14,9 @@
 #include "Editor/UI/EditorCameraShakeWidget.h"
 #include "Editor/UI/EditorSkeletalMeshViewerWidget.h"
 
+#include <memory>
+#include <vector>
+
 class FRenderer;
 class UEditorEngine;
 class FWindowsWindow;
@@ -30,8 +33,19 @@ public:
 	FEditorMaterialWidget& GetMaterialWidget() { return MaterialWidget; }
 	FEditorSceneWidget& GetSceneWidget() { return SceneWidget; }
 	const FEditorSceneWidget& GetSceneWidget() const { return SceneWidget; }
-	FSkeletalMeshPreviewScene* GetSkeletalMeshPreviewScene() { return SkeletalMeshViewerWidget.GetPreviewScene(); }
-	const FSkeletalMeshPreviewScene* GetSkeletalMeshPreviewScene() const { return SkeletalMeshViewerWidget.GetPreviewScene(); }
+	void OpenSkeletalMeshViewer(const FString& MeshPath);
+	FSkeletalMeshPreviewScene* GetSkeletalMeshPreviewScene()
+	{
+		return FocusedSkeletalMeshViewer ? FocusedSkeletalMeshViewer->GetPreviewScene() : nullptr;
+	}
+	const FSkeletalMeshPreviewScene* GetSkeletalMeshPreviewScene() const
+	{
+		return FocusedSkeletalMeshViewer ? FocusedSkeletalMeshViewer->GetPreviewScene() : nullptr;
+	}
+	const std::vector<std::shared_ptr<FEditorSkeletalMeshViewerWidget>>& GetSkeletalMeshViewers() const
+	{
+		return SkeletalMeshViewers;
+	}
 
 	void ResetWidgetSelections()
 	{
@@ -60,7 +74,9 @@ private:
 	FEditorToolbarWidget ToolbarWidget;
 	FEditorPlayStreamWidget PlayStreamWidget;
 	FEditorCameraShakeWidget CameraShakeWidget;
-	FEditorSkeletalMeshViewerWidget SkeletalMeshViewerWidget;
+	FEditorSkeletalMeshViewerWidget* FocusedSkeletalMeshViewer = nullptr;
+	std::vector<std::shared_ptr<FEditorSkeletalMeshViewerWidget>> SkeletalMeshViewers;
+	int32 NextViewerInstanceId = 1;
 
 	bool bShowConsole = false;
 	bool bShowCameraShake = true;
@@ -70,6 +86,5 @@ private:
 	bool bShowMaterialEditor = true;
 	bool bShowStatProfiler = true;
 	bool bShowPlayStream = true;
-	bool bShowSkeletalMeshViewer = true;
 	bool bDefaultDockLayoutChecked = false;
 };
