@@ -467,7 +467,8 @@ void FInputRouter::TickKeyboardInput(const FInputRouteContext& Context)
 void FInputRouter::TickMouseInput(const FInputRouteContext& Context)
 {
 	const InputSystem& IS = InputSystem::Get();
-	if (!Context.bIgnoreGuiBlock && IS.GetGuiInputState().bBlockViewportInput)
+	const FGuiInputState& GuiState = IS.GetGuiInputState();
+	if (!Context.bIgnoreGuiBlock && GuiState.bBlockViewportInput)
 		return;
 
 	POINT MousePoint = IS.GetMousePos();

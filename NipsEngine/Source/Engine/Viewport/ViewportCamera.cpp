@@ -122,6 +122,7 @@ void FViewportCamera::BuildSceneView(FSceneView& OutView, const FViewportRect& V
 	OutView.CameraFrustum = GetFrustum();
 	OutView.ViewMode = ViewMode;
 	OutView.bOrthographic = IsOrthographic();
+	OutView.bFixedOrthographic = IsOrthographic() && bHasCustomLookDir;
 }
 
 void FViewportCamera::BuildSceneView(FSceneView& OutView, EViewMode ViewMode) const

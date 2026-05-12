@@ -125,6 +125,12 @@ namespace
 		return Name;
 	}
 
+	const FName& AxisMoveUp()
+	{
+		static const FName Name("MoveUp");
+		return Name;
+	}
+
 	const FName& AxisLookYaw()
 	{
 		static const FName Name("LookYaw");
@@ -886,6 +892,7 @@ void FGamePlayerController::BuildSceneView(FSceneView& OutView, const FViewportR
 		OutView.NearPlane = Camera->GetNearPlane();
 		OutView.FarPlane = Camera->GetFarPlane();
 		OutView.bOrthographic = Camera->IsOrthogonal();
+		OutView.bFixedOrthographic = false;
 		OutView.CameraOrthoHeight = Camera->GetOrthoWidth();
 		OutView.CameraFrustum.UpdateFromCamera(OutView.View, OutView.Proj);
 	}
@@ -920,6 +927,8 @@ void FGamePlayerController::SetupDefaultInputMappings()
 	InputMapping.AddAxisMapping(AxisMoveForward(), 'S', -1.0f);
 	InputMapping.AddAxisMapping(AxisMoveRight(), 'D', 1.0f);
 	InputMapping.AddAxisMapping(AxisMoveRight(), 'A', -1.0f);
+	InputMapping.AddAxisMapping(AxisMoveUp(), 'E', 1.0f);
+	InputMapping.AddAxisMapping(AxisMoveUp(), 'Q', -1.0f);
 
 	InputMapping.AddAxisMapping(AxisLookYaw(), VK_RIGHT, 1.0f);
 	InputMapping.AddAxisMapping(AxisLookYaw(), VK_LEFT, -1.0f);
@@ -936,6 +945,7 @@ void FGamePlayerController::ApplyInputAxes(float DeltaTime)
 
 	const float MoveForwardValue = InputMapping.GetAxisValue(AxisMoveForward());
 	const float MoveRightValue = InputMapping.GetAxisValue(AxisMoveRight());
+	const float MoveUpValue = InputMapping.GetAxisValue(AxisMoveUp());
 	const bool bSprintHeld = IsSprintKeyHeld();
 
 	// GetAxisValue가 매핑된 키들을 보고 MoveForwardValue 같은 의미 값만 돌려줍니다.
@@ -943,10 +953,13 @@ void FGamePlayerController::ApplyInputAxes(float DeltaTime)
 	// 실제 월드 방향은 현재 카메라의 forward/right/up 벡터로 변환합니다.
 	const float Yaw = Camera ? Camera->GetYawDegrees() : FreeCameraYaw;
 	const float Pitch = Camera ? Camera->GetPitchDegrees() : FreeCameraPitch;
-	const FVector Forward = IsRuntimeWorld() ? ToForward(0.0f, Yaw) : ToForward(Pitch, Yaw);
+	const bool bUsePlanarRuntimeMovement = IsRuntimeWorld() && (Player != nullptr || GetCharacterMovement() != nullptr);
+	const FVector Forward = bUsePlanarRuntimeMovement ? ToForward(0.0f, Yaw) : ToForward(Pitch, Yaw);
 	const FVector Right = ToRight(Yaw);
+	const FVector Up = FVector::UpVector;
 
-	const FVector Direction = Forward * MoveForwardValue + Right * MoveRightValue;
+	const bool bAllowVerticalMove = !bUsePlanarRuntimeMovement;
+	const FVector Direction = Forward * MoveForwardValue + Right * MoveRightValue + (bAllowVerticalMove ? Up * MoveUpValue : FVector::ZeroVector);
 	if (!Direction.IsNearlyZero())
 	{
 		if (IsRuntimeWorld())

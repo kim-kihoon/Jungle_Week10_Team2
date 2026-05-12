@@ -7,6 +7,7 @@
 #include "Editor/EditorEngine.h"
 #include "Editor/Settings/EditorSettings.h"
 #include "Editor/Viewport/ViewportLayout.h"
+#include "Engine/Input/InputRouter.h"
 #include "Engine/Object/FName.h"
 
 namespace
@@ -19,6 +20,14 @@ namespace
 		Value = std::clamp(Value, 0.0f, 1.0f);
 		const float Inv = 1.0f - Value;
 		return 1.0f - Inv * Inv * Inv;
+	}
+
+	void BlockViewportInputForConsole()
+	{
+		FGuiInputState& GuiState = FInputRouter::GetGuiInputState();
+		GuiState.bBlockViewportInput = true;
+		GuiState.bUsingMouse = true;
+		GuiState.bUsingKeyboard = true;
 	}
 }
 
@@ -107,6 +116,8 @@ void FEditorConsoleWidget::OpenFromDrawerTakeover(float InDrawerHeight)
 
 void FEditorConsoleWidget::Render(float DeltaTime)
 {
+	bViewportInputBlocking = false;
+
 	const float TargetAlpha = bOpen ? 1.0f : 0.0f;
 	const float AlphaStep = std::clamp(DeltaTime * ConsoleDrawerAnimationSpeed, 0.0f, 1.0f);
 	DrawerAnimationAlpha += (TargetAlpha - DrawerAnimationAlpha) * AlphaStep;
@@ -170,6 +181,12 @@ void FEditorConsoleWidget::Render(float DeltaTime)
 			SetOpen(false);
 		}
 		return;
+	}
+
+	if (ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows) || ImGui::IsAnyItemActive())
+	{
+		bViewportInputBlocking = true;
+		BlockViewportInputForConsole();
 	}
 
 	RenderResizeHandle(AvailableHeight);

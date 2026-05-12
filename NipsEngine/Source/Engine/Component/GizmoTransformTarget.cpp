@@ -3,6 +3,25 @@
 #include "Component/SceneComponent.h"
 #include "Component/SkeletalMeshComponent.h"
 #include "Asset/SkeletalMesh.h"
+#include "Object/Object.h"
+
+namespace
+{
+    bool IsLiveSceneComponent(USceneComponent* Component)
+    {
+        return UObject::IsValid(Component);
+    }
+
+    bool IsLiveActorWithRoot(AActor* Actor)
+    {
+        if (!UObject::IsValid(Actor))
+        {
+            return false;
+        }
+
+        return IsLiveSceneComponent(Actor->GetRootComponent());
+    }
+}
 
 // FActorGizmoTarget
 FActorGizmoTarget::FActorGizmoTarget(AActor* InActor)
@@ -12,12 +31,12 @@ FActorGizmoTarget::FActorGizmoTarget(AActor* InActor)
 
 bool FActorGizmoTarget::IsValid() const
 {
-    return TargetActor != nullptr;
+    return IsLiveActorWithRoot(TargetActor);
 }
 
 FTransform FActorGizmoTarget::GetWorldTransform() const
 {
-    if (TargetActor && TargetActor->GetRootComponent())
+    if (IsLiveActorWithRoot(TargetActor))
     {
         return TargetActor->GetRootComponent()->GetWorldTransform();
     }
@@ -26,7 +45,7 @@ FTransform FActorGizmoTarget::GetWorldTransform() const
 
 void FActorGizmoTarget::SetWorldTransform(const FTransform& NewWorldTransform)
 {
-    if (TargetActor && TargetActor->GetRootComponent())
+    if (IsLiveActorWithRoot(TargetActor))
     {
         TargetActor->GetRootComponent()->SetWorldTransform(NewWorldTransform);
     }
@@ -40,12 +59,12 @@ FSceneComponentGizmoTarget::FSceneComponentGizmoTarget(USceneComponent* InCompon
 
 bool FSceneComponentGizmoTarget::IsValid() const
 {
-    return TargetComponent != nullptr;
+    return IsLiveSceneComponent(TargetComponent);
 }
 
 FTransform FSceneComponentGizmoTarget::GetWorldTransform() const
 {
-    if (TargetComponent)
+    if (IsLiveSceneComponent(TargetComponent))
     {
         return TargetComponent->GetWorldTransform();
     }
@@ -54,7 +73,7 @@ FTransform FSceneComponentGizmoTarget::GetWorldTransform() const
 
 void FSceneComponentGizmoTarget::SetWorldTransform(const FTransform& NewWorldTransform)
 {
-    if (TargetComponent)
+    if (IsLiveSceneComponent(TargetComponent))
     {
         TargetComponent->SetWorldTransform(NewWorldTransform);
     }
@@ -68,7 +87,7 @@ FBoneGizmoTarget::FBoneGizmoTarget(USkeletalMeshComponent* InMeshComp, int32 InB
 
 bool FBoneGizmoTarget::IsValid() const
 {
-    if (!MeshComp || !MeshComp->HasValidMesh())
+    if (!UObject::IsValid(MeshComp) || !MeshComp->HasValidMesh())
     {
         return false;
     }
@@ -83,7 +102,7 @@ bool FBoneGizmoTarget::IsValid() const
 
 FTransform FBoneGizmoTarget::GetWorldTransform() const
 {
-    if (MeshComp)
+    if (IsValid())
     {
         return MeshComp->GetBoneWorldTransform(BoneIndex);
     }
@@ -92,7 +111,7 @@ FTransform FBoneGizmoTarget::GetWorldTransform() const
 
 void FBoneGizmoTarget::SetWorldTransform(const FTransform& NewWorldTransform)
 {
-    if (MeshComp)
+    if (IsValid())
     {
         MeshComp->SetBoneWorldTransform(BoneIndex, NewWorldTransform);
     }

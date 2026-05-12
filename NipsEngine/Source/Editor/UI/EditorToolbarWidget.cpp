@@ -119,6 +119,15 @@ namespace
 		return bClicked;
 	}
 
+	static const char* AddActorCategories[] = {
+		"Basic",
+		"Rendering",
+		"Light",
+		"Environment",
+		"Audio",
+		"Gameplay",
+	};
+
 	std::wstring GetSceneDialogInitialDir()
 	{
 		std::filesystem::path SceneDir(FSceneSaveManager::GetSceneDirectory());
@@ -441,15 +450,8 @@ void FEditorToolbarWidget::RenderAddActorMenu(int32 ViewportIndex)
 		return;
 	}
 
-	const char* CurrentCategory = nullptr;
-	for (const FAddActorEntry& Entry : AddActorTypes)
+	auto SpawnEntry = [&](const FAddActorEntry& Entry)
 	{
-		if (CurrentCategory == nullptr || strcmp(CurrentCategory, Entry.Category) != 0)
-		{
-			CurrentCategory = Entry.Category;
-			ImGui::SeparatorText(CurrentCategory);
-		}
-
 		if (ImGui::Selectable(Entry.Label))
 		{
 			AActor* LastSpawnedActor = nullptr;
@@ -467,6 +469,24 @@ void FEditorToolbarWidget::RenderAddActorMenu(int32 ViewportIndex)
 			}
 			SpawnCount = 1;
 		}
+	};
+
+	for (const char* Category : AddActorCategories)
+	{
+		if (!ImGui::BeginMenu(Category))
+		{
+			continue;
+		}
+
+		for (const FAddActorEntry& Entry : AddActorTypes)
+		{
+			if (strcmp(Entry.Category, Category) == 0)
+			{
+				SpawnEntry(Entry);
+			}
+		}
+
+		ImGui::EndMenu();
 	}
 
 	ImGui::EndPopup();

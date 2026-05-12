@@ -291,7 +291,18 @@ void UGizmoComponent::ClearTransformTarget()
 
 USceneComponent* UGizmoComponent::GetEffectiveTargetComponent() const
 {
-    return TrackingComponent ? TrackingComponent : (TrackingActor ? TrackingActor->GetRootComponent() : nullptr);
+    if (UObject::IsValid(TrackingComponent))
+    {
+        return TrackingComponent;
+    }
+
+    if (UObject::IsValid(TrackingActor))
+    {
+        USceneComponent* Root = TrackingActor->GetRootComponent();
+        return UObject::IsValid(Root) ? Root : nullptr;
+    }
+
+    return nullptr;
 }
 
 FVector UGizmoComponent::GetTargetLocation() const
@@ -306,12 +317,18 @@ FVector UGizmoComponent::GetTargetRotation() const
 
 void UGizmoComponent::SetTarget(AActor* NewTarget)
 {
-    if (!NewTarget || !NewTarget->GetRootComponent())
+    if (!UObject::IsValid(NewTarget))
     {
         return;
     }
 
-    if (TrackingActor == NewTarget && TrackingComponent == nullptr)
+    USceneComponent* Root = NewTarget->GetRootComponent();
+    if (!UObject::IsValid(Root))
+    {
+        return;
+    }
+
+    if (TrackingActor == NewTarget && TrackingComponent == nullptr && HasTarget())
     {
         return;
     }
@@ -325,7 +342,7 @@ void UGizmoComponent::SetTarget(AActor* NewTarget)
 
 void UGizmoComponent::SetTargetComponent(USceneComponent* NewTargetComponent)
 {
-    if (!NewTargetComponent || !NewTargetComponent->GetOwner()) return;
+    if (!UObject::IsValid(NewTargetComponent) || !UObject::IsValid(NewTargetComponent->GetOwner())) return;
 
     if (TrackingComponent == NewTargetComponent && TrackingBoneIndex == -1)
     {
@@ -343,7 +360,7 @@ void UGizmoComponent::SetSelectedActors(const TArray<AActor*>* InSelectedActors)
 {
     if (!InSelectedActors || InSelectedActors->empty())
     {
-        TrackingActors = nullptr;
+        ClearTransformTarget();
         return;
     }
 
@@ -361,7 +378,7 @@ void UGizmoComponent::SetSelectedActors(const TArray<AActor*>* InSelectedActors)
         }
     }
 
-    if (bIsSame)
+    if (bIsSame && HasTarget())
     {
         return;
     }
@@ -370,7 +387,30 @@ void UGizmoComponent::SetSelectedActors(const TArray<AActor*>* InSelectedActors)
 
     TrackingActors = InSelectedActors;
 
-    TrackingActor = (*InSelectedActors)[0];
+    AActor* FirstValidActor = nullptr;
+    for (AActor* Actor : *InSelectedActors)
+    {
+        if (!UObject::IsValid(Actor))
+        {
+            continue;
+        }
+
+        USceneComponent* Root = Actor->GetRootComponent();
+        if (UObject::IsValid(Root))
+        {
+            FirstValidActor = Actor;
+            break;
+        }
+    }
+
+    if (!FirstValidActor)
+    {
+        TrackingActors = nullptr;
+        Deactivate();
+        return;
+    }
+
+    TrackingActor = FirstValidActor;
     TrackingComponent = nullptr;
 
     SetTransformTarget(std::make_unique<FActorGizmoTarget>(TrackingActor));
