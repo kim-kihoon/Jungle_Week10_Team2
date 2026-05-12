@@ -143,6 +143,16 @@ void FEditorToolbarWidget::Render(float DeltaTime)
 	(void)DeltaTime;
 
 	const ImGuiIO& IO = ImGui::GetIO();
+	if (!IO.WantTextInput && bShowConsole && ImGui::IsKeyPressed(ImGuiKey_GraveAccent, false))
+	{
+		const bool bNextOpen = !*bShowConsole;
+		*bShowConsole = bNextOpen;
+		if (bNextOpen && ContentDrawerWidget)
+		{
+			ContentDrawerWidget->StartConsoleTakeover();
+		}
+	}
+
 	if (!IO.WantTextInput && IO.KeyCtrl)
 	{
 		if (ContentDrawerWidget && ImGui::IsKeyPressed(ImGuiKey_Space, false))
@@ -263,7 +273,18 @@ void FEditorToolbarWidget::RenderViewMenu()
 		return;
 	}
 
-	if (bShowConsole) ImGui::MenuItem("Console", nullptr, bShowConsole);
+	if (bShowConsole)
+	{
+		bool bConsoleVisible = *bShowConsole;
+		if (ImGui::MenuItem("Console", nullptr, bConsoleVisible))
+		{
+			*bShowConsole = !bConsoleVisible;
+			if (*bShowConsole && ContentDrawerWidget)
+			{
+				ContentDrawerWidget->StartConsoleTakeover();
+			}
+		}
+	}
 	if (bShowControl) ImGui::MenuItem("Control Panel", nullptr, bShowControl);
 	if (bShowProperty) ImGui::MenuItem("Property", nullptr, bShowProperty);
 	if (bShowSceneManager) ImGui::MenuItem("Scene Manager", nullptr, bShowSceneManager);

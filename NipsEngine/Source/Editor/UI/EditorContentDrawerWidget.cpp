@@ -264,6 +264,37 @@ bool FEditorContentDrawerWidget::ConsumeOpenRequest()
 	return bResult;
 }
 
+void FEditorContentDrawerWidget::CloseImmediately()
+{
+	bOpen = false;
+	DrawerAnimationAlpha = 0.0f;
+	bOpenedThisFrame = false;
+}
+
+void FEditorContentDrawerWidget::StartConsoleTakeover()
+{
+	if (bOpen || DrawerAnimationAlpha > 0.0f)
+	{
+		bPendingConsoleTakeover = true;
+		PendingConsoleTakeoverHeight = DrawerHeight;
+	}
+
+	CloseImmediately();
+}
+
+bool FEditorContentDrawerWidget::ConsumeConsoleTakeover(float& OutDrawerHeight)
+{
+	if (!bPendingConsoleTakeover)
+	{
+		return false;
+	}
+
+	bPendingConsoleTakeover = false;
+	OutDrawerHeight = PendingConsoleTakeoverHeight;
+	PendingConsoleTakeoverHeight = 0.0f;
+	return true;
+}
+
 void FEditorContentDrawerWidget::RefreshAssetTree()
 {
 	FolderPaths.clear();
@@ -521,19 +552,23 @@ void FEditorContentDrawerWidget::RenderBottomBar(const ImGuiViewport* Viewport, 
 		DrawList->AddLine(BarMin, ImVec2(BarMax.x, BarMin.y), IM_COL32(70, 72, 78, 255));
 
 		const bool bWasOpen = bOpen;
-		if (bWasOpen)
+		auto PushButtonStyle = [](bool bActive)
 		{
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.26f, 0.36f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.23f, 0.32f, 0.44f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.15f, 0.22f, 0.31f, 1.0f));
-		}
-		else
-		{
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.10f, 0.105f, 0.115f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.16f, 0.17f, 0.19f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.08f, 0.085f, 0.095f, 1.0f));
-		}
+			if (bActive)
+			{
+				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.26f, 0.36f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.23f, 0.32f, 0.44f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.15f, 0.22f, 0.31f, 1.0f));
+			}
+			else
+			{
+				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.10f, 0.105f, 0.115f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.16f, 0.17f, 0.19f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.08f, 0.085f, 0.095f, 1.0f));
+			}
+		};
 
+		PushButtonStyle(bWasOpen);
 		if (ImGui::Button("    Content Drawer", ImVec2(142.0f, 22.0f)))
 		{
 			ToggleOpen();
@@ -559,30 +594,47 @@ void FEditorContentDrawerWidget::RenderBottomBar(const ImGuiViewport* Viewport, 
 			ImGui::SetTooltip("Ctrl+Space");
 		}
 
-		ImGui::SameLine();
-		const bool bConsoleOpen = ConsoleWidget && ConsoleWidget->IsOpen();
-		if (bConsoleOpen)
-		{
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.26f, 0.36f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.23f, 0.32f, 0.44f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.15f, 0.22f, 0.31f, 1.0f));
-		}
-		else
-		{
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.10f, 0.105f, 0.115f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.16f, 0.17f, 0.19f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.08f, 0.085f, 0.095f, 1.0f));
-		}
+		ImGui::SameLine(0.0f, 6.0f);
 
-		if (ImGui::Button(">_ Console", ImVec2(104.0f, 22.0f)) && ConsoleWidget)
+		const bool bConsoleOpen = ConsoleWidget && ConsoleWidget->IsOpen();
+		PushButtonStyle(bConsoleOpen);
+		if (ImGui::Button("    Console", ImVec2(96.0f, 22.0f)) && ConsoleWidget)
 		{
 			const bool bNextOpen = !ConsoleWidget->IsOpen();
-			ConsoleWidget->SetOpen(bNextOpen);
 			if (bNextOpen)
 			{
-				SetOpen(false);
+				StartConsoleTakeover();
+				float TakeoverHeight = 0.0f;
+				if (ConsumeConsoleTakeover(TakeoverHeight))
+				{
+					ConsoleWidget->OpenFromDrawerTakeover(TakeoverHeight);
+				}
+				else
+				{
+					ConsoleWidget->SetOpen(true);
+				}
+			}
+			else
+			{
+				ConsoleWidget->SetOpen(false);
 			}
 		}
+
+		const ImVec2 ConsoleButtonMin = ImGui::GetItemRectMin();
+		const ImVec2 ConsoleButtonMax = ImGui::GetItemRectMax();
+		const ImU32 ConsoleColor = bConsoleOpen ? IM_COL32(170, 200, 235, 255) : IM_COL32(190, 194, 202, 255);
+		DrawList->AddRect(
+			ImVec2(ConsoleButtonMin.x + 10.0f, ConsoleButtonMin.y + 6.0f),
+			ImVec2(ConsoleButtonMin.x + 25.0f, ConsoleButtonMax.y - 5.0f),
+			ConsoleColor,
+			2.0f,
+			0,
+			1.5f);
+		DrawList->AddText(
+			ImVec2(ConsoleButtonMin.x + 14.0f, ConsoleButtonMin.y + 4.0f),
+			ConsoleColor,
+			">");
+
 		ImGui::PopStyleColor(3);
 
 		if (ImGui::IsItemHovered())

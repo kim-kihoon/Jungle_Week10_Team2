@@ -177,6 +177,19 @@ void FEditorMainPanel::Render(float DeltaTime)
 
 	RenderViewportHostWindow();
 
+	float ConsoleTakeoverHeight = 0.0f;
+	if (ContentDrawerWidget.ConsumeOpenRequest())
+	{
+		ConsoleWidget.SetOpen(false);
+		bShowConsole = false;
+	}
+
+	if (ContentDrawerWidget.ConsumeConsoleTakeover(ConsoleTakeoverHeight))
+	{
+		bShowConsole = true;
+		ConsoleWidget.OpenFromDrawerTakeover(ConsoleTakeoverHeight);
+	}
+
 	ConsoleWidget.SetOpen(bShowConsole);
 	ConsoleWidget.Render(DeltaTime);
 	if (ConsoleWidget.ConsumeOpenRequest())
@@ -201,6 +214,11 @@ void FEditorMainPanel::Render(float DeltaTime)
 	bShowSkeletalMeshViewer = SkeletalMeshViewerWidget.IsOpen();
 	ViewportOverlayWidget.Render(DeltaTime);
 	ContentDrawerWidget.Render(DeltaTime);
+	if (ContentDrawerWidget.ConsumeConsoleTakeover(ConsoleTakeoverHeight))
+	{
+		bShowConsole = true;
+		ConsoleWidget.OpenFromDrawerTakeover(ConsoleTakeoverHeight);
+	}
 	if (ContentDrawerWidget.ConsumeOpenRequest())
 	{
 		ConsoleWidget.SetOpen(false);
@@ -280,7 +298,16 @@ bool FEditorMainPanel::ShouldResetDefaultDockLayout(ImGuiID DockspaceId) const
 
 	// A leaf dockspace means ImGui could not restore a useful editor split layout.
 	// This happens with a fresh or corrupted imgui_editor.ini.
-	return RootNode->IsLeafNode();
+	if (RootNode->IsLeafNode())
+		return true;
+
+	const ImGuiID LegacyConsoleId = ImHashStr("Console");
+	if (const ImGuiWindowSettings* ConsoleSettings = ImGui::FindWindowSettingsByID(LegacyConsoleId))
+	{
+		return ConsoleSettings->DockId != 0;
+	}
+
+	return false;
 }
 
 void FEditorMainPanel::EnsureDefaultDockLayout(ImGuiID DockspaceId)
@@ -294,6 +321,10 @@ void FEditorMainPanel::EnsureDefaultDockLayout(ImGuiID DockspaceId)
 
 	const ImGuiViewport* Viewport = ImGui::GetMainViewport();
 	ImGui::DockBuilderRemoveNode(DockspaceId);
+	if (ImGuiWindowSettings* ConsoleSettings = ImGui::FindWindowSettingsByID(ImHashStr("Console")))
+	{
+		ConsoleSettings->DockId = 0;
+	}
 	ImGui::DockBuilderAddNode(DockspaceId, ImGuiDockNodeFlags_DockSpace);
 	ImGui::DockBuilderSetNodePos(DockspaceId, Viewport->WorkPos);
 	ImGui::DockBuilderSetNodeSize(DockspaceId, Viewport->WorkSize);
