@@ -184,8 +184,6 @@ void FEditorMainPanel::Render(float DeltaTime)
 		ContentDrawerWidget.SetOpen(false);
 	}
 	bShowConsole = ConsoleWidget.IsOpen();
-	if (bShowControl)
-		ControlWidget.Render(DeltaTime);
 	if (bShowMaterialEditor)
 		MaterialWidget.Render(DeltaTime);
 	if (bShowProperty)
@@ -309,12 +307,10 @@ void FEditorMainPanel::EnsureDefaultDockLayout(ImGuiID DockspaceId)
 
 	ImGui::DockBuilderSplitNode(MainNode, ImGuiDir_Right, 0.185f, &RightNode, &MainNode);
 	ImGui::DockBuilderSplitNode(MainNode, ImGuiDir_Left, 0.17f, &LeftNode, &CenterAndControlNode);
-	ImGui::DockBuilderSplitNode(CenterAndControlNode, ImGuiDir_Right, 0.20f, &ControlNode, &CenterNode);
 	ImGui::DockBuilderSplitNode(RightNode, ImGuiDir_Up, 0.22f, &RightTopNode, &RightBottomNode);
 
 	ImGui::DockBuilderDockWindow("Viewport Settings", LeftNode);
-	ImGui::DockBuilderDockWindow("Viewport", CenterNode);
-	ImGui::DockBuilderDockWindow("Jungle Control Panel", ControlNode);
+	ImGui::DockBuilderDockWindow("Viewport", CenterAndControlNode);
 	ImGui::DockBuilderDockWindow("Scene Manager", RightTopNode);
 	ImGui::DockBuilderDockWindow("Stat Profiler", RightTopNode);
 	ImGui::DockBuilderDockWindow("Jungle Property Window", RightBottomNode);
@@ -420,6 +416,7 @@ void FEditorMainPanel::RenderViewportHostWindow()
 				{
 					if (ImGui::BeginMenuBar())
 					{
+						ToolbarWidget.RenderViewportToolBarItems(i);
 						RenderViewportMenuBarForIndex(i);
 						ImGui::EndMenuBar();
 					}
@@ -446,10 +443,26 @@ void FEditorMainPanel::RenderViewportMenuBarForIndex(int32 Index)
 	FEditorViewportClient* Client = Layout.GetViewportClient(Index);
 	FEditorViewportState& State = Layout.GetViewportState(Index);
 
-	ImGui::TextDisabled("%s | %s | %s",
-						GetViewportSlotName(Index),
-						GetViewportTypeName(Client->GetViewportType()),
-						GetViewModeName(State.ViewMode));
+	const char* SlotName = GetViewportSlotName(Index);
+	const char* ViewportTypeName = GetViewportTypeName(Client->GetViewportType());
+	const char* ViewModeName = GetViewModeName(State.ViewMode);
+	const ImGuiStyle& Style = ImGui::GetStyle();
+	const float RightGroupWidth =
+		ImGui::CalcTextSize(SlotName).x +
+		ImGui::CalcTextSize(" | ").x +
+		ImGui::CalcTextSize(ViewportTypeName).x +
+		ImGui::CalcTextSize(" | ").x +
+		ImGui::CalcTextSize(ViewModeName).x +
+		ImGui::CalcTextSize("Layout").x +
+		ImGui::CalcTextSize("Type").x +
+		ImGui::CalcTextSize("View").x +
+		ImGui::CalcTextSize("Stats").x +
+		Style.ItemSpacing.x * 8.0f +
+		Style.FramePadding.x * 8.0f;
+	const float RightAlignedX = ImGui::GetWindowContentRegionMax().x - RightGroupWidth;
+	ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), RightAlignedX));
+
+	ImGui::TextDisabled("%s | %s | %s", SlotName, ViewportTypeName, ViewModeName);
 	ImGui::SameLine();
 
 	if (ImGui::BeginMenu("Layout"))

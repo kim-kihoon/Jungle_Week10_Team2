@@ -141,7 +141,7 @@ bool FWindowsApplication::Init(HINSTANCE InHInstance)
 	HInstance = InHInstance;
 
 	WCHAR WindowClass[] = L"JungleWindowClass";
-	WCHAR Title[] = L"Nutella Engine";
+	WCHAR Title[] = L"Nips Engine";
 	WNDCLASSW WndClass = {};
 	WndClass.lpfnWndProc = StaticWndProc;
 	WndClass.hInstance = HInstance;

@@ -4,10 +4,18 @@
 #include "Editor/UI/EditorSceneWidget.h"
 #include "Editor/UI/EditorViewportOverlayWidget.h"
 #include "Editor/UI/EditorPlayStreamWidget.h"
+#include "Editor/EditorEngine.h"
+#include "Editor/Selection/SelectionManager.h"
+#include "Editor/Viewport/ViewportLayout.h"
+#include "Component/GizmoComponent.h"
 #include "Core/ResourceManager.h"
+#include "Engine/Viewport/ViewportCamera.h"
+#include "GameFramework/PrimitiveActors.h"
+#include "GameFramework/World.h"
 #include "Serialization/SceneSaveManager.h"
 #include "ImGui/imgui.h"
 
+#include <algorithm>
 #include <Windows.h>
 #include <commdlg.h>
 #include <filesystem>
@@ -15,6 +23,50 @@
 
 namespace
 {
+	template <typename T>
+	AActor* SpawnEditorActor(UWorld* World, const FVector& Location)
+	{
+		if (!World)
+		{
+			return nullptr;
+		}
+
+		T* Actor = World->SpawnActor<T>();
+		if (!Actor)
+		{
+			return nullptr;
+		}
+
+		Actor->InitDefaultComponents();
+		Actor->SetActorLocation(Location);
+		return Actor;
+	}
+
+	struct FAddActorEntry
+	{
+		const char* Label;
+		AActor* (*Spawn)(UWorld*, const FVector&);
+	};
+
+	static const FAddActorEntry AddActorTypes[] = {
+		{ "Pawn", SpawnEditorActor<APawnActor> },
+		{ "Scene", SpawnEditorActor<ASceneActor> },
+		{ "StaticMesh", SpawnEditorActor<AStaticMeshActor> },
+		{ "SkeletalMesh", SpawnEditorActor<ASkeletalMeshActor> },
+		{ "TextRender", SpawnEditorActor<ATextRenderActor> },
+		{ "SubUV", SpawnEditorActor<ASubUVActor> },
+		{ "Billboard", SpawnEditorActor<ABillboardActor> },
+		{ "Decal", SpawnEditorActor<ADecalActor> },
+		{ "Directional Light", SpawnEditorActor<ADirectionalLightActor> },
+		{ "Ambient Light", SpawnEditorActor<AAmbientLightActor> },
+		{ "Point Light", SpawnEditorActor<APointLightActor> },
+		{ "Spot Light", SpawnEditorActor<ASpotLightActor> },
+		{ "Sky Atmosphere", SpawnEditorActor<ASkyAtmosphereActor> },
+		{ "Height Fog", SpawnEditorActor<AHeightFogActor> },
+		{ "Audio Zone", SpawnEditorActor<AAudioZoneActor> },
+		{ "Player Start", SpawnEditorActor<APlayerStartActor> },
+	};
+
 	std::wstring GetSceneDialogInitialDir()
 	{
 		std::filesystem::path SceneDir(FSceneSaveManager::GetSceneDirectory());
@@ -197,6 +249,155 @@ void FEditorToolbarWidget::Render(float DeltaTime)
 	ImGui::EndMainMenuBar();
 }
 
+void FEditorToolbarWidget::RenderViewportToolBarItems(int32 ViewportIndex)
+{
+	RenderAddActorMenu(ViewportIndex);
+	ImGui::SameLine();
+	RenderGizmoTools();
+	ImGui::SameLine();
+	ImGui::TextDisabled("|");
+	ImGui::SameLine();
+}
+
+void FEditorToolbarWidget::RenderAddActorMenu(int32 ViewportIndex)
+{
+	constexpr ImVec2 ToolButtonSize(68.0f, 22.0f);
+	constexpr float CountWidth = 48.0f;
+
+	ImGui::PushID(ViewportIndex);
+	if (ImGui::Button("+  Add", ToolButtonSize))
+	{
+		ImGui::OpenPopup("AddActorMenu");
+	}
+	ImGui::SameLine();
+	ImGui::SetNextItemWidth(CountWidth);
+	if (ImGui::DragInt("##SpawnCount", &SpawnCount, 0.1f, 1, 100))
+	{
+		SpawnCount = std::clamp(SpawnCount, 1, 100);
+	}
+	if (ImGui::IsItemHovered())
+	{
+		ImGui::SetTooltip("Spawn count");
+	}
+
+	if (!ImGui::BeginPopup("AddActorMenu"))
+	{
+		ImGui::PopID();
+		return;
+	}
+
+	if (!EditorEngine)
+	{
+		ImGui::TextDisabled("No editor world.");
+		ImGui::EndPopup();
+		ImGui::PopID();
+		return;
+	}
+
+	UWorld* World = EditorEngine->GetFocusedWorld();
+	if (!World)
+	{
+		ImGui::TextDisabled("No focused world.");
+		ImGui::EndPopup();
+		ImGui::PopID();
+		return;
+	}
+
+	for (const FAddActorEntry& Entry : AddActorTypes)
+	{
+		if (ImGui::Selectable(Entry.Label))
+		{
+			AActor* LastSpawnedActor = nullptr;
+			const FVector BaseLocation = GetActorPlacementLocation(ViewportIndex);
+			const int32 ClampedCount = std::clamp(SpawnCount, 1, 100);
+			for (int32 Index = 0; Index < ClampedCount; ++Index)
+			{
+				const FVector Offset(static_cast<float>(Index) * 1.5f, 0.0f, 0.0f);
+				LastSpawnedActor = Entry.Spawn(World, BaseLocation + Offset);
+			}
+
+			if (LastSpawnedActor)
+			{
+				EditorEngine->GetSelectionManager().Select(LastSpawnedActor);
+			}
+			SpawnCount = 1;
+		}
+	}
+
+	ImGui::EndPopup();
+	ImGui::PopID();
+}
+
+void FEditorToolbarWidget::RenderGizmoTools()
+{
+	if (!EditorEngine || !EditorEngine->GetGizmo())
+	{
+		ImGui::TextDisabled("Gizmo unavailable");
+		return;
+	}
+
+	constexpr ImVec2 GizmoModeButtonSize(58.0f, 22.0f);
+
+	UGizmoComponent* Gizmo = EditorEngine->GetGizmo();
+	if (ImGui::Selectable("Move", Gizmo->IsTranslateMode(), 0, GizmoModeButtonSize))
+	{
+		Gizmo->SetTranslateMode();
+	}
+	ImGui::SameLine();
+	if (ImGui::Selectable("Rotate", Gizmo->IsRotateMode(), 0, GizmoModeButtonSize))
+	{
+		Gizmo->SetRotateMode();
+	}
+	ImGui::SameLine();
+	if (ImGui::Selectable("Scale", Gizmo->IsScaleMode(), 0, GizmoModeButtonSize))
+	{
+		Gizmo->SetScaleMode();
+	}
+	ImGui::SameLine();
+
+	const char* SpaceLabel = Gizmo->IsWorldSpace() ? "World" : "Local";
+	ImGui::SetNextItemWidth(76.0f);
+	if (ImGui::BeginCombo("##GizmoSpace", SpaceLabel))
+	{
+		const bool bWorldSelected = Gizmo->IsWorldSpace();
+		if (ImGui::Selectable("World", bWorldSelected))
+		{
+			Gizmo->SetWorldSpace(true);
+		}
+		if (ImGui::Selectable("Local", !bWorldSelected))
+		{
+			Gizmo->SetWorldSpace(false);
+		}
+		ImGui::EndCombo();
+	}
+}
+
+FVector FEditorToolbarWidget::GetActorPlacementLocation(int32 ViewportIndex) const
+{
+	if (!EditorEngine)
+	{
+		return FVector::ZeroVector;
+	}
+
+	const FEditorViewportLayout& Layout = EditorEngine->GetViewportLayout();
+	const int32 ClampedViewportIndex =
+		std::clamp(ViewportIndex, 0, FEditorViewportLayout::MaxViewports - 1);
+	const FEditorViewportClient* Client = Layout.GetViewportClient(ClampedViewportIndex);
+	const FViewportCamera* Camera = Client ? Client->GetCamera() : nullptr;
+	if (!Camera)
+	{
+		return FVector::ZeroVector;
+	}
+
+	FVector Forward = Camera->GetEffectiveForward();
+	if (Forward.IsNearlyZero())
+	{
+		Forward = Camera->GetForwardVector();
+	}
+	Forward.NormalizeSafe();
+	return Camera->GetLocation() + Forward * 5.0f;
+}
+
 void FEditorToolbarWidget::RenderFilesMenu()
 {
 	if (!ImGui::BeginMenu("Files"))
@@ -264,7 +465,6 @@ void FEditorToolbarWidget::RenderViewMenu()
 	}
 
 	if (bShowConsole) ImGui::MenuItem("Console", nullptr, bShowConsole);
-	if (bShowControl) ImGui::MenuItem("Control Panel", nullptr, bShowControl);
 	if (bShowProperty) ImGui::MenuItem("Property", nullptr, bShowProperty);
 	if (bShowSceneManager) ImGui::MenuItem("Scene Manager", nullptr, bShowSceneManager);
 	if (bShowMaterialEditor) ImGui::MenuItem("Material Editor", nullptr, bShowMaterialEditor);
