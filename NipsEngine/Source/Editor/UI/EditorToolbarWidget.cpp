@@ -193,6 +193,7 @@ void FEditorToolbarWidget::SetPanelVisibilityRefs(
 void FEditorToolbarWidget::Render(float DeltaTime)
 {
 	(void)DeltaTime;
+	constexpr float EditorToolBarHeight = 34.0f;
 
 	const ImGuiIO& IO = ImGui::GetIO();
 	if (!IO.WantTextInput && IO.KeyCtrl)
@@ -226,6 +227,8 @@ void FEditorToolbarWidget::Render(float DeltaTime)
 
 	ImVec2 OriginalPadding = ImGui::GetStyle().FramePadding;
 	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(OriginalPadding.x, 5.0f));
+	const float MenuBarHeight = ImGui::GetFrameHeight();
+	ReservedTopHeight = MenuBarHeight + EditorToolBarHeight;
 
 	bool bMenuBarOpened = ImGui::BeginMainMenuBar();
 
@@ -247,16 +250,55 @@ void FEditorToolbarWidget::Render(float DeltaTime)
 	}
 
 	ImGui::EndMainMenuBar();
+	RenderEditorToolBar(MenuBarHeight, EditorToolBarHeight);
 }
 
-void FEditorToolbarWidget::RenderViewportToolBarItems(int32 ViewportIndex)
+void FEditorToolbarWidget::RenderEditorToolBar(float MenuBarHeight, float ToolBarHeight)
 {
-	RenderAddActorMenu(ViewportIndex);
-	ImGui::SameLine();
-	RenderGizmoTools();
-	ImGui::SameLine();
-	ImGui::TextDisabled("|");
-	ImGui::SameLine();
+	const ImGuiViewport* MainViewport = ImGui::GetMainViewport();
+	if (!MainViewport)
+	{
+		return;
+	}
+
+	ImGui::SetNextWindowPos(ImVec2(MainViewport->Pos.x, MainViewport->Pos.y + MenuBarHeight));
+	ImGui::SetNextWindowSize(ImVec2(MainViewport->Size.x, ToolBarHeight));
+	ImGui::SetNextWindowViewport(MainViewport->ID);
+
+	constexpr ImGuiWindowFlags ToolBarFlags =
+		ImGuiWindowFlags_NoTitleBar |
+		ImGuiWindowFlags_NoResize |
+		ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_NoScrollbar |
+		ImGuiWindowFlags_NoSavedSettings |
+		ImGuiWindowFlags_NoDocking |
+		ImGuiWindowFlags_NoCollapse |
+		ImGuiWindowFlags_NoNavFocus;
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 5.0f));
+	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.0f, 3.0f));
+	ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.08f, 0.08f, 0.08f, 1.0f));
+
+	if (ImGui::Begin("##EditorGlobalToolBar", nullptr, ToolBarFlags))
+	{
+		int32 FocusedViewportIndex = 0;
+		if (EditorEngine)
+		{
+			FocusedViewportIndex = EditorEngine->GetViewportLayout().GetLastFocusedViewportIndex();
+		}
+
+		RenderAddActorMenu(FocusedViewportIndex);
+		ImGui::SameLine();
+		ImGui::TextDisabled("|");
+		ImGui::SameLine();
+		RenderGizmoTools();
+	}
+
+	ImGui::End();
+	ImGui::PopStyleColor();
+	ImGui::PopStyleVar(4);
 }
 
 void FEditorToolbarWidget::RenderAddActorMenu(int32 ViewportIndex)

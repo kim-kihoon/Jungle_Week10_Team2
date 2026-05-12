@@ -169,11 +169,35 @@ void FEditorMainPanel::Render(float DeltaTime)
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
 
-	const ImGuiID DockspaceId = ImGui::GetID("EditorDockSpaceV2");
-	ImGui::DockSpaceOverViewport(DockspaceId, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
-	EnsureDefaultDockLayout(DockspaceId);
-
 	ToolbarWidget.Render(DeltaTime);
+
+	const ImGuiID DockspaceId = ImGui::GetID("EditorDockSpaceV2");
+	const ImGuiViewport* MainViewport = ImGui::GetMainViewport();
+	const float ReservedTopHeight = ToolbarWidget.GetReservedTopHeight();
+	ImGui::SetNextWindowPos(ImVec2(MainViewport->Pos.x, MainViewport->Pos.y + ReservedTopHeight));
+	ImGui::SetNextWindowSize(ImVec2(MainViewport->Size.x, std::max(1.0f, MainViewport->Size.y - ReservedTopHeight)));
+	ImGui::SetNextWindowViewport(MainViewport->ID);
+
+	constexpr ImGuiWindowFlags DockspaceWindowFlags =
+		ImGuiWindowFlags_NoTitleBar |
+		ImGuiWindowFlags_NoCollapse |
+		ImGuiWindowFlags_NoResize |
+		ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_NoBringToFrontOnFocus |
+		ImGuiWindowFlags_NoNavFocus |
+		ImGuiWindowFlags_NoDocking |
+		ImGuiWindowFlags_NoBackground |
+		ImGuiWindowFlags_NoSavedSettings;
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+	ImGui::Begin("##EditorDockSpaceHost", nullptr, DockspaceWindowFlags);
+	ImGui::DockSpace(DockspaceId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
+	ImGui::End();
+	ImGui::PopStyleVar(3);
+
+	EnsureDefaultDockLayout(DockspaceId);
 
 	RenderViewportHostWindow();
 
@@ -291,10 +315,13 @@ void FEditorMainPanel::EnsureDefaultDockLayout(ImGuiID DockspaceId)
 		return;
 
 	const ImGuiViewport* Viewport = ImGui::GetMainViewport();
+	const float ReservedTopHeight = ToolbarWidget.GetReservedTopHeight();
 	ImGui::DockBuilderRemoveNode(DockspaceId);
 	ImGui::DockBuilderAddNode(DockspaceId, ImGuiDockNodeFlags_DockSpace);
-	ImGui::DockBuilderSetNodePos(DockspaceId, Viewport->WorkPos);
-	ImGui::DockBuilderSetNodeSize(DockspaceId, Viewport->WorkSize);
+	ImGui::DockBuilderSetNodePos(DockspaceId, ImVec2(Viewport->Pos.x, Viewport->Pos.y + ReservedTopHeight));
+	ImGui::DockBuilderSetNodeSize(
+		DockspaceId,
+		ImVec2(Viewport->Size.x, std::max(1.0f, Viewport->Size.y - ReservedTopHeight)));
 
 	ImGuiID MainNode = DockspaceId;
 	ImGuiID RightNode = 0;
@@ -416,7 +443,6 @@ void FEditorMainPanel::RenderViewportHostWindow()
 				{
 					if (ImGui::BeginMenuBar())
 					{
-						ToolbarWidget.RenderViewportToolBarItems(i);
 						RenderViewportMenuBarForIndex(i);
 						ImGui::EndMenuBar();
 					}

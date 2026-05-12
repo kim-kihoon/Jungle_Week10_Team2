@@ -23,11 +23,12 @@ public:
 		bool* InShowStatProfiler,
 		bool* InShowSkeletalMeshViewer);
 	virtual void Render(float DeltaTime) override;
-	void RenderViewportToolBarItems(int32 ViewportIndex);
+	float GetReservedTopHeight() const { return ReservedTopHeight; }
 
 private:
 	bool OpenSceneFileDialog(FString& OutFilePath) const;
 	bool SaveSceneFileDialog(FString& OutFilePath) const;
+	void RenderEditorToolBar(float MenuBarHeight, float ToolBarHeight);
 	void RenderFilesMenu();
 	void RenderViewMenu();
 	void RenderEditMenu();
@@ -41,6 +42,7 @@ private:
 	FEditorPlayStreamWidget* PlayStreamWidget = nullptr;
 	FEditorContentDrawerWidget* ContentDrawerWidget = nullptr;
 	int32 SpawnCount = 1;
+	float ReservedTopHeight = 0.0f;
 
 	bool* bShowConsole = nullptr;
 	bool* bShowControl = nullptr;
