@@ -325,6 +325,22 @@ void UEditorEngine::Init(FWindowsWindow* InWindow)
 	{
 		FWorldContext& EditorContext = CreateWorldContext(EWorldType::Editor, FName("Default"));
 		EditorWorldHandle = EditorContext.ContextHandle;
+		
+		if (UWorld* World = EditorContext.World)
+		{
+			if (ASkyAtmosphereActor* SkyActor = World->SpawnActor<ASkyAtmosphereActor>())
+			{
+				SkyActor->InitDefaultComponents();
+				SkyActor->SetActorLocation(FVector::ZeroVector);
+			}
+
+			if (ADirectionalLightActor* LightActor = World->SpawnActor<ADirectionalLightActor>())
+			{
+				LightActor->InitDefaultComponents();
+				LightActor->SetActorLocation(FVector::ZeroVector);
+				LightActor->SetActorRotation(FVector(0.0f, 45.0f, 0.0f));
+			}
+		}
 	}
 	SetActiveWorld(EditorWorldHandle);
 
@@ -887,6 +903,22 @@ void UEditorEngine::NewScene()
 	FWorldContext& Ctx = CreateWorldContext(EWorldType::Editor, FName("NewScene"), "New Scene");
 	SetActiveWorld(Ctx.ContextHandle);
 	ApplySpatialIndexMaintenanceSettings(Ctx.World);
+
+	if (UWorld* World = Ctx.World)
+	{
+		if (ASkyAtmosphereActor* SkyActor = World->SpawnActor<ASkyAtmosphereActor>())
+		{
+			SkyActor->InitDefaultComponents();
+			SkyActor->SetActorLocation(FVector::ZeroVector);
+		}
+
+		if (ADirectionalLightActor* LightActor = World->SpawnActor<ADirectionalLightActor>())
+		{
+			LightActor->InitDefaultComponents();
+			LightActor->SetActorLocation(FVector::ZeroVector);
+			LightActor->SetActorRotation(FVector(0.0f, 45.0f, 0.0f));
+		}
+	}
 
 	ResetViewport();
 }
