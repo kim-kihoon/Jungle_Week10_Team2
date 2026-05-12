@@ -98,7 +98,7 @@ namespace
 		void (*Spawn)(UWorld*, FSelectionManager&, const FVector&);
 	};
 
-	// 꼭 모든 Actor Types가 저장될 필요는 없습니다. 우클릭으로 생성할 수 있는 액터만 관리합니다.
+	// Place Actor에서 생성 가능한 에디터 Actor 타입 목록입니다.
 	static const FPlacementActorEntry PlacementActorTypes[] = {
 		{ "Pawn", SpawnActorAt<APawnActor> },
 		{ "Scene", SpawnActorAt<ASceneActor> },
@@ -112,6 +112,8 @@ namespace
 		{ "Ambient Light", SpawnActorAt<AAmbientLightActor> },
 		{ "Point Light", SpawnActorAt<APointLightActor> },
 		{ "Spot Light", SpawnActorAt<ASpotLightActor> },
+		{ "Sky Atmosphere", SpawnActorAt<ASkyAtmosphereActor> },
+		{ "Height Fog", SpawnActorAt<AHeightFogActor> },
 		{ "Audio Zone", SpawnActorAt<AAudioZoneActor> },
 		{ "Player Start", SpawnActorAt<APlayerStartActor> },
 	};
@@ -420,13 +422,13 @@ void FEditorViewportOverlayWidget::RenderActorPlacementPopup()
 	{
 		const POINT PopupPos = Client->GetPendingActorPlacementPopupPos();
 		ImGui::SetNextWindowPos(ImVec2(static_cast<float>(PopupPos.x), static_cast<float>(PopupPos.y)), ImGuiCond_Always);
-		ImGui::OpenPopup("Actor Placement##Popup");
+		ImGui::OpenPopup("Place Actor##Popup");
 		bActorPlacementPopupOpened = true;
 	}
 
-	if (ImGui::BeginPopup("Actor Placement##Popup"))
+	if (ImGui::BeginPopup("Place Actor##Popup"))
 	{
-		ImGui::TextColored(ColorMint, "Spawn Actor");
+		ImGui::TextColored(ColorMint, "Place Actor");
 		ImGui::Separator();
 
 		for (const FPlacementActorEntry& Entry : PlacementActorTypes)
@@ -544,9 +546,9 @@ void FEditorViewportOverlayWidget::RenderShortcutsWindow()
 		{"Ctrl + Alt + Shift + Drag", "기존 선택에 박스 선택 추가"},
 	});
 
-	DrawShortcutTable("Actor Placement",
+	DrawShortcutTable("Place Actor",
 	{
-		{"Ctrl + Mouse Right Click", "클릭한 지점에 Ray Casting 후 Actor 생성 메뉴 열기"},
+		{"Mouse Right Click", "클릭한 지점에 Place Actor 메뉴 열기"},
 	});
 
 	DrawShortcutTable("Gizmo",

@@ -160,6 +160,9 @@ void FInputRouter::RouteMouseInput(EMouseInputType Type, float DeltaX, float Del
 	case EMouseInputType::E_RightMouseClicked:
 		Controller->OnRightMouseClick(DeltaX, DeltaY);
 		break;
+	case EMouseInputType::E_RightMouseButtonUp:
+		Controller->OnRightMouseButtonUp(DeltaX, DeltaY);
+		break;
 	case EMouseInputType::E_LeftMouseDragged:
 		Controller->OnLeftMouseDrag(DeltaX, DeltaY);
 		break;
@@ -503,6 +506,8 @@ void FInputRouter::TickMouseInput(const FInputRouteContext& Context)
 
 	if (IS.GetKeyDown(VK_RBUTTON))
 		RouteMouseInput(EMouseInputType::E_RightMouseClicked, LocalX, LocalY);
+	if (IS.GetKeyUp(VK_RBUTTON) && !IS.GetRightDragEnd())
+		RouteMouseInput(EMouseInputType::E_RightMouseButtonUp, LocalX, LocalY);
 	if (IS.GetRightDragging())
 		RouteMouseInput(EMouseInputType::E_RightMouseDragged, DeltaX, DeltaY);
 	if (IS.GetMiddleDragging())

@@ -345,10 +345,10 @@ void FEditorMainPanel::EnsureDefaultDockLayout(ImGuiID DockspaceId)
 
 	ImGui::DockBuilderDockWindow("Viewport Settings", LeftNode);
 	ImGui::DockBuilderDockWindow("Viewport", CenterNode);
-	ImGui::DockBuilderDockWindow("Jungle Control Panel", ControlNode);
+	ImGui::DockBuilderDockWindow("Control Panel", ControlNode);
 	ImGui::DockBuilderDockWindow("Scene Manager", RightTopNode);
 	ImGui::DockBuilderDockWindow("Stat Profiler", RightTopNode);
-	ImGui::DockBuilderDockWindow("Jungle Property Window", RightBottomNode);
+	ImGui::DockBuilderDockWindow("Property Window", RightBottomNode);
 	ImGui::DockBuilderDockWindow("Material Editor", RightBottomNode);
 	ImGui::DockBuilderDockWindow("ObjViewer Panel", RightBottomNode);
 	ImGui::DockBuilderDockWindow("SkeletalMesh Viewer", RightBottomNode);
