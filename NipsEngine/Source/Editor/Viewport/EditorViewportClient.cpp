@@ -259,12 +259,13 @@ void FEditorViewportClient::ApplyCameraMode()
 		Camera.SetProjectionType(EViewportProjectionType::Perspective);
 		Camera.ClearCustomLookDir();
 		Camera.SetLocation(FVector(5.f, 3.f, 5.f));
-		Camera.SetLookAt(FVector(0.f, 0.f, 0.f));
+        Camera.SetRotation(FRotator(0.f, 0.f, 0.f));
 		break;
 
 	case EVT_Orthographic:
 		Camera.SetProjectionType(EViewportProjectionType::Orthographic);
 		Camera.ClearCustomLookDir();
+        Camera.SetRotation(FRotator(-45.f, 125.f, -45.f));
 		break;
 
 		// Orthographic axis views reset rotation so the existing value doesn't interfere with LookAt.

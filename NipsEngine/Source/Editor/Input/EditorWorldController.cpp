@@ -241,24 +241,23 @@ void FEditorWorldController::OnRightMouseDrag(float DeltaX, float DeltaY)
 	if (bCtrlDown || bAltDown || bShiftDown)
 		return;
 
-	if (Camera->IsOrthographic() && Camera->HasCustomLookDir())
+	if (Camera->IsOrthographic())
 	{
 		// Pan: scale movement proportionally to current ortho zoom level
 		const float     PanScale = Camera->GetOrthoHeight() * 0.002f;
 		const FVector   Right    = Camera->GetEffectiveRight();
 		const FVector   Up       = Camera->GetEffectiveUp();
-		TargetLocation += Right * (-DeltaX * PanScale) + Up * (DeltaY * PanScale);
+		const FVector   PanMove  = Right * (-DeltaX * PanScale) + Up * (DeltaY * PanScale);
+		TargetLocation += PanMove;
+		if (IsFreeOrthographicCamera())
+		{
+			OrthoOrbitTarget += PanMove;
+		}
 	}
 	else
 	{
 		// Accumulate yaw/pitch and rebuild rotation quaternion
 		const float RotationSpeed = 0.15f * RotateSensitivity;
-		if (IsFreeOrthographicCamera())
-		{
-			OrbitFreeOrthographicAroundWorldUp(DeltaX * RotationSpeed);
-			return;
-		}
-
 		Yaw   += DeltaX * RotationSpeed;
 		Pitch -= DeltaY * RotationSpeed;
 		Pitch  = MathUtil::Clamp(Pitch, -89.f, 89.f);
