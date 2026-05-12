@@ -1,4 +1,4 @@
-#include "Editor/UI/EditorPropertyWidget.h"
+﻿#include "Editor/UI/EditorPropertyWidget.h"
 
 #include "Editor/EditorEngine.h"
 #include "ImGui/imgui.h"
@@ -161,7 +161,7 @@ void FEditorPropertyWidget::Render(float DeltaTime)
 	(void)DeltaTime;
 
 	ImGui::SetNextWindowSize(ImVec2(350.0f, 500.0f), ImGuiCond_Once);
-	ImGui::Begin("Jungle Property Window");
+	ImGui::Begin("Property Window");
 
 	AActor* PrimaryActor = SelectionManager->GetPrimarySelection();
 	if (!PrimaryActor)

@@ -17,13 +17,12 @@ class FEditorViewportOverlayWidget : public FEditorWidget
 {
 private:
 	bool bExpanded = false;
-	bool bShowViewportSettings = true;
+	bool bShowViewportSettings = false;
 	bool bShowShortcutsWindow = false;
 	bool bActorPlacementPopupOpened = false;
 	EShadowAtlasPreviewMode ShadowAtlasPreviewMode = EShadowAtlasPreviewMode::Directional;
 
 private:
-	void RenderViewportSettings(float DeltaTime);
 	void RenderDebugStats(float DeltaTime);
 	void RenderSplitterBar();
 	void RenderBoxSelectionOverlay();
@@ -35,6 +34,7 @@ public:
 	void SetViewportSettingsVisible(bool bVisible) { bShowViewportSettings = bVisible; }
 	bool IsShortcutsWindowVisible() const { return bShowShortcutsWindow; }
 	void SetShortcutsWindowVisible(bool bVisible) { bShowShortcutsWindow = bVisible; }
+	void RenderViewportSettings(float DeltaTime, bool bUseWindow = true);
 	void Render(float DeltaTime) override;
 
 private:

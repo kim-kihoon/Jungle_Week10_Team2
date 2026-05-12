@@ -171,7 +171,7 @@ void FEditorMainPanel::Render(float DeltaTime)
 
 	ToolbarWidget.Render(DeltaTime);
 
-	const ImGuiID DockspaceId = ImGui::GetID("EditorDockSpaceV2");
+	const ImGuiID DockspaceId = ImGui::GetID("EditorDockSpaceV3");
 	const ImGuiViewport* MainViewport = ImGui::GetMainViewport();
 	const float ReservedTopHeight = ToolbarWidget.GetReservedTopHeight();
 	ImGui::SetNextWindowPos(ImVec2(MainViewport->Pos.x, MainViewport->Pos.y + ReservedTopHeight));
@@ -325,22 +325,16 @@ void FEditorMainPanel::EnsureDefaultDockLayout(ImGuiID DockspaceId)
 
 	ImGuiID MainNode = DockspaceId;
 	ImGuiID RightNode = 0;
-	ImGuiID LeftNode = 0;
-	ImGuiID CenterAndControlNode = 0;
-	ImGuiID CenterNode = 0;
-	ImGuiID ControlNode = 0;
 	ImGuiID RightTopNode = 0;
 	ImGuiID RightBottomNode = 0;
 
 	ImGui::DockBuilderSplitNode(MainNode, ImGuiDir_Right, 0.185f, &RightNode, &MainNode);
-	ImGui::DockBuilderSplitNode(MainNode, ImGuiDir_Left, 0.17f, &LeftNode, &CenterAndControlNode);
 	ImGui::DockBuilderSplitNode(RightNode, ImGuiDir_Up, 0.22f, &RightTopNode, &RightBottomNode);
 
-	ImGui::DockBuilderDockWindow("Viewport Settings", LeftNode);
-	ImGui::DockBuilderDockWindow("Viewport", CenterAndControlNode);
+	ImGui::DockBuilderDockWindow("Viewport", MainNode);
 	ImGui::DockBuilderDockWindow("Scene Manager", RightTopNode);
 	ImGui::DockBuilderDockWindow("Stat Profiler", RightTopNode);
-	ImGui::DockBuilderDockWindow("Jungle Property Window", RightBottomNode);
+	ImGui::DockBuilderDockWindow("Property Window", RightBottomNode);
 	ImGui::DockBuilderDockWindow("Material Editor", RightBottomNode);
 	ImGui::DockBuilderDockWindow("ObjViewer Panel", RightBottomNode);
 	ImGui::DockBuilderDockWindow("SkeletalMesh Viewer", RightBottomNode);

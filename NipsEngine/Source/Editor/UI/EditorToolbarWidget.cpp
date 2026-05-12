@@ -294,6 +294,27 @@ void FEditorToolbarWidget::RenderEditorToolBar(float MenuBarHeight, float ToolBa
 		ImGui::TextDisabled("|");
 		ImGui::SameLine();
 		RenderGizmoTools();
+		ImGui::SameLine();
+		ImGui::TextDisabled("|");
+		ImGui::SameLine();
+		if (ImGui::Button("Settings", ImVec2(78.0f, 22.0f)))
+		{
+			ImGui::OpenPopup("ViewportSettingsPopup");
+		}
+
+		ImGui::SetNextWindowSize(ImVec2(360.0f, 520.0f), ImGuiCond_Appearing);
+		if (ImGui::BeginPopup("ViewportSettingsPopup"))
+		{
+			if (ViewportOverlayWidget)
+			{
+				ViewportOverlayWidget->RenderViewportSettings(0.0f, false);
+			}
+			else
+			{
+				ImGui::TextDisabled("Viewport settings unavailable.");
+			}
+			ImGui::EndPopup();
+		}
 	}
 
 	ImGui::End();
@@ -524,15 +545,6 @@ void FEditorToolbarWidget::RenderViewMenu()
 	else
 	{
 		ImGui::MenuItem("Content Drawer", "Ctrl+Space", false, false);
-	}
-
-	if (ViewportOverlayWidget)
-	{
-		bool bShowViewportSettings = ViewportOverlayWidget->IsViewportSettingsVisible();
-		if (ImGui::MenuItem("Viewport Settings", nullptr, bShowViewportSettings))
-		{
-			ViewportOverlayWidget->SetViewportSettingsVisible(!bShowViewportSettings);
-		}
 	}
 
 	ImGui::EndMenu();

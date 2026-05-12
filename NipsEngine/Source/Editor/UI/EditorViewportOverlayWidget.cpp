@@ -133,11 +133,11 @@ void FEditorViewportOverlayWidget::Render(float DeltaTime)
 }
 
 // 뷰포트 설정(표시 플래그, 그리드, 카메라 감도, BVH 관리 정책 등)을 조작하는 창을 렌더링합니다.
-void FEditorViewportOverlayWidget::RenderViewportSettings(float DeltaTime)
+void FEditorViewportOverlayWidget::RenderViewportSettings(float DeltaTime, bool bUseWindow)
 {
 	FEditorSettings& Settings = FEditorSettings::Get();
 
-	if (!ImGui::Begin("Viewport Settings"))
+	if (bUseWindow && !ImGui::Begin("Viewport Settings"))
 	{
 		ImGui::End();
 		return;
@@ -276,7 +276,10 @@ void FEditorViewportOverlayWidget::RenderViewportSettings(float DeltaTime)
 		}
 	}
 
-	ImGui::End();
+	if (bUseWindow)
+	{
+		ImGui::End();
+	}
 }
 
 // 활성화된 뷰포트를 순회하며 설정에 따라 디버그 스탯(FPS, Culling, Memory 등) 오버레이를 화면에 배치하고 렌더링합니다.
