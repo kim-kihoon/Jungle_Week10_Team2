@@ -43,28 +43,25 @@ void FEditorPlayStreamWidget::Render(float DeltaTime)
 	}
 
 	// --- 1번 버튼 (Play / Pause / Resume) ---
-	if (bIsPlaying || bIsPaused)
+	if (bIsPlaying)
 	{
-		// 실행 중(Pause)이거나 일시정지(Resume)일 때도 편집기 공통 톤을 유지합니다.
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.141f, 0.141f, 0.141f, 1.0f));        // #242424
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.188f, 0.188f, 0.188f, 1.0f));
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.102f, 0.102f, 0.102f, 1.0f));  // #1a1a1a
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.753f, 0.753f, 0.753f, 1.0f));       // #c0c0c0
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.830f, 0.830f, 0.830f, 1.0f));
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.620f, 0.620f, 0.620f, 1.0f));
 		
 		// 버튼 렌더링 시 계산한 고정 크기(PlayBtnSize)를 넘겨줍니다.
 		if (ImGui::Button(CurrentPlayPauseLabel, PlayBtnSize))
 		{
-			if (bIsPlaying) EditorEngine->PausePlaySession();
-			else            EditorEngine->StartPlaySession();  // Paused → Resume 포함
+			EditorEngine->PausePlaySession();
 			ImGui::SetWindowFocus(nullptr);
 		}
 		ImGui::PopStyleColor(3);
 	}
 	else
 	{
-		// 완전히 꺼져있음(Edit): 처음 재생(Play) 버튼
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.141f, 0.141f, 0.141f, 1.0f));
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.188f, 0.188f, 0.188f, 1.0f));
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.102f, 0.102f, 0.102f, 1.0f));
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.545f, 0.761f, 0.290f, 1.0f));       // #8bc24a
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.620f, 0.820f, 0.365f, 1.0f));
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.420f, 0.620f, 0.220f, 1.0f));
 		
 		if (ImGui::Button(CurrentPlayPauseLabel, PlayBtnSize))
 		{
@@ -78,9 +75,9 @@ void FEditorPlayStreamWidget::Render(float DeltaTime)
 	// --- 2번 버튼 (Stop) ---
 	if (bIsEditing) ImGui::BeginDisabled();
 	
-	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.141f, 0.141f, 0.141f, 1.0f));
-	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.188f, 0.188f, 0.188f, 1.0f));
-	ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.102f, 0.102f, 0.102f, 1.0f));
+	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 0.251f, 0.251f, 1.0f));       // #ff4040
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.333f, 0.333f, 1.0f));
+	ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.82f, 0.18f, 0.18f, 1.0f));
 	
 	// Stop 버튼도 고정 크기(StopBtnSize)를 적용합니다.
 	if (ImGui::Button(StopLabel, StopBtnSize))
