@@ -143,7 +143,7 @@ void FEditorToolbarWidget::Render(float DeltaTime)
 	(void)DeltaTime;
 
 	const ImGuiIO& IO = ImGui::GetIO();
-	if (!IO.WantTextInput && bShowConsole && ImGui::IsKeyPressed(ImGuiKey_GraveAccent, false))
+	if (bShowConsole && ImGui::IsKeyPressed(ImGuiKey_GraveAccent, false) && (*bShowConsole || !IO.WantTextInput))
 	{
 		const bool bNextOpen = !*bShowConsole;
 		*bShowConsole = bNextOpen;
