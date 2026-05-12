@@ -12,6 +12,7 @@ class UWorld;
 class AActor;
 class USkeletalMesh;
 class USkeletalMeshComponent;
+class UGizmoComponent;
 
 class FSkeletalMeshPreviewScene
 {
@@ -48,6 +49,11 @@ public:
 	void SetViewportHovered(bool bHovered) { bPreviewHovered = bHovered; }
 	bool IsInputCaptured() const { return bPreviewInputCaptured; }
 	bool IsInputActive() const { return bPreviewHovered || bPreviewInputCaptured; }
+
+	UGizmoComponent* GetPreviewGizmo() const { return PreviewGizmo; }
+
+public:
+	UGizmoComponent* PreviewGizmo = nullptr;
 
 private:
 	UEditorEngine* Editor = nullptr;

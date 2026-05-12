@@ -283,6 +283,24 @@ const FMatrix& USceneComponent::GetWorldMatrix() const
 	return CachedWorldMatrix;
 }
 
+void USceneComponent::SetWorldTransform(const FTransform& NewWorldTransform)
+{
+	FTransform NewRelativeTransform = NewWorldTransform;
+
+	if (ParentComponent != nullptr)
+	{
+		const FTransform ParentWorldInverse = ParentComponent->GetWorldTransform().Inverse();
+		NewRelativeTransform = NewWorldTransform * ParentWorldInverse;
+	}
+
+	RelativeLocation = NewRelativeTransform.GetTranslation();
+	RelativeRotationQuat = NewRelativeTransform.GetRotation().GetNormalized();
+	RelativeRotation = RelativeRotationQuat.Euler();
+	RelativeScale3D = NewRelativeTransform.GetScale3D();
+
+	MarkTransformDirty();
+}
+
 FTransform USceneComponent::GetWorldTransform() const
 {
 	if (bTransformDirty)

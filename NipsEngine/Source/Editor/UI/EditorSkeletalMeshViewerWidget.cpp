@@ -65,10 +65,11 @@ void FEditorSkeletalMeshViewerWidget::Render(float DeltaTime)
 		RenderToolbar();
 
 		const ImVec2 LayoutSize = ImGui::GetContentRegionAvail();
-		if (ImGui::BeginTable("ViewerLayout", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV, LayoutSize))
+		if (ImGui::BeginTable("ViewerLayout", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV, LayoutSize))
 		{
 			ImGui::TableSetupColumn("Hierarchy", ImGuiTableColumnFlags_WidthFixed, 250.0f);
 			ImGui::TableSetupColumn("Viewport", ImGuiTableColumnFlags_WidthStretch);
+			ImGui::TableSetupColumn("Details", ImGuiTableColumnFlags_WidthFixed, 300.0f);
 			ImGui::TableNextRow();
 
 			ImGui::TableSetColumnIndex(0);
@@ -78,10 +79,7 @@ void FEditorSkeletalMeshViewerWidget::Render(float DeltaTime)
 
 			ImGui::TableSetColumnIndex(1);
 
-			const float DetailsHeight = 150.0f;
 			ImVec2 ViewportAvail = ImGui::GetContentRegionAvail();
-			ViewportAvail.y -= (DetailsHeight + ImGui::GetStyle().ItemSpacing.y);
-			if (ViewportAvail.y < 100.0f) ViewportAvail.y = 100.0f;
 
 			ImGui::BeginChild("ViewportPanel", ViewportAvail, false);
 
@@ -120,7 +118,9 @@ void FEditorSkeletalMeshViewerWidget::Render(float DeltaTime)
 			}
 			ImGui::EndChild();
 
-			ImGui::BeginChild("DetailsPanel", ImVec2(0, DetailsHeight), true);
+			ImGui::TableSetColumnIndex(2);
+
+			ImGui::BeginChild("DetailsPanel", ImVec2(0, LayoutSize.y), true);
 			RenderBoneDetailsPanel();
 			ImGui::EndChild();
 
@@ -288,9 +288,9 @@ void FEditorSkeletalMeshViewerWidget::RenderBoneTree(int32 BoneIndex, const TArr
 	{
 		Flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
 	}
-	else if (Bone.ParentIndex == -1) // 최상위 루트는 기본적으로 열어둠
+	else
 	{
-		Flags |= ImGuiTreeNodeFlags_DefaultOpen;
+		Flags |= ImGuiTreeNodeFlags_DefaultOpen; // 모든 하위 트리를 기본적으로 열어둠
 	}
 
 	const bool bIsOpen = ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<intptr_t>(BoneIndex)), Flags, "%s", Bone.Name.c_str());
@@ -322,41 +322,70 @@ void FEditorSkeletalMeshViewerWidget::RenderBoneDetailsPanel()
 		return;
 	}
 
+	USkeletalMeshComponent* MeshComp = PreviewScene.GetPreviewMeshComponent();
+	if (!MeshComp) return;
+
 	const TArray<FSkeletalBone>& Bones = CurrentSkeletalMesh->GetBones();
 	if (SelectedBoneIndex >= static_cast<int32>(Bones.size())) return;
 
 	ImGui::Text("Name: %s (Index: %d)", Bones[SelectedBoneIndex].Name.c_str(), SelectedBoneIndex);
+	ImGui::Separator();
 
-	USkeletalMeshComponent* MeshComp = PreviewScene.GetPreviewMeshComponent();
-	if (MeshComp)
+	// --- 1. Reset Buttons ---
+	if (ImGui::Button("Reset Selected Bone"))
 	{
-		FTransform LocalTransform = MeshComp->GetBoneLocalTransform(SelectedBoneIndex);
-		FVector Position = LocalTransform.GetLocation();
-		FVector Rotation = LocalTransform.GetRotation().Euler();
-		FVector Scale = LocalTransform.GetScale3D();
-
-		bool bChanged = false;
-
-		ImGui::PushItemWidth(200.0f);
-		if (ImGui::DragFloat3("Location", &Position.X, 0.1f)) bChanged = true;
-		if (ImGui::DragFloat3("Rotation", &Rotation.X, 0.1f)) bChanged = true;
-		if (ImGui::DragFloat3("Scale", &Scale.X, 0.01f)) bChanged = true;
-		ImGui::PopItemWidth();
-
-		if (ImGui::Button("Reset Pose"))
-		{
-			MeshComp->SetBoneLocalTransform(SelectedBoneIndex, Bones[SelectedBoneIndex].ReferenceLocalTransform);
-		}
-
-		if (bChanged)
-		{
-			FTransform NewTransform;
-			NewTransform.SetLocation(Position);
-			NewTransform.SetRotation(FQuat::MakeFromEuler(Rotation));
-			NewTransform.SetScale3D(Scale);
-			MeshComp->SetBoneLocalTransform(SelectedBoneIndex, NewTransform);
-		}
+		MeshComp->SetBoneLocalTransform(SelectedBoneIndex, Bones[SelectedBoneIndex].ReferenceLocalTransform);
+		LastEditedBoneIndex = -1; // 캐시 무효화
 	}
+	ImGui::SameLine();
+	if (ImGui::Button("Reset All Pose"))
+	{
+		MeshComp->ResetPose();
+		LastEditedBoneIndex = -1; // 캐시 무효화
+	}
+	ImGui::Separator();
+
+	// --- 2. Local Transform Edit ---
+	ImGui::Text("Local Transform (Editable)");
+	FTransform LocalTransform = MeshComp->GetBoneLocalTransform(SelectedBoneIndex);
+	FVector Position = LocalTransform.GetLocation();
+	FVector Scale = LocalTransform.GetScale3D();
+
+	if (LastEditedBoneIndex != SelectedBoneIndex)
+	{
+		CachedEulerRotation = LocalTransform.GetRotation().Euler();
+		LastEditedBoneIndex = SelectedBoneIndex;
+	}
+
+	bool bChanged = false;
+	ImGui::PushItemWidth(200.0f);
+	if (ImGui::DragFloat3("Location", &Position.X, 0.1f)) bChanged = true;
+	if (ImGui::DragFloat3("Rotation", &CachedEulerRotation.X, 0.1f)) bChanged = true;
+	if (ImGui::DragFloat3("Scale", &Scale.X, 0.01f)) bChanged = true;
+	ImGui::PopItemWidth();
+
+	if (bChanged)
+	{
+		FTransform NewTransform;
+		NewTransform.SetLocation(Position);
+		NewTransform.SetRotation(FQuat::MakeFromEuler(CachedEulerRotation));
+		NewTransform.SetScale3D(Scale);
+
+		MeshComp->SetBoneLocalTransform(SelectedBoneIndex, NewTransform);
+	}
+	ImGui::Separator();
+
+	ImGui::TextDisabled("Component Space Transform");
+	FTransform CompTransform = MeshComp->GetBoneComponentTransform(SelectedBoneIndex);
+	FVector CompPos = CompTransform.GetLocation();
+	ImGui::Text("Loc: %.2f, %.2f, %.2f", CompPos.X, CompPos.Y, CompPos.Z);
+
+	ImGui::Spacing();
+
+	ImGui::TextDisabled("World Space Transform");
+	FTransform WorldTransform = MeshComp->GetBoneWorldTransform(SelectedBoneIndex);
+	FVector WorldPos = WorldTransform.GetLocation();
+	ImGui::Text("Loc: %.2f, %.2f, %.2f", WorldPos.X, WorldPos.Y, WorldPos.Z);
 }
 
 void FEditorSkeletalMeshViewerWidget::RebuildBoneCache(USkeletalMesh* Mesh)

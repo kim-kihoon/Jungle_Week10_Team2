@@ -43,6 +43,7 @@ public:
 	FTransform GetWorldTransform() const;
 	const FMatrix& GetWorldMatrix() const;
 
+	void SetWorldTransform(const FTransform& NewWorldTransform);
 	void SetWorldLocation(FVector NewWorldLocation);
 	FVector GetWorldLocation() const;
 	FVector GetWorldScale() const;

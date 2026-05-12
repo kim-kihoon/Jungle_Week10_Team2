@@ -67,6 +67,7 @@ public:
 	void CollectDebugBounds(UWorld* World, const FShowFlags& ShowFlags, EViewMode ViewMode, FRenderBus& RenderBus);
 	void CollectGizmo(UGizmoComponent* Gizmo, const FShowFlags& ShowFlags, FRenderBus& RenderBus, bool bIsActiveOperation);
 	void CollectGrid(float GridSpacing, int32 GridHalfLineCount, FRenderBus& RenderBus, bool bOrthographic = false);
+	void CollectSkeleton(USkeletalMeshComponent* MeshComp, int32 SelectedBoneIndex, FRenderBus& RenderBus, FLineBatcher* LineBatcher);
 
 private:
 	void CollectLight(UWorld* World, FRenderBus& RenderBus, const FFrustum* ViewFrustum = nullptr);
