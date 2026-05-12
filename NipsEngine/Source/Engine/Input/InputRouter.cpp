@@ -57,20 +57,26 @@ void FInputRouter::Tick(float DeltaTime)
 
 void FInputRouter::Tick(float DeltaTime, const FInputRouteContext& Context)
 {
+	IInputController* Controller = GetActiveController();
+	const bool bMouseInteractionActive = Controller && Controller->IsMouseInteractionActive();
+
 	if (!Context.bHovered)
 	{
-		return;
+		if (!bMouseInteractionActive)
+		{
+			return;
+		}
 	}
 
 	SetViewportDim(static_cast<float>(Context.ViewportRect.X), static_cast<float>(Context.ViewportRect.Y), static_cast<float>(Context.ViewportRect.Width), static_cast<float>(Context.ViewportRect.Height));
 
 	const bool bBlockedByGui = !Context.bIgnoreGuiBlock && GetGuiInputState().bBlockViewportInput;
 	UpdateControllerModifiers();
-	if (IInputController* Controller = GetActiveController())
+	if (Controller)
 	{
-		Controller->SetInputEnabled(Context.bInputActive && !Context.bControlLocked && !bBlockedByGui);
+		Controller->SetInputEnabled(Context.bInputActive && !Context.bControlLocked && (!bBlockedByGui || bMouseInteractionActive));
 	}
-	if (bBlockedByGui)
+	if (bBlockedByGui && !bMouseInteractionActive)
 	{
 		return;
 	}
@@ -468,7 +474,9 @@ void FInputRouter::TickMouseInput(const FInputRouteContext& Context)
 {
 	const InputSystem& IS = InputSystem::Get();
 	const FGuiInputState& GuiState = IS.GetGuiInputState();
-	if (!Context.bIgnoreGuiBlock && GuiState.bBlockViewportInput)
+	IInputController* Controller = GetActiveController();
+	const bool bMouseInteractionActive = Controller && Controller->IsMouseInteractionActive();
+	if (!Context.bIgnoreGuiBlock && GuiState.bBlockViewportInput && !bMouseInteractionActive)
 		return;
 
 	POINT MousePoint = IS.GetMousePos();
@@ -518,7 +526,7 @@ void FInputRouter::TickMouseInput(const FInputRouteContext& Context)
 
 	if (IS.GetKeyDown(VK_LBUTTON))
 		RouteMouseInput(EMouseInputType::E_LeftMouseClicked, LocalX, LocalY);
-	if (IS.GetLeftDragging())
+	if (IS.GetLeftDragging() || (bMouseInteractionActive && IS.GetKey(VK_LBUTTON) && IS.MouseMoved()))
 		RouteMouseInput(EMouseInputType::E_LeftMouseDragged, LocalX, LocalY);
 	if (IS.GetLeftDragEnd())
 		RouteMouseInput(EMouseInputType::E_LeftMouseDragEnded, LocalX, LocalY);

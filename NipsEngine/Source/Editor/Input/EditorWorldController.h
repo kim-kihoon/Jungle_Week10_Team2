@@ -28,6 +28,7 @@ class FEditorWorldController : public IBaseEditorController
 	void OnKeyDown(int VK) override;
 	void OnKeyReleased(int VK) override;
 	void OnWheelScrolled(float Notch) override;
+	bool IsMouseInteractionActive() const override;
 
 	void SetSelectionManager(FSelectionManager* InSM);
 	void SetSelectionManager(FSelectionManager& InSM);

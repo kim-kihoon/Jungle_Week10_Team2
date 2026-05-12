@@ -91,7 +91,23 @@ void FEditorWorldController::OnLeftMouseClick(float X, float Y)
 	FRay       Ray = Camera->DeprojectScreenToWorld(X, Y, ViewportWidth, ViewportHeight);
 	FHitResult HitResult{};
 
-	if (Gizmo && FRayCollision::RaycastComponent(Gizmo, Ray, HitResult))
+	bool bHitGizmo = false;
+	if (Gizmo)
+	{
+		if (Gizmo->RaycastMesh(Ray, HitResult))
+		{
+			bHitGizmo = true;
+		}
+		else if (Gizmo->IsHovered())
+		{
+			// If the user clicked and dragged very quickly in the same frame,
+			// the mouse position might have slipped off the thin gizmo handle 
+			// before OnLeftMouseClick was evaluated. We tolerate this by checking IsHovered().
+			bHitGizmo = true;
+		}
+	}
+
+	if (bHitGizmo)
 	{
 		Gizmo->SetPressedOnHandle(true);
 		return;
@@ -693,7 +709,12 @@ FVector FEditorWorldController::GetFreeOrthographicPlanarRight() const
 
 bool FEditorWorldController::IsActiveOperation() const
 {
-	return FInputRouter::GetRightDragging() || FInputRouter::GetMiddleDragging();
+	return IsMouseInteractionActive() || FInputRouter::GetRightDragging() || FInputRouter::GetMiddleDragging();
+}
+
+bool FEditorWorldController::IsMouseInteractionActive() const
+{
+	return bBoxSelecting || (Gizmo && Gizmo->IsInteracting());
 }
 
 void FEditorWorldController::UpdateGizmoScreenScaling()
