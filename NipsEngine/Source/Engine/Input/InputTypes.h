@@ -18,6 +18,7 @@ enum class EMouseInputType
     E_LeftMouseButtonUp,  // LMB released (no drag / below threshold)
     E_RightMouseClicked,
     E_RightMouseDragged,
+    E_RightMouseButtonUp,
     E_MiddleMouseDragged,
     E_MouseWheelScrolled,
 };

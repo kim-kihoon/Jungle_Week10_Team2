@@ -20,6 +20,7 @@ class FEditorWorldController : public IBaseEditorController
 	void OnLeftMouseDragEnd(float X, float Y) override;  // LMB drag released
 	void OnLeftMouseButtonUp(float X, float Y) override; // LMB up (no drag)
 	void OnRightMouseClick(float DeltaX, float DeltaY) override;
+	void OnRightMouseButtonUp(float X, float Y) override;
 	void OnLeftMouseDrag(float X, float Y) override; // X/Y = viewport-local pos
 	void OnRightMouseDrag(float DeltaX, float DeltaY) override;
 	void OnMiddleMouseDrag(float DeltaX, float DeltaY) override;
@@ -69,6 +70,8 @@ class FEditorWorldController : public IBaseEditorController
 	void ClearFocusSelectionCallback() { OnRequestFocusSelection = nullptr; }
 	void SetBeforeDeleteSelectionCallback(std::function<void()> Callback) { OnBeforeDeleteSelection = std::move(Callback); }
 	void ClearBeforeDeleteSelectionCallback() { OnBeforeDeleteSelection = nullptr; }
+	void SetActorPlacementCallback(std::function<bool(float, float, float, float)> Callback) { OnRequestActorPlacement = std::move(Callback); }
+	void ClearActorPlacementCallback() { OnRequestActorPlacement = nullptr; }
 
 	bool  IsActiveOperation() const;
 	bool  IsBoxSelecting() const { return bBoxSelecting; }
@@ -98,6 +101,7 @@ class FEditorWorldController : public IBaseEditorController
 	std::function<void()> OnRequestStartPIE;
 	std::function<void()> OnRequestFocusSelection;
 	std::function<void()> OnBeforeDeleteSelection;
+	std::function<bool(float, float, float, float)> OnRequestActorPlacement;
 
 	bool  bBoxSelecting = false;
 	POINT BoxSelectStart = { 0, 0 };
