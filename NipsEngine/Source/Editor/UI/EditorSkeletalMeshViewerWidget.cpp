@@ -6,6 +6,8 @@
 
 #include <d3d11.h>
 
+#include "Component/SkeletalMeshComponent.h"
+
 namespace
 {
 const char* GetPreviewViewportTypeName(EEditorViewportType Type)
@@ -43,6 +45,8 @@ void FEditorSkeletalMeshViewerWidget::Initialize(UEditorEngine* InEditorEngine)
 {
 	FEditorWidget::Initialize(InEditorEngine);
 	PreviewScene.Initialize(InEditorEngine);
+	RefreshSkeletalMeshPathCache();
+	SyncCurrentMeshFromPreview();
 }
 
 void FEditorSkeletalMeshViewerWidget::Render(float DeltaTime)
@@ -57,33 +61,70 @@ void FEditorSkeletalMeshViewerWidget::Render(float DeltaTime)
 
 	if (ImGui::Begin("SkeletalMesh Viewer", &bIsOpen, ImGuiWindowFlags_MenuBar))
 	{
+		SyncCurrentMeshFromPreview();
 		RenderToolbar();
 
-		FSkeletalMeshPreviewViewportClient& Client = PreviewScene.GetViewportClient();
-		const FEditorSettings& Settings = FEditorSettings::Get();
-		Client.SetMoveSpeed(Settings.CameraSpeed);
-		Client.SetMoveSensitivity(Settings.CameraMoveSensitivity);
-		Client.SetRotateSensitivity(Settings.CameraRotateSensitivity);
-		Client.SetZoomSpeed(Settings.CameraZoomSpeed);
-
-		const ImVec2 ViewportSize = ImGui::GetContentRegionAvail();
-		if (ViewportSize.x > 0.0f && ViewportSize.y > 0.0f)
+		const ImVec2 LayoutSize = ImGui::GetContentRegionAvail();
+		if (ImGui::BeginTable("ViewerLayout", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV, LayoutSize))
 		{
-			PreviewScene.SetViewportSize(static_cast<uint32>(ViewportSize.x), static_cast<uint32>(ViewportSize.y));
+			ImGui::TableSetupColumn("Hierarchy", ImGuiTableColumnFlags_WidthFixed, 250.0f);
+			ImGui::TableSetupColumn("Viewport", ImGuiTableColumnFlags_WidthStretch);
+			ImGui::TableNextRow();
 
-			if (ID3D11ShaderResourceView* SRV = PreviewScene.GetSceneViewport().GetOutSRV())
-			{
-				ImGui::Image(reinterpret_cast<ImTextureID>(SRV), ViewportSize);
-			}
-			else
-			{
-				ImGui::Dummy(ViewportSize);
-			}
+			ImGui::TableSetColumnIndex(0);
+			ImGui::BeginChild("BoneHierarchyPanel", ImVec2(0, LayoutSize.y), true);
+			RenderBoneHierarchyPanel();
+			ImGui::EndChild();
 
-			const ImVec2 Min = ImGui::GetItemRectMin();
-			const ImVec2 Max = ImGui::GetItemRectMax();
-			PreviewScene.SetInputRectFromScreenRect(Min.x, Min.y, Max.x, Max.y);
-			PreviewScene.SetViewportHovered(ImGui::IsItemHovered());
+			ImGui::TableSetColumnIndex(1);
+
+			const float DetailsHeight = 150.0f;
+			ImVec2 ViewportAvail = ImGui::GetContentRegionAvail();
+			ViewportAvail.y -= (DetailsHeight + ImGui::GetStyle().ItemSpacing.y);
+			if (ViewportAvail.y < 100.0f) ViewportAvail.y = 100.0f;
+
+			ImGui::BeginChild("ViewportPanel", ViewportAvail, false);
+
+			FSkeletalMeshPreviewViewportClient& Client = PreviewScene.GetViewportClient();
+			const FEditorSettings& Settings = FEditorSettings::Get();
+			Client.SetMoveSpeed(Settings.CameraSpeed);
+			Client.SetMoveSensitivity(Settings.CameraMoveSensitivity);
+			Client.SetRotateSensitivity(Settings.CameraRotateSensitivity);
+			Client.SetZoomSpeed(Settings.CameraZoomSpeed);
+
+			const ImVec2 ViewportSize = ImGui::GetContentRegionAvail();
+			if (ViewportSize.x > 0.0f && ViewportSize.y > 0.0f)
+			{
+				const uint32 ViewportWidth = static_cast<uint32>(ViewportSize.x);
+				const uint32 ViewportHeight = static_cast<uint32>(ViewportSize.y);
+				if (ViewportWidth != LastViewportWidth || ViewportHeight != LastViewportHeight)
+				{
+					PreviewScene.SetViewportSize(ViewportWidth, ViewportHeight);
+					LastViewportWidth = ViewportWidth;
+					LastViewportHeight = ViewportHeight;
+				}
+
+				if (ID3D11ShaderResourceView* SRV = PreviewScene.GetSceneViewport().GetOutSRV())
+				{
+					ImGui::Image(reinterpret_cast<ImTextureID>(SRV), ViewportSize);
+				}
+				else
+				{
+					ImGui::Dummy(ViewportSize);
+				}
+
+				const ImVec2 Min = ImGui::GetItemRectMin();
+				const ImVec2 Max = ImGui::GetItemRectMax();
+				PreviewScene.SetInputRectFromScreenRect(Min.x, Min.y, Max.x, Max.y);
+				PreviewScene.SetViewportHovered(ImGui::IsItemHovered());
+			}
+			ImGui::EndChild();
+
+			ImGui::BeginChild("DetailsPanel", ImVec2(0, DetailsHeight), true);
+			RenderBoneDetailsPanel();
+			ImGui::EndChild();
+
+			ImGui::EndTable();
 		}
 
 		PreviewScene.Tick(DeltaTime);
@@ -168,7 +209,6 @@ void FEditorSkeletalMeshViewerWidget::RenderToolbar()
 		ImGui::EndMenu();
 	}
 
-	CachedSkeletalMeshPaths = FResourceManager::Get().GetSkeletalMeshPaths();
 	if (SelectedMeshPathIndex >= static_cast<int32>(CachedSkeletalMeshPaths.size()))
 	{
 		SelectedMeshPathIndex = CachedSkeletalMeshPaths.empty() ? -1 : 0;
@@ -176,13 +216,18 @@ void FEditorSkeletalMeshViewerWidget::RenderToolbar()
 
 	if (ImGui::BeginMenu("Mesh"))
 	{
+		RefreshSkeletalMeshPathCache();
+
 		for (int32 i = 0; i < static_cast<int32>(CachedSkeletalMeshPaths.size()); ++i)
 		{
 			const bool bSelected = SelectedMeshPathIndex == i;
 			if (ImGui::MenuItem(CachedSkeletalMeshPaths[i].c_str(), nullptr, bSelected))
 			{
 				SelectedMeshPathIndex = i;
-				PreviewScene.SetSkeletalMesh(FResourceManager::Get().LoadSkeletalMesh(CachedSkeletalMeshPaths[i]));
+				USkeletalMesh* LoadedMesh = FResourceManager::Get().LoadSkeletalMesh(CachedSkeletalMeshPaths[i]);
+				PreviewScene.SetSkeletalMesh(LoadedMesh);
+
+				RebuildBoneCache(LoadedMesh);
 			}
 		}
 		if (CachedSkeletalMeshPaths.empty())
@@ -199,4 +244,168 @@ void FEditorSkeletalMeshViewerWidget::RenderToolbar()
 	}
 
 	ImGui::EndMenuBar();
+}
+
+void FEditorSkeletalMeshViewerWidget::RenderBoneHierarchyPanel()
+{
+	ImGui::Text("Bone Hierarchy");
+	ImGui::Separator();
+
+	if (!CurrentSkeletalMesh || RootBones.empty())
+	{
+		ImGui::TextDisabled("No skeleton data.");
+		return;
+	}
+
+	const TArray<FSkeletalBone>& Bones = CurrentSkeletalMesh->GetBones();
+	ImGui::TextDisabled("%d bones", static_cast<int32>(Bones.size()));
+	ImGui::Spacing();
+
+	for (int32 RootIndex : RootBones)
+	{
+		RenderBoneTree(RootIndex, Bones);
+	}
+}
+
+void FEditorSkeletalMeshViewerWidget::RenderBoneTree(int32 BoneIndex, const TArray<FSkeletalBone>& Bones)
+{
+	if (BoneIndex < 0 ||
+		BoneIndex >= static_cast<int32>(Bones.size()) ||
+		BoneIndex >= static_cast<int32>(CachedBoneChildren.size()))
+	{
+		return;
+	}
+
+	const FSkeletalBone& Bone = Bones[BoneIndex];
+
+	ImGuiTreeNodeFlags Flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
+
+	if (SelectedBoneIndex == BoneIndex)
+	{
+		Flags |= ImGuiTreeNodeFlags_Selected;
+	}
+	if (CachedBoneChildren[BoneIndex].empty())
+	{
+		Flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+	}
+	else if (Bone.ParentIndex == -1) // 최상위 루트는 기본적으로 열어둠
+	{
+		Flags |= ImGuiTreeNodeFlags_DefaultOpen;
+	}
+
+	const bool bIsOpen = ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<intptr_t>(BoneIndex)), Flags, "%s", Bone.Name.c_str());
+
+	if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
+	{
+		SelectedBoneIndex = BoneIndex;
+		PreviewScene.SelectBone(BoneIndex);
+	}
+
+	if (bIsOpen && !CachedBoneChildren[BoneIndex].empty())
+	{
+		for (int32 ChildIndex : CachedBoneChildren[BoneIndex])
+		{
+			RenderBoneTree(ChildIndex, Bones);
+		}
+		ImGui::TreePop();
+	}
+}
+
+void FEditorSkeletalMeshViewerWidget::RenderBoneDetailsPanel()
+{
+	ImGui::Text("Bone Transform Details");
+	ImGui::Separator();
+
+	if (SelectedBoneIndex == -1 || !CurrentSkeletalMesh)
+	{
+		ImGui::TextDisabled("Select a bone to edit its local transform.");
+		return;
+	}
+
+	const TArray<FSkeletalBone>& Bones = CurrentSkeletalMesh->GetBones();
+	if (SelectedBoneIndex >= static_cast<int32>(Bones.size())) return;
+
+	ImGui::Text("Name: %s (Index: %d)", Bones[SelectedBoneIndex].Name.c_str(), SelectedBoneIndex);
+
+	USkeletalMeshComponent* MeshComp = PreviewScene.GetPreviewMeshComponent();
+	if (MeshComp)
+	{
+		FTransform LocalTransform = MeshComp->GetBoneLocalTransform(SelectedBoneIndex);
+		FVector Position = LocalTransform.GetLocation();
+		FVector Rotation = LocalTransform.GetRotation().Euler();
+		FVector Scale = LocalTransform.GetScale3D();
+
+		bool bChanged = false;
+
+		ImGui::PushItemWidth(200.0f);
+		if (ImGui::DragFloat3("Location", &Position.X, 0.1f)) bChanged = true;
+		if (ImGui::DragFloat3("Rotation", &Rotation.X, 0.1f)) bChanged = true;
+		if (ImGui::DragFloat3("Scale", &Scale.X, 0.01f)) bChanged = true;
+		ImGui::PopItemWidth();
+
+		if (ImGui::Button("Reset Pose"))
+		{
+			MeshComp->SetBoneLocalTransform(SelectedBoneIndex, Bones[SelectedBoneIndex].ReferenceLocalTransform);
+		}
+
+		if (bChanged)
+		{
+			FTransform NewTransform;
+			NewTransform.SetLocation(Position);
+			NewTransform.SetRotation(FQuat::MakeFromEuler(Rotation));
+			NewTransform.SetScale3D(Scale);
+			MeshComp->SetBoneLocalTransform(SelectedBoneIndex, NewTransform);
+		}
+	}
+}
+
+void FEditorSkeletalMeshViewerWidget::RebuildBoneCache(USkeletalMesh* Mesh)
+{
+	CurrentSkeletalMesh = Mesh;
+	SelectedBoneIndex = -1;
+	CachedBoneChildren.clear();
+	RootBones.clear();
+
+	PreviewScene.SelectBone(-1);
+
+	if (!CurrentSkeletalMesh || !CurrentSkeletalMesh->HasValidSkeleton())
+	{
+		return;
+	}
+
+	const TArray<FSkeletalBone>& Bones = CurrentSkeletalMesh->GetBones();
+	CachedBoneChildren.resize(Bones.size());
+
+	for (int32 i = 0; i < static_cast<int32>(Bones.size()); i++)
+	{
+		const int32 ParentIndex = Bones[i].ParentIndex;
+		if (ParentIndex >= 0 && ParentIndex < static_cast<int32>(Bones.size()))
+		{
+			CachedBoneChildren[ParentIndex].push_back(i);
+		}
+		else
+		{
+			RootBones.push_back(i);
+		}
+	}
+}
+
+void FEditorSkeletalMeshViewerWidget::SyncCurrentMeshFromPreview()
+{
+	USkeletalMesh* PreviewMesh = PreviewScene.GetCurrentSkeletalMesh();
+	if (PreviewMesh != CurrentSkeletalMesh)
+	{
+		RebuildBoneCache(PreviewMesh);
+	}
+
+	const int32 PreviewSelectedBoneIndex = PreviewScene.GetSelectedBoneIndex();
+	if (PreviewSelectedBoneIndex != SelectedBoneIndex)
+	{
+		SelectedBoneIndex = PreviewSelectedBoneIndex;
+	}
+}
+
+void FEditorSkeletalMeshViewerWidget::RefreshSkeletalMeshPathCache()
+{
+	CachedSkeletalMeshPaths = FResourceManager::Get().GetSkeletalMeshPaths();
 }

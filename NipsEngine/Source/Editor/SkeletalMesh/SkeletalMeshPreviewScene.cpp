@@ -55,6 +55,9 @@ void FSkeletalMeshPreviewScene::Initialize(UEditorEngine* InEditor)
 
 	ADirectionalLightActor* LightActor = PreviewWorld->SpawnActor<ADirectionalLightActor>();
 	LightActor->InitDefaultComponents();
+
+	AAmbientLightActor* AmbientLightActor = PreviewWorld->SpawnActor<AAmbientLightActor>();
+	AmbientLightActor->InitDefaultComponents();
 }
 
 void FSkeletalMeshPreviewScene::Shutdown()
@@ -130,11 +133,44 @@ void FSkeletalMeshPreviewScene::SetSkeletalMesh(USkeletalMesh* Mesh)
 	{
 		PreviewMeshComponent->SetSkeletalMesh(Mesh);
 	}
+	SelectBone(-1);
 	ResetPose();
 }
 
 void FSkeletalMeshPreviewScene::ResetPose()
 {
+	if (USkeletalMeshComponent* Comp = GetPreviewMeshComponent())
+	{
+		Comp->ResetPose();
+	}
+}
+
+USkeletalMeshComponent* FSkeletalMeshPreviewScene::GetPreviewMeshComponent() const
+{
+	if (PreviewActor)
+	{
+		return static_cast<USkeletalMeshComponent*>(PreviewActor->GetRootComponent());
+	}
+	return nullptr;
+}
+
+USkeletalMesh* FSkeletalMeshPreviewScene::GetCurrentSkeletalMesh() const
+{
+	if (USkeletalMeshComponent* Comp = GetPreviewMeshComponent())
+	{
+		return Comp->GetSkeletalMesh();
+	}
+	return nullptr;
+}
+
+void FSkeletalMeshPreviewScene::SelectBone(int32 BoneIndex)
+{
+	SelectedBoneIndex = BoneIndex;
+}
+
+int32 FSkeletalMeshPreviewScene::GetSelectedBoneIndex() const
+{
+	return SelectedBoneIndex;
 }
 
 void FSkeletalMeshPreviewScene::SetViewportSize(uint32 Width, uint32 Height)

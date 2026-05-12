@@ -52,6 +52,12 @@ void USkinnedMeshComponent::SetSkeletalMesh(USkeletalMesh* InSkeletalMesh)
     ComponentSpaceBoneTransforms.clear();
     SkinningMatrices.clear();
     SkinnedVertices.clear();
+    LocalBoneTransforms.clear();
+
+    if (SkeletalMesh != nullptr && SkeletalMesh->HasValidSkeleton())
+    {
+        InitializePoseFromReference();
+    }
 
     MarkBoneTransformsDirty();
     MarkSkinningDirty();
@@ -101,10 +107,16 @@ void USkinnedMeshComponent::RefreshBoneTransforms()
         const FSkeletalBone& Bone = Bones[BoneIndex];
         const int32 ParentIndex = Bone.ParentIndex;
 
+        FTransform CurrentLocalTransform = Bone.ReferenceLocalTransform;
+        if (BoneIndex < static_cast<int32>(LocalBoneTransforms.size()))
+        {
+            CurrentLocalTransform = LocalBoneTransforms[BoneIndex];
+        }
+
         if (ParentIndex >= 0 && ParentIndex < BoneIndex)
         {
 			//현재 bone에 부모 bone의 transform을 반영.
-            ComponentSpaceBoneTransforms[BoneIndex] = Bone.ReferenceLocalTransform * ComponentSpaceBoneTransforms[ParentIndex];
+            ComponentSpaceBoneTransforms[BoneIndex] = CurrentLocalTransform * ComponentSpaceBoneTransforms[ParentIndex];
         }
         else
         {
@@ -377,6 +389,93 @@ bool USkinnedMeshComponent::ConsumeRenderStateDirty()
     const bool bWasDirty = bRenderStateDirty;
     bRenderStateDirty = false;
     return bWasDirty;
+}
+
+void USkinnedMeshComponent::InitializePoseFromReference()
+{
+    if (!HasValidMesh())
+    {
+        LocalBoneTransforms.clear();
+        return;
+    }
+
+	const TArray<FSkeletalBone>& Bones = SkeletalMesh->GetBones();
+    const int32 BoneCount = static_cast<int32>(Bones.size());
+
+    LocalBoneTransforms.clear();
+	LocalBoneTransforms.resize(BoneCount, FTransform::Identity);
+
+    for (int32 i = 0; i < BoneCount; i++)
+    {
+		LocalBoneTransforms[i] = Bones[i].ReferenceLocalTransform;
+    }
+
+    MarkBoneTransformsDirty();
+}
+
+void USkinnedMeshComponent::ResetPose()
+{
+	InitializePoseFromReference();
+}
+
+FTransform USkinnedMeshComponent::GetBoneLocalTransform(int32 BoneIndex) const
+{
+    if (BoneIndex >= 0 && BoneIndex < static_cast<int32>(LocalBoneTransforms.size()))
+    {
+		return LocalBoneTransforms[BoneIndex];
+    }
+	return FTransform::Identity;
+}
+
+void USkinnedMeshComponent::SetBoneLocalTransform(int32 BoneIndex, const FTransform& NewLocalTransform)
+{
+    if (BoneIndex >= 0 && BoneIndex < static_cast<int32>(LocalBoneTransforms.size()))
+    {
+		LocalBoneTransforms[BoneIndex] = NewLocalTransform;
+        MarkBoneTransformsDirty();
+	}
+}
+
+FTransform USkinnedMeshComponent::GetBoneComponentTransform(int32 BoneIndex) const
+{
+    if (bBoneTransformsDirty)
+    {
+        const_cast<USkinnedMeshComponent*>(this)->RefreshBoneTransforms();
+    }
+
+    if (BoneIndex >= 0 && BoneIndex < static_cast<int32>(ComponentSpaceBoneTransforms.size()))
+    {
+		return ComponentSpaceBoneTransforms[BoneIndex];
+    }
+    return FTransform::Identity;
+}
+
+FTransform USkinnedMeshComponent::GetBoneWorldTransform(int32 BoneIndex) const
+{
+	FTransform ComponentSpaceTransform = GetBoneComponentTransform(BoneIndex);
+	return ComponentSpaceTransform * GetWorldTransform();
+}
+
+void USkinnedMeshComponent::SetBoneWorldTransform(int32 BoneIndex, const FTransform& NewWorldTransform)
+{
+    if (!HasValidMesh() || LocalBoneTransforms.empty()) return;
+
+    const TArray<FSkeletalBone>& Bones = SkeletalMesh->GetBones();
+    if (BoneIndex < 0 || BoneIndex >= static_cast<int32>(Bones.size())) return;
+
+    FTransform InvComponentTransform = GetWorldTransform().Inverse();
+    FTransform TargetComponentSpace = NewWorldTransform * InvComponentTransform;
+
+    const int32 ParentIndex = Bones[BoneIndex].ParentIndex;
+    FTransform NewLocalTransform = TargetComponentSpace;
+
+    if (ParentIndex >= 0 && ParentIndex < BoneIndex)
+    {
+        FTransform InvParentComponentSpace = GetBoneComponentTransform(ParentIndex).Inverse();
+        NewLocalTransform = TargetComponentSpace * InvParentComponentSpace;
+    }
+
+    SetBoneLocalTransform(BoneIndex, NewLocalTransform);
 }
 
 void USkinnedMeshComponent::MarkBoneTransformsDirty()
