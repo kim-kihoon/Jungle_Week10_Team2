@@ -23,6 +23,7 @@ namespace EditorKey
 	constexpr const char* CameraMoveSensitivity = "CameraMoveSensitivity";
 	constexpr const char* CameraRotateSensitivity = "CameraRotateSensitivity";
 	constexpr const char* CameraZoomSpeed = "CameraZoomSpeed";
+	constexpr const char* CameraWASDAlwaysMove = "CameraWASDAlwaysMove";
 	constexpr const char* InitViewPos = "InitViewPos";
 	constexpr const char* InitLookAt = "InitLookAt";
 
@@ -79,6 +80,7 @@ void FEditorSettings::SaveToFile(const FString& Path) const
 	Viewport[EditorKey::CameraMoveSensitivity] = CameraMoveSensitivity;
 	Viewport[EditorKey::CameraRotateSensitivity] = CameraRotateSensitivity;
 	Viewport[EditorKey::CameraZoomSpeed] = CameraZoomSpeed;
+	Viewport[EditorKey::CameraWASDAlwaysMove] = bCameraWASDAlwaysMove;
 
 	JSON InitPos = Array(InitViewPos.X, InitViewPos.Y, InitViewPos.Z);
 	Viewport[EditorKey::InitViewPos] = InitPos;
@@ -178,6 +180,8 @@ void FEditorSettings::LoadFromFile(const FString& Path)
 			CameraRotateSensitivity = static_cast<float>(Viewport[EditorKey::CameraRotateSensitivity].ToFloat());
 		if (Viewport.hasKey(EditorKey::CameraZoomSpeed))
 			CameraZoomSpeed = static_cast<float>(Viewport[EditorKey::CameraZoomSpeed].ToFloat());
+		if (Viewport.hasKey(EditorKey::CameraWASDAlwaysMove))
+			bCameraWASDAlwaysMove = Viewport[EditorKey::CameraWASDAlwaysMove].ToBool();
 
 		if (Viewport.hasKey(EditorKey::InitViewPos))
 		{

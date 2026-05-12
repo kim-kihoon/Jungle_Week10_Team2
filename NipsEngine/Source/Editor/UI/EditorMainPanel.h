@@ -64,7 +64,7 @@ private:
 
 	bool bShowConsole = false;
 	bool bShowCameraShake = true;
-	bool bShowControl = true;
+	bool bShowControl = false;
 	bool bShowProperty = true;
 	bool bShowSceneManager = true;
 	bool bShowMaterialEditor = true;

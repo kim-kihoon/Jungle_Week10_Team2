@@ -16,12 +16,13 @@
 enum EEditorViewportType
 {
 	EVT_Perspective = 0,		// Perspective
-	EVT_OrthoXY = 1,			// Top
-	EVT_OrthoXZ = 2,			// Right
-	EVT_OrthoYZ = 3,			// Back
-	EVT_OrthoNegativeXY = 4,	// Bottom
-	EVT_OrthoNegativeXZ = 5,	// Left
-	EVT_OrthoNegativeYZ = 6,	// Front
+	EVT_Orthographic = 1,	// Free orthographic
+	EVT_OrthoXY = 2,			// Top
+	EVT_OrthoXZ = 3,			// Right
+	EVT_OrthoYZ = 4,			// Back
+	EVT_OrthoNegativeXY = 5,	// Bottom
+	EVT_OrthoNegativeXZ = 6,	// Left
+	EVT_OrthoNegativeYZ = 7,	// Front
 
 	EVT_OrthoTop    = EVT_OrthoXY,			// TOP
 	EVT_OrthoLeft   = EVT_OrthoXZ,			// Left
@@ -29,7 +30,7 @@ enum EEditorViewportType
 	EVT_OrthoBack   = EVT_OrthoYZ,			// Back
 	EVT_OrthoBottom = EVT_OrthoNegativeXY,	// Bottom
 	EVT_OrthoRight  = EVT_OrthoNegativeXZ,	// Right
-	LVT_MAX = 7,
+	LVT_MAX = 8,
 };
 
 class UEditorEngine;
