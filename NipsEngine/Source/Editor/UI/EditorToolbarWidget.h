@@ -21,6 +21,7 @@ public:
 		bool* InShowSceneManager,
 		bool* InShowMaterialEditor,
 		bool* InShowStatProfiler,
+		bool* InShowCameraShake,
 		bool* InShowSkeletalMeshViewer);
 	virtual void Render(float DeltaTime) override;
 	float GetReservedTopHeight() const { return ReservedTopHeight; }
@@ -50,5 +51,6 @@ private:
 	bool* bShowSceneManager = nullptr;
 	bool* bShowMaterialEditor = nullptr;
 	bool* bShowStatProfiler = nullptr;
+	bool* bShowCameraShake = nullptr;
 	bool* bShowSkeletalMeshViewer = nullptr;
 };

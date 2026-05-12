@@ -7,6 +7,8 @@ class FEditorStatWidget : public FEditorWidget
 {
 public:
 	void Render(float DeltaTime) override;
+	void SetOpen(bool bInOpen) { bIsOpen = bInOpen; }
+	bool IsOpen() const { return bIsOpen; }
 
 private:
 	void RenderStatTable(const char* TableID, const TArray<FStatEntry>& Source, int& OutSortColumn, bool& OutSortDescending);
@@ -18,4 +20,5 @@ private:
 	bool bPaused = false;
 	TArray<FStatEntry> FrozenCPUEntries;
 	TArray<FStatEntry> FrozenGPUEntries;
+	bool bIsOpen = true;
 };

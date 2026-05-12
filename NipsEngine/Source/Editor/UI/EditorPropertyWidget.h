@@ -12,6 +12,8 @@ class FEditorPropertyWidget : public FEditorWidget
 public:
 	virtual void Render(float DeltaTime) override;
 	void Initialize(UEditorEngine* InEditorEngine) override;
+	void SetOpen(bool bInOpen) { bIsOpen = bInOpen; }
+	bool IsOpen() const { return bIsOpen; }
 
 	UActorComponent* GetSelectedComponent() const { return SelectedComponent; }
 	UActorComponent* GetSelectedDetailComponent() const { return bActorSelected ? nullptr : SelectedComponent; }
@@ -61,4 +63,5 @@ private:
 	UActorComponent* SelectedComponent = nullptr;
 	AActor* LastSelectedActor = nullptr;
 	bool bActorSelected   = true; // true: Actor details, false: Component details
+	bool bIsOpen = true;
 };

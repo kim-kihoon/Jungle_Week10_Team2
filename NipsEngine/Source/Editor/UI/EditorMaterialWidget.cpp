@@ -137,8 +137,15 @@ void FEditorMaterialWidget::ResetSelection()
 // -----------------------------------------------------------------------
 void FEditorMaterialWidget::Render(float DeltaTime)
 {
+	if (!bIsOpen)
+		return;
+
 	ImGui::SetNextWindowSize(ImVec2(500.0f, 400.0f), ImGuiCond_Once);
-	ImGui::Begin("Material Editor");
+	if (!ImGui::Begin("Material Editor", &bIsOpen))
+	{
+		ImGui::End();
+		return;
+	}
 
 	FEditorPropertyWidget& PropWidget = EditorEngine->GetMainPanel().GetPropertyWidget();
 	

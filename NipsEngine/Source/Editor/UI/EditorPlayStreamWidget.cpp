@@ -88,5 +88,6 @@ void FEditorPlayStreamWidget::Render(float DeltaTime)
 
 	if (bIsEditing) ImGui::EndDisabled();
 
+	ImGui::SetWindowFontScale(1.0f);
 	ImGui::PopStyleVar();
 }

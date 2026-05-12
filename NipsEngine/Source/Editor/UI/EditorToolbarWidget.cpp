@@ -179,6 +179,7 @@ void FEditorToolbarWidget::SetPanelVisibilityRefs(
 	bool* InShowSceneManager,
 	bool* InShowMaterialEditor,
 	bool* InShowStatProfiler,
+	bool* InShowCameraShake,
 	bool* InShowSkeletalMeshViewer)
 {
 	bShowConsole = InShowConsole;
@@ -187,13 +188,14 @@ void FEditorToolbarWidget::SetPanelVisibilityRefs(
 	bShowSceneManager = InShowSceneManager;
 	bShowMaterialEditor = InShowMaterialEditor;
 	bShowStatProfiler = InShowStatProfiler;
+	bShowCameraShake = InShowCameraShake;
 	bShowSkeletalMeshViewer = InShowSkeletalMeshViewer;
 }
 
 void FEditorToolbarWidget::Render(float DeltaTime)
 {
 	(void)DeltaTime;
-	constexpr float EditorToolBarHeight = 34.0f;
+	constexpr float EditorToolBarHeight = 40.0f;
 
 	const ImGuiIO& IO = ImGui::GetIO();
 	if (bShowConsole && ImGui::IsKeyPressed(ImGuiKey_GraveAccent, false) && (*bShowConsole || !IO.WantTextInput))
@@ -253,11 +255,6 @@ void FEditorToolbarWidget::Render(float DeltaTime)
 	RenderViewMenu();
 	RenderEditMenu();
 	RenderHelpMenu();
-
-	if (PlayStreamWidget)
-	{
-		PlayStreamWidget->Render(DeltaTime);
-	}
 
 	ImGui::EndMainMenuBar();
 	RenderEditorToolBar(MenuBarHeight, EditorToolBarHeight);
@@ -324,6 +321,12 @@ void FEditorToolbarWidget::RenderEditorToolBar(float MenuBarHeight, float ToolBa
 				ImGui::TextDisabled("Viewport settings unavailable.");
 			}
 			ImGui::EndPopup();
+		}
+
+		if (PlayStreamWidget)
+		{
+			ImGui::SameLine();
+			PlayStreamWidget->Render(0.0f);
 		}
 	}
 
@@ -553,6 +556,7 @@ void FEditorToolbarWidget::RenderViewMenu()
 	if (bShowSceneManager) ImGui::MenuItem("Scene Manager", nullptr, bShowSceneManager);
 	if (bShowMaterialEditor) ImGui::MenuItem("Material Editor", nullptr, bShowMaterialEditor);
 	if (bShowStatProfiler) ImGui::MenuItem("Stat Profiler", nullptr, bShowStatProfiler);
+	if (bShowCameraShake) ImGui::MenuItem("Camera Shake", nullptr, bShowCameraShake);
 	if (bShowSkeletalMeshViewer) ImGui::MenuItem("SkeletalMesh Viewer", nullptr, bShowSkeletalMeshViewer);
 
 	if (ContentDrawerWidget)
