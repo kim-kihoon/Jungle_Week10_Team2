@@ -39,11 +39,11 @@ static void bezier_table(FVector2 P[4], FVector2 results[steps + 1])
 // ── ImGui 커브 에디터 위젯 ────────────────────────────────────────────────────────
 int BezierUI::Bezier(const char* label, float cp[4])
 {
-    enum { SMOOTHNESS  = 64 }; // 커브 분할 수
-    enum { CURVE_WIDTH = 4  }; // 커브 선 두께
-    enum { LINE_WIDTH  = 1  }; // 핸들 연결선 두께
-    enum { GRAB_RADIUS = 6  }; // 핸들 원 반지름
-    enum { GRAB_BORDER = 2  }; // 핸들 원 테두리 두께
+    constexpr int   SMOOTHNESS  = 64; // 커브 분할 수
+    constexpr float CURVE_WIDTH = 4.f; // 커브 선 두께
+    constexpr float LINE_WIDTH  = 1.f; // 핸들 연결선 두께
+    constexpr float GRAB_RADIUS = 6.f; // 핸들 원 반지름
+    constexpr float GRAB_BORDER = 2.f; // 핸들 원 테두리 두께
 
     const ImGuiStyle& Style    = GetStyle();
     ImDrawList*       DrawList = GetWindowDrawList();
@@ -55,7 +55,7 @@ int BezierUI::Bezier(const char* label, float cp[4])
 
     // 헤더 슬라이더 — label은 이미 PushID로 스코프됐으므로 "##v" 사용
     int changed = SliderFloat4("##v", cp, 0, 1, "%.3f");
-    int hovered = IsItemActive() || IsItemHovered();
+    bool hovered = IsItemActive() || IsItemHovered();
     Dummy(ImVec2(0, 3));
 
     // 캔버스 크기 — 순수 데이터이므로 FVector2 사용
