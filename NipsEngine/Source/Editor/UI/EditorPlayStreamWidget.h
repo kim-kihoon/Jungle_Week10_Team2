@@ -2,9 +2,12 @@
 #include "Editor/UI/EditorWidget.h"
 #include "ImGui/imgui.h"
 
+class UTexture;
+
 class FEditorPlayStreamWidget : public FEditorWidget
 {
 public:
+	virtual void Initialize(UEditorEngine* InEditorEngine) override;
 	virtual void Render(float DeltaTime) override;
 
 private:
@@ -12,5 +15,8 @@ private:
 	const char* ResumeLabel = "▶ Resume";
 	const char* PauseLabel  = "❚❚ Pause"; 
 	const char* StopLabel   = "■ Stop";
+
+	UTexture* PlayIconTexture = nullptr;
+	UTexture* StopIconTexture = nullptr;
 };
 
