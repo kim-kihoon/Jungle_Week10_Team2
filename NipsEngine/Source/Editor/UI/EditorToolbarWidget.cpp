@@ -1,5 +1,6 @@
 #include "Editor/UI/EditorToolbarWidget.h"
 
+#include "Editor/UI/EditorContentDrawerWidget.h"
 #include "Editor/UI/EditorSceneWidget.h"
 #include "Editor/UI/EditorViewportOverlayWidget.h"
 #include "Editor/UI/EditorPlayStreamWidget.h"
@@ -114,6 +115,11 @@ void FEditorToolbarWidget::SetPlayStreamWidget(FEditorPlayStreamWidget* InPlaySt
 	PlayStreamWidget = InPlayStreamWidget;
 }
 
+void FEditorToolbarWidget::SetContentDrawerWidget(FEditorContentDrawerWidget* InContentDrawerWidget)
+{
+	ContentDrawerWidget = InContentDrawerWidget;
+}
+
 void FEditorToolbarWidget::SetPanelVisibilityRefs(
 	bool* InShowConsole,
 	bool* InShowControl,
@@ -137,13 +143,18 @@ void FEditorToolbarWidget::Render(float DeltaTime)
 	(void)DeltaTime;
 
 	const ImGuiIO& IO = ImGui::GetIO();
-	if (SceneWidget && !IO.WantTextInput && IO.KeyCtrl)
+	if (!IO.WantTextInput && IO.KeyCtrl)
 	{
-		if (ImGui::IsKeyPressed(ImGuiKey_N, false))
+		if (ContentDrawerWidget && ImGui::IsKeyPressed(ImGuiKey_Space, false))
+		{
+			ContentDrawerWidget->ToggleOpen();
+		}
+
+		if (SceneWidget && ImGui::IsKeyPressed(ImGuiKey_N, false))
 		{
 			SceneWidget->NewScene();
 		}
-		if (ImGui::IsKeyPressed(ImGuiKey_O, false))
+		if (SceneWidget && ImGui::IsKeyPressed(ImGuiKey_O, false))
 		{
 			FString PickedPath;
 			if (OpenSceneFileDialog(PickedPath))
@@ -151,7 +162,7 @@ void FEditorToolbarWidget::Render(float DeltaTime)
 				SceneWidget->LoadSceneFromFilePath(PickedPath);
 			}
 		}
-		if (ImGui::IsKeyPressed(ImGuiKey_S, false))
+		if (SceneWidget && ImGui::IsKeyPressed(ImGuiKey_S, false))
 		{
 			FString PickedPath;
 			if (SaveSceneFileDialog(PickedPath))
@@ -221,6 +232,10 @@ void FEditorToolbarWidget::RenderFilesMenu()
 		if (ImGui::MenuItem("Reload Asset From Disk"))
 		{
 			SceneWidget->RefreshSceneAndAssets();
+			if (ContentDrawerWidget)
+			{
+				ContentDrawerWidget->RefreshAssetTree();
+			}
 		}
 		if (ImGui::MenuItem("Open Asset Folder"))
 		{
@@ -255,6 +270,19 @@ void FEditorToolbarWidget::RenderViewMenu()
 	if (bShowMaterialEditor) ImGui::MenuItem("Material Editor", nullptr, bShowMaterialEditor);
 	if (bShowStatProfiler) ImGui::MenuItem("Stat Profiler", nullptr, bShowStatProfiler);
 	if (bShowSkeletalMeshViewer) ImGui::MenuItem("SkeletalMesh Viewer", nullptr, bShowSkeletalMeshViewer);
+
+	if (ContentDrawerWidget)
+	{
+		bool bContentDrawerOpen = ContentDrawerWidget->IsOpen();
+		if (ImGui::MenuItem("Content Drawer", "Ctrl+Space", bContentDrawerOpen))
+		{
+			ContentDrawerWidget->SetOpen(!bContentDrawerOpen);
+		}
+	}
+	else
+	{
+		ImGui::MenuItem("Content Drawer", "Ctrl+Space", false, false);
+	}
 
 	if (ViewportOverlayWidget)
 	{

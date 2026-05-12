@@ -1224,6 +1224,8 @@ bool FEditorPropertyWidget::RenderPropertyWidget(FPropertyDescriptor& Prop)
 			Options = FResourceManager::Get().GetTextureFilePath();
 		else if (strcmp(Prop.Name, "StaticMesh") == 0)
 			Options = FResourceManager::Get().GetStaticMeshPaths();
+		else if (strcmp(Prop.Name, "SkeletalMesh") == 0)
+			Options = FResourceManager::Get().GetSkeletalMeshPaths();
 		bChanged = EditorUIUtils::RenderStringComboOrInput(Prop.Name, *Val, Options);
 		break;
 	}

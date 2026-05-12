@@ -503,6 +503,7 @@ void FResourceManager::LoadFromAssetDirectory(const FString& Path)
 	TextureFilePaths.clear();
 	MaterialFilePaths.clear();
 	ParticleFilePaths.clear();
+	SkeletalMeshFilePaths.clear();
 	StaticMeshRegistry.clear();
 
 	InitializeDefaultResources(CachedDevice.Get());
@@ -627,6 +628,7 @@ void FResourceManager::RefreshFromAssetDirectory(const FString& Path)
 	TextureFilePaths.clear();
 	MaterialFilePaths.clear();
 	ParticleFilePaths.clear();
+	SkeletalMeshFilePaths.clear();
 	StaticMeshRegistry.clear();
 	FontResources.clear();
 	ParticleResources.clear();
@@ -657,7 +659,7 @@ void FResourceManager::RefreshFromAssetDirectory(const FString& Path)
 				continue;
 			}
 
-			const FString RelativePath = FPaths::ToString(fs::relative(FilePath, ProjectRootPath));
+			const FString RelativePath = FPaths::ToUtf8(fs::relative(FilePath, ProjectRootPath).generic_wstring());
 
 			if (Extension == L".obj")
 			{
@@ -711,6 +713,10 @@ void FResourceManager::RefreshFromAssetDirectory(const FString& Path)
 				//{
 				//	TextureFilePaths.push_back(RelativePath);
 				//}
+			}
+			else if (Extension == L".fbx")
+			{
+				SkeletalMeshFilePaths.push_back(RelativePath);
 			}
 		}
 	}
