@@ -31,9 +31,9 @@ namespace
 		FVector4 ColorB;  // 수직 축 색상
 	};
 
-	EGridPlane DetermineGridPlane(bool bOrthographic, const FVector& CameraForward)
+	EGridPlane DetermineGridPlane(bool bOrthographic, bool bFixedOrthographic, const FVector& CameraForward)
 	{
-		if (!bOrthographic) return EGridPlane::XY;
+		if (!bOrthographic || !bFixedOrthographic) return EGridPlane::XY;
 
 		const float AxX = std::fabs(CameraForward.X);
 		const float AxY = std::fabs(CameraForward.Y);
@@ -279,7 +279,7 @@ void FLineBatcher::AddOBB(const FOBB& Box, const FColor& InColor)
 }
 
 void FLineBatcher::AddWorldHelpers(const FShowFlags& ShowFlags, float GridSpacing, int32 GridHalfLineCount,
-	const FVector& CameraPosition, const FVector& CameraForward, bool bOrthographic)
+	const FVector& CameraPosition, const FVector& CameraForward, bool bOrthographic, bool bFixedOrthographic)
 {
 	const float Spacing = GridSpacing;
 	const int32 BaseHalfCount = (std::max)(GridHalfLineCount, 1);
@@ -287,7 +287,7 @@ void FLineBatcher::AddWorldHelpers(const FShowFlags& ShowFlags, float GridSpacin
 	if (Spacing <= 0.0f) return;
 
 	// 뷰 방향에 맞는 그리드 평면 결정
-	const EGridPlane    Plane = DetermineGridPlane(bOrthographic, CameraForward);
+	const EGridPlane    Plane = DetermineGridPlane(bOrthographic, bFixedOrthographic, CameraForward);
 	const FGridPlaneDesc Desc = GetGridPlaneDesc(Plane);
 
 	// 카메라 → 그리드 평면 교점을 포커스 포인트로 사용

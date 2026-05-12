@@ -22,7 +22,7 @@ public:
 	void CollectOutline(const TArray<AActor*>& Actors, const FVector4& OutlineColor, float OutlineThicknessPixels, FRenderBus& RenderBus);
 	void CollectDebugBounds(UWorld* World, const FShowFlags& ShowFlags, EViewMode ViewMode, FRenderBus& RenderBus, FLineBatcher* LineBatcher);
 	void CollectGizmo(UGizmoComponent* Gizmo, const FShowFlags& ShowFlags, FRenderBus& RenderBus, bool bIsActiveOperation);
-	void CollectGrid(float GridSpacing, int32 GridHalfLineCount, FRenderBus& RenderBus, bool bOrthographic = false);
+	void CollectGrid(float GridSpacing, int32 GridHalfLineCount, FRenderBus& RenderBus, bool bOrthographic = false, bool bFixedOrthographic = false);
 	void CollectBVHInternalNodeAABBs(UPrimitiveComponent* PrimitiveComponent, const FShowFlags& ShowFlags, FRenderBus& RenderBus, FLineBatcher* LineBatcher, std::unordered_set<int32>& SeenNodeIndices);
 	void CollectSkeleton(USkeletalMeshComponent* MeshComp, int32 SelectedBoneIndex, FRenderBus& RenderBus, FLineBatcher* LineBatcher);
 

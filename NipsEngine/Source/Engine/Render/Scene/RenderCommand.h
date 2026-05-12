@@ -91,6 +91,7 @@ struct FGridConstants
 	float GridSpacing;
 	int32 GridHalfLineCount;
 	bool  bOrthographic;
+	bool  bFixedOrthographic;
 	float Padding0[1];
 };
 

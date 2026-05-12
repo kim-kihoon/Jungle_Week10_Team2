@@ -86,7 +86,7 @@ void FEditorRenderPipeline::RenderViewport(FRenderer& Renderer, int32 ViewportIn
 	// 뷰포트가 편집 모드일 때만 그리드·축선·기즈모·선택 오버레이를 그립니다.
 	if (bEditingViewport)
 	{
-		Collector.CollectGrid(Settings.GridSpacing, Settings.GridHalfLineCount, Bus, SceneView.bOrthographic);
+		Collector.CollectGrid(Settings.GridSpacing, Settings.GridHalfLineCount, Bus, SceneView.bOrthographic, SceneView.bFixedOrthographic);
 
 		if (UGizmoComponent* Gizmo = Editor->GetGizmo())
 		{
@@ -155,7 +155,7 @@ void FEditorRenderPipeline::RenderSkeletalMeshPreview(FRenderer& Renderer, FSkel
 	const FFrustum& ViewFrustum = SceneView.CameraFrustum;
 	Collector.CollectWorld(PreviewScene.GetWorld(), Settings.ShowFlags, SceneView.ViewMode, Bus, &ViewFrustum);
 	Collector.CollectDebugBounds(PreviewScene.GetWorld(), Settings.ShowFlags, SceneView.ViewMode, Bus);
-	Collector.CollectGrid(Settings.GridSpacing, Settings.GridHalfLineCount, Bus, SceneView.bOrthographic);
+	Collector.CollectGrid(Settings.GridSpacing, Settings.GridHalfLineCount, Bus, SceneView.bOrthographic, SceneView.bFixedOrthographic);
 	Collector.CollectSkeleton(PreviewScene.GetPreviewMeshComponent(), PreviewScene.GetSelectedBoneIndex(), Bus, &Renderer.GetEditorLineBatcher());
 
 
