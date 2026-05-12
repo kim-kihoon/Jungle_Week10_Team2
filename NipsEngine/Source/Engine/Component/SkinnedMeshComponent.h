@@ -36,7 +36,18 @@ public:
 
 	bool ConsumeRenderStateDirty();
 
-private:
+	void InitializePoseFromReference();
+	void ResetPose();
+
+	FTransform GetBoneLocalTransform(int32 BoneIndex) const;
+	void SetBoneLocalTransform(int32 BoneIndex, const FTransform& NewLocalTransform);
+
+	FTransform GetBoneComponentTransform(int32 BoneIndex) const;
+
+	FTransform GetBoneWorldTransform(int32 BoneIndex) const;
+	void SetBoneWorldTransform(int32 BoneIndex, const FTransform& NewWorldTransform);
+
+protected:
 	// 상속받은 skeletal mesh componen에서도 접근
 	void MarkBoneTransformsDirty();
 	void MarkSkinningDirty();
@@ -54,6 +65,7 @@ protected:
     // 하지만 skinning을 계산하려면 vertex에 영향을 주는 여러 bone transform들이
     // 모두 같은 기준 공간에 있어야 해요. root부터 parent transform을 누적해 각 bone의
     // component-space transform을 만들고, 이 transform과 inverse bind pose를 이용해 skinning matrix를 계산해요.
+	TArray<FTransform> LocalBoneTransforms;			// 편집 가능한 로컬 트랜스폼 상태.
     TArray<FMatrix> SkinningMatrices;				// 정점의 최종 변환 행렬입니다.
     TArray<FNormalVertex> SkinnedVertices;			// skinning이 끝난 정점 위치입니다. 이걸로 렌더링할 거에요
 
