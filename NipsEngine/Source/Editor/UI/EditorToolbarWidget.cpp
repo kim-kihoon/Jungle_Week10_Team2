@@ -44,27 +44,28 @@ namespace
 
 	struct FAddActorEntry
 	{
+		const char* Category;
 		const char* Label;
 		AActor* (*Spawn)(UWorld*, const FVector&);
 	};
 
 	static const FAddActorEntry AddActorTypes[] = {
-		{ "Pawn", SpawnEditorActor<APawnActor> },
-		{ "Scene", SpawnEditorActor<ASceneActor> },
-		{ "StaticMesh", SpawnEditorActor<AStaticMeshActor> },
-		{ "SkeletalMesh", SpawnEditorActor<ASkeletalMeshActor> },
-		{ "TextRender", SpawnEditorActor<ATextRenderActor> },
-		{ "SubUV", SpawnEditorActor<ASubUVActor> },
-		{ "Billboard", SpawnEditorActor<ABillboardActor> },
-		{ "Decal", SpawnEditorActor<ADecalActor> },
-		{ "Directional Light", SpawnEditorActor<ADirectionalLightActor> },
-		{ "Ambient Light", SpawnEditorActor<AAmbientLightActor> },
-		{ "Point Light", SpawnEditorActor<APointLightActor> },
-		{ "Spot Light", SpawnEditorActor<ASpotLightActor> },
-		{ "Sky Atmosphere", SpawnEditorActor<ASkyAtmosphereActor> },
-		{ "Height Fog", SpawnEditorActor<AHeightFogActor> },
-		{ "Audio Zone", SpawnEditorActor<AAudioZoneActor> },
-		{ "Player Start", SpawnEditorActor<APlayerStartActor> },
+		{ "Basic", "Pawn", SpawnEditorActor<APawnActor> },
+		{ "Basic", "Scene", SpawnEditorActor<ASceneActor> },
+		{ "Rendering", "StaticMesh", SpawnEditorActor<AStaticMeshActor> },
+		{ "Rendering", "SkeletalMesh", SpawnEditorActor<ASkeletalMeshActor> },
+		{ "Rendering", "TextRender", SpawnEditorActor<ATextRenderActor> },
+		{ "Rendering", "SubUV", SpawnEditorActor<ASubUVActor> },
+		{ "Rendering", "Billboard", SpawnEditorActor<ABillboardActor> },
+		{ "Rendering", "Decal", SpawnEditorActor<ADecalActor> },
+		{ "Light", "Directional Light", SpawnEditorActor<ADirectionalLightActor> },
+		{ "Light", "Ambient Light", SpawnEditorActor<AAmbientLightActor> },
+		{ "Light", "Point Light", SpawnEditorActor<APointLightActor> },
+		{ "Light", "Spot Light", SpawnEditorActor<ASpotLightActor> },
+		{ "Environment", "Sky Atmosphere", SpawnEditorActor<ASkyAtmosphereActor> },
+		{ "Environment", "Height Fog", SpawnEditorActor<AHeightFogActor> },
+		{ "Audio", "Audio Zone", SpawnEditorActor<AAudioZoneActor> },
+		{ "Gameplay", "Player Start", SpawnEditorActor<APlayerStartActor> },
 	};
 
 	std::wstring GetSceneDialogInitialDir()
@@ -379,8 +380,15 @@ void FEditorToolbarWidget::RenderAddActorMenu(int32 ViewportIndex)
 		return;
 	}
 
+	const char* CurrentCategory = nullptr;
 	for (const FAddActorEntry& Entry : AddActorTypes)
 	{
+		if (CurrentCategory == nullptr || strcmp(CurrentCategory, Entry.Category) != 0)
+		{
+			CurrentCategory = Entry.Category;
+			ImGui::SeparatorText(CurrentCategory);
+		}
+
 		if (ImGui::Selectable(Entry.Label))
 		{
 			AActor* LastSpawnedActor = nullptr;
