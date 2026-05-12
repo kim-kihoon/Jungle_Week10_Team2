@@ -165,7 +165,7 @@ void APawnActor::EnsureDefaultComponents()
 		Billboard->AttachToComponent(SceneRoot);
 		Billboard->SetEditorOnly(true);
 		Billboard->SetHiddenInEditor(true);
-		Billboard->SetTexturePath("Asset/Texture/Pawn_64x.png");
+		Billboard->SetTexturePath("Asset/Texture/S_Pawn.png");
 	}
 }
 
@@ -227,7 +227,7 @@ void ABillboardActor::InitDefaultComponents()
 {
 	UBillboardComponent* Billboard = AddComponent<UBillboardComponent>();
 	SetRootComponent(Billboard);
-	Billboard->SetTexturePath(("Asset/Texture/Pawn_64x.png"));
+	Billboard->SetTexturePath(("Asset/Texture/S_Pawn.png"));
 	Billboard->SetEditorOnly(true);
 }
 
@@ -319,7 +319,7 @@ void APlayerStartActor::InitDefaultComponents()
 	Billboard->AttachToComponent(SceneRoot);
 	Billboard->SetEditorOnly(true);
 	Billboard->SetHiddenInEditor(true);
-	Billboard->SetTexturePath("Asset/Texture/Pawn_64x.png");
+	Billboard->SetTexturePath("Asset/Texture/S_Player.png");
 }
 
 void ALightActor::PostDuplicate(UObject* Original)

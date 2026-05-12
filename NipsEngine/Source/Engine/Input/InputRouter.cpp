@@ -313,13 +313,13 @@ void FInputRouter::TickCursorCapture(const FInputRouteContext& Context)
 
 		if (bDragBegin)
 		{
-			IS.SetCursorVisibility(false);
-			LockCursorToContextViewport(Context);
+			// IS.SetCursorVisibility(false);
+			// LockCursorToContextViewport(Context);
 		}
 		else if (bDragEnd)
 		{
-			IS.SetCursorVisibility(true);
-			IS.LockMouse(false);
+			// IS.SetCursorVisibility(true);
+			// IS.LockMouse(false);
 		}
 		return;
 	}

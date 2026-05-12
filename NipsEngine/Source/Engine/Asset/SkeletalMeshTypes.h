@@ -47,6 +47,8 @@ struct FSkeletalMeshMaterialSlot
     FString SlotName;
     UMaterialInterface* Material = nullptr;
     FString ExtractedDiffusePath;
+    FString ExtractedNormalPath;
+    FString ExtractedSpecularPath;
 };
 
 struct FSkeletalBone

@@ -450,9 +450,7 @@ void FEditorWorldController::OnWheelScrolled(float Notch)
 	else
 	{
 		FVector Forward = Camera->GetForwardVector();
-		FVector NewLocation = Camera->GetLocation() + Forward * Notch * ZoomSpeed;
-		Camera->SetLocation(NewLocation);
-		ResetTargetLocation();
+		TargetLocation += Forward * Notch * ZoomSpeed;
 	}
 }
 

@@ -1,12 +1,15 @@
 ﻿#include "FbxLoader.h"
 #include "SkeletalMesh.h"
 #include "Core/Logger.h"
+#include "Core/Paths.h"
+#include "Core/ResourceManager.h"
 
 #include <fbxsdk.h> //FbxManager, FbxScene, FbxIOSettings 등 FBX SDK 관련 클래스 제공.
 #include <string>
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <filesystem>
 
 namespace
 {
@@ -210,6 +213,255 @@ namespace
 		return FString(Object->GetName());
 	}
 
+	bool TextureFileExists(const FString& TexturePath)
+	{
+		if (TexturePath.empty())
+		{
+			return false;
+		}
+
+		return std::filesystem::exists(std::filesystem::path(FPaths::ToAbsolute(FPaths::ToWide(TexturePath))));
+	}
+
+	FString FindExistingTexturePath(const TArray<FString>& Candidates)
+	{
+		for (const FString& Candidate : Candidates)
+		{
+			if (TextureFileExists(Candidate))
+			{
+				return Candidate;
+			}
+		}
+
+		return {};
+	}
+
+	FString ResolveFbxTexturePath(const FString& FbxFilePath, const char* TextureFilePath)
+	{
+		if (TextureFilePath == nullptr || TextureFilePath[0] == '\0')
+		{
+			return {};
+		}
+
+		std::filesystem::path TexturePath(FPaths::ToWide(TextureFilePath));
+		if (TexturePath.is_absolute())
+		{
+			return FPaths::ToUtf8(TexturePath.lexically_normal().generic_wstring());
+		}
+
+		const std::filesystem::path FbxDir = std::filesystem::path(FPaths::ToWide(FbxFilePath)).parent_path();
+		const FString FbxRelativePath = FPaths::ToUtf8((FbxDir / TexturePath).lexically_normal().generic_wstring());
+		if (TextureFileExists(FbxRelativePath))
+		{
+			return FbxRelativePath;
+		}
+
+		const FString FileName = FPaths::ToUtf8(TexturePath.filename().generic_wstring());
+		const FString AssetTexturePath = FindExistingTexturePath({
+			"Asset/Texture/" + FileName,
+			"Asset/Fbx/Textures/" + FileName,
+		});
+
+		return AssetTexturePath.empty() ? FbxRelativePath : AssetTexturePath;
+	}
+
+	FString GetTexturePathFromProperty(const FString& FbxFilePath, FbxSurfaceMaterial* Material, const char* PropertyName)
+	{
+		if (Material == nullptr || PropertyName == nullptr)
+		{
+			return {};
+		}
+
+		FbxProperty TextureProperty = Material->FindProperty(PropertyName);
+		if (!TextureProperty.IsValid())
+		{
+			return {};
+		}
+
+		const int32 TextureCount = TextureProperty.GetSrcObjectCount<FbxFileTexture>();
+		for (int32 TextureIndex = 0; TextureIndex < TextureCount; ++TextureIndex)
+		{
+			FbxFileTexture* Texture = TextureProperty.GetSrcObject<FbxFileTexture>(TextureIndex);
+			if (Texture == nullptr)
+			{
+				continue;
+			}
+
+			const char* RelativeFileName = Texture->GetRelativeFileName();
+			if (RelativeFileName != nullptr && RelativeFileName[0] != '\0')
+			{
+				return ResolveFbxTexturePath(FbxFilePath, RelativeFileName);
+			}
+
+			const char* FileName = Texture->GetFileName();
+			if (FileName != nullptr && FileName[0] != '\0')
+			{
+				return ResolveFbxTexturePath(FbxFilePath, FileName);
+			}
+		}
+
+		return {};
+	}
+
+	FString BuildTextureStemFromMaterialName(const FString& MaterialName, const char* TextureSuffix)
+	{
+		FString BaseName = MaterialName;
+		if (BaseName.starts_with("MI_"))
+		{
+			BaseName = BaseName.substr(3);
+		}
+		else if (BaseName.starts_with("M_"))
+		{
+			BaseName = BaseName.substr(2);
+		}
+
+		if (!BaseName.starts_with("T_"))
+		{
+			BaseName = "T_" + BaseName;
+		}
+
+		return BaseName + "_" + FString(TextureSuffix ? TextureSuffix : "");
+	}
+
+	FString FindAssetTextureByMaterialName(const FString& MaterialName, const char* TextureSuffix)
+	{
+		const FString Stem = BuildTextureStemFromMaterialName(MaterialName, TextureSuffix);
+		const TArray<FString> Extensions = { ".PNG", ".png", ".DDS", ".dds", ".JPG", ".jpg", ".JPEG", ".jpeg" };
+
+		TArray<FString> Candidates;
+		for (const FString& Extension : Extensions)
+		{
+			Candidates.push_back("Asset/Texture/" + Stem + Extension);
+			Candidates.push_back("Asset/Fbx/Textures/" + Stem + Extension);
+		}
+
+		return FindExistingTexturePath(Candidates);
+	}
+
+	FString GetDiffuseTexturePath(const FString& FbxFilePath, FbxSurfaceMaterial* Material)
+	{
+		FString TexturePath = GetTexturePathFromProperty(FbxFilePath, Material, FbxSurfaceMaterial::sDiffuse);
+		if (!TexturePath.empty())
+		{
+			return TexturePath;
+		}
+
+		return Material ? FindAssetTextureByMaterialName(Material->GetName(), "D") : FString();
+	}
+
+	FString GetNormalTexturePath(const FString& FbxFilePath, FbxSurfaceMaterial* Material)
+	{
+		FString TexturePath = GetTexturePathFromProperty(FbxFilePath, Material, FbxSurfaceMaterial::sNormalMap);
+		if (!TexturePath.empty())
+		{
+			return TexturePath;
+		}
+
+		TexturePath = GetTexturePathFromProperty(FbxFilePath, Material, FbxSurfaceMaterial::sBump);
+		if (!TexturePath.empty())
+		{
+			return TexturePath;
+		}
+
+		return Material ? FindAssetTextureByMaterialName(Material->GetName(), "N") : FString();
+	}
+
+	FString GetSpecularTexturePath(const FString& FbxFilePath, FbxSurfaceMaterial* Material)
+	{
+		FString TexturePath = GetTexturePathFromProperty(FbxFilePath, Material, FbxSurfaceMaterial::sSpecular);
+		if (!TexturePath.empty())
+		{
+			return TexturePath;
+		}
+
+		return Material ? FindAssetTextureByMaterialName(Material->GetName(), "S") : FString();
+	}
+
+	void SetDefaultUberLitParams(UMaterial* Material, UTexture* DiffuseTexture, UTexture* NormalTexture, UTexture* SpecularTexture)
+	{
+		if (Material == nullptr)
+		{
+			return;
+		}
+
+		FResourceManager& ResourceManager = FResourceManager::Get();
+		UTexture* DefaultWhite = ResourceManager.GetTexture("DefaultWhite");
+		UTexture* DefaultNormal = ResourceManager.GetTexture("DefaultNormal");
+
+		Material->MaterialParams["BaseColor"] = FMaterialParamValue(Material->MaterialData.BaseColor);
+		Material->MaterialParams["SpecularColor"] = FMaterialParamValue(Material->MaterialData.SpecularColor);
+		Material->MaterialParams["EmissiveColor"] = FMaterialParamValue(Material->MaterialData.EmissiveColor);
+		Material->MaterialParams["Shininess"] = FMaterialParamValue(Material->MaterialData.Shininess);
+		Material->MaterialParams["Opacity"] = FMaterialParamValue(Material->MaterialData.Opacity);
+		Material->MaterialParams["DiffuseMap"] = FMaterialParamValue(DiffuseTexture ? DiffuseTexture : DefaultWhite);
+		Material->MaterialParams["SpecularMap"] = FMaterialParamValue(SpecularTexture ? SpecularTexture : DefaultWhite);
+		Material->MaterialParams["NormalMap"] = FMaterialParamValue(NormalTexture ? NormalTexture : DefaultNormal);
+		Material->MaterialParams["BumpMap"] = FMaterialParamValue(DefaultWhite);
+		Material->MaterialParams["bHasDiffuseMap"] = FMaterialParamValue(Material->MaterialData.bHasDiffuseTexture);
+		Material->MaterialParams["bHasSpecularMap"] = FMaterialParamValue(Material->MaterialData.bHasSpecularTexture);
+		Material->MaterialParams["bHasNormalMap"] = FMaterialParamValue(Material->MaterialData.bHasNormalTexture);
+		Material->MaterialParams["bHasBumpMap"] = FMaterialParamValue(false);
+		Material->MaterialParams["ScrollUV"] = FMaterialParamValue(FVector2(0.0f, 0.0f));
+	}
+
+	UMaterialInterface* GetOrCreateFbxMaterial(const FString& FbxFilePath, FbxSurfaceMaterial* FbxMaterial)
+	{
+		FResourceManager& ResourceManager = FResourceManager::Get();
+		if (FbxMaterial == nullptr)
+		{
+			return ResourceManager.GetMaterial("DefaultWhite");
+		}
+
+		const FString MaterialName = GetFbxObjectName(FbxMaterial, "Material");
+		if (UMaterial* ExistingMaterial = ResourceManager.GetMaterial(MaterialName))
+		{
+			return ExistingMaterial;
+		}
+
+		const FString DiffuseTexturePath = GetDiffuseTexturePath(FbxFilePath, FbxMaterial);
+		const FString NormalTexturePath = GetNormalTexturePath(FbxFilePath, FbxMaterial);
+		const FString SpecularTexturePath = GetSpecularTexturePath(FbxFilePath, FbxMaterial);
+		if (DiffuseTexturePath.empty() && NormalTexturePath.empty() && SpecularTexturePath.empty())
+		{
+			return ResourceManager.GetMaterial("DefaultWhite");
+		}
+
+		UTexture* DiffuseTexture = DiffuseTexturePath.empty() ? nullptr : ResourceManager.LoadTexture(DiffuseTexturePath);
+		if (DiffuseTexture == nullptr && !DiffuseTexturePath.empty())
+		{
+			UE_LOG("FBX diffuse texture load failed: %s", DiffuseTexturePath.c_str());
+		}
+
+		UTexture* NormalTexture = NormalTexturePath.empty() ? nullptr : ResourceManager.LoadTexture(NormalTexturePath);
+		if (NormalTexture == nullptr && !NormalTexturePath.empty())
+		{
+			UE_LOG("FBX normal texture load failed: %s", NormalTexturePath.c_str());
+		}
+
+		UTexture* SpecularTexture = SpecularTexturePath.empty() ? nullptr : ResourceManager.LoadTexture(SpecularTexturePath);
+		if (SpecularTexture == nullptr && !SpecularTexturePath.empty())
+		{
+			UE_LOG("FBX specular texture load failed: %s", SpecularTexturePath.c_str());
+		}
+
+		if (DiffuseTexture == nullptr && NormalTexture == nullptr && SpecularTexture == nullptr)
+		{
+			return ResourceManager.GetMaterial("DefaultWhite");
+		}
+
+		UMaterial* Material = ResourceManager.GetOrCreateMaterial(MaterialName, "Shaders/UberLit.hlsl");
+		Material->MaterialData.Name = MaterialName;
+		Material->MaterialData.DiffuseTexPath = DiffuseTexturePath;
+		Material->MaterialData.bHasDiffuseTexture = DiffuseTexture != nullptr && !DiffuseTexturePath.empty();
+		Material->MaterialData.NormalTexPath = NormalTexturePath;
+		Material->MaterialData.bHasNormalTexture = NormalTexture != nullptr && !NormalTexturePath.empty();
+		Material->MaterialData.SpecularTexPath = SpecularTexturePath;
+		Material->MaterialData.bHasSpecularTexture = SpecularTexture != nullptr && !SpecularTexturePath.empty();
+
+		SetDefaultUberLitParams(Material, DiffuseTexture, NormalTexture, SpecularTexture);
+		return Material;
+	}
+
 	FVector ToEngineVector(const FbxVector4& Vector)
 	{
 		return FVector(
@@ -404,8 +656,8 @@ namespace
 		if (NodeMaterialCount <= 0)
 		{
 			FSkeletalMeshMaterialSlot Slot;
-			Slot.SlotName = FString("Default");
-			Slot.Material = nullptr;
+			Slot.SlotName = FString("DefaultWhite");
+			Slot.Material = FResourceManager::Get().GetMaterial("DefaultWhite");
 			Context.LoadedMesh.MaterialSlots.push_back(Slot);
 			OutMaterialCount = 1;
 			return;
@@ -417,21 +669,10 @@ namespace
 
 			FSkeletalMeshMaterialSlot Slot;
 			Slot.SlotName = GetFbxObjectName(FbxMaterial, "Material");
-			Slot.Material = nullptr;
-			
-			FbxProperty lProperty = FbxMaterial->FindProperty(FbxSurfaceMaterial::sDiffuse);
-			if (lProperty.IsValid() && lProperty.GetSrcObjectCount<FbxFileTexture>() > 0)
-			{
-				FbxFileTexture* lTexture = lProperty.GetSrcObject<FbxFileTexture>(0);
-				if (lTexture)
-				{
-					Slot.ExtractedDiffusePath = lTexture->GetRelativeFileName();
-					if (Slot.ExtractedDiffusePath.empty())
-					{
-						Slot.ExtractedDiffusePath = lTexture->GetFileName();
-					}
-				}
-			}
+			Slot.ExtractedDiffusePath = GetDiffuseTexturePath(Context.SourcePath, FbxMaterial);
+			Slot.ExtractedNormalPath = GetNormalTexturePath(Context.SourcePath, FbxMaterial);
+			Slot.ExtractedSpecularPath = GetSpecularTexturePath(Context.SourcePath, FbxMaterial);
+			Slot.Material = GetOrCreateFbxMaterial(Context.SourcePath, FbxMaterial);
 
 			Context.LoadedMesh.MaterialSlots.push_back(Slot);
 		}
