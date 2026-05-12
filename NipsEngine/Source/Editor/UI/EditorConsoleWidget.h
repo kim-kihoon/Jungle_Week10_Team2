@@ -22,6 +22,12 @@ public:
 
 	virtual void Render(float DeltaTime) override;
 
+	void SetOpen(bool bInOpen);
+	bool IsOpen() const { return bOpen; }
+	bool ShouldRender() const;
+	void CloseImmediately();
+	void OpenFromDrawerTakeover(float InDrawerHeight);
+
 	void Clear()
 	{
 		for (int32 i = 0; i < Messages.Size; i++) free(Messages[i]);
@@ -34,6 +40,9 @@ public:
 	}
 
 private:
+	bool bOpen = false;
+	float DrawerHeight = 0.0f;
+	float DrawerAnimationAlpha = 0.0f;
 	char InputBuf[256]{};
 	static ImVector<char*> Messages;
 	static ImVector<char*> History;

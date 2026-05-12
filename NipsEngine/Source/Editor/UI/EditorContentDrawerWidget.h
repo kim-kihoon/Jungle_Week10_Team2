@@ -33,7 +33,11 @@ public:
 	void SetOpen(bool bInOpen);
 	bool IsOpen() const { return bOpen; }
 	void ToggleOpen();
+	void CloseImmediately();
+	void StartConsoleTakeover();
+	bool ConsumeConsoleTakeover(float& OutDrawerHeight);
 	void RefreshAssetTree();
+	void SetConsoleVisibilityRef(bool* InShowConsole);
 
 private:
 	void RenderResizeHandle(float WorkAreaHeight);
@@ -55,8 +59,11 @@ private:
 private:
 	bool bOpen = false;
 	bool bAssetTreeDirty = true;
+	bool* bShowConsole = nullptr;
+	bool bPendingConsoleTakeover = false;
 	float DrawerHeight = 0.0f;
 	float DrawerAnimationAlpha = 0.0f;
+	float PendingConsoleTakeoverHeight = 0.0f;
 	int32 SelectedKindFilter = 0;
 	int32 LastVisibleFolderCount = 0;
 	int32 LastVisibleAssetCount = 0;

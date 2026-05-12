@@ -7,6 +7,19 @@
 #include "Editor/Viewport/ViewportLayout.h"
 #include "Engine/Object/FName.h"
 
+namespace
+{
+	constexpr float EditorBottomBarHeight = 28.0f;
+	constexpr float ConsoleDrawerAnimationSpeed = 12.0f;
+
+	float EaseOutCubic(float Value)
+	{
+		Value = std::clamp(Value, 0.0f, 1.0f);
+		const float Inv = 1.0f - Value;
+		return 1.0f - Inv * Inv * Inv;
+	}
+}
+
 // 콘솔 초기화 시점에 입력될 명령어를 등록한다.
 FEditorConsoleWidget::FEditorConsoleWidget() 
 {
@@ -40,10 +53,35 @@ void FEditorConsoleWidget::AddMessage(const char* Message)
 	if (AutoScroll) ScrollToBottom = true;
 }
 
+void FEditorConsoleWidget::SetOpen(bool bInOpen)
+{
+	bOpen = bInOpen;
+}
+
+bool FEditorConsoleWidget::ShouldRender() const
+{
+	return bOpen || DrawerAnimationAlpha > 0.0f;
+}
+
+void FEditorConsoleWidget::CloseImmediately()
+{
+	bOpen = false;
+	DrawerAnimationAlpha = 0.0f;
+}
+
+void FEditorConsoleWidget::OpenFromDrawerTakeover(float InDrawerHeight)
+{
+	bOpen = true;
+	if (InDrawerHeight > 0.0f)
+	{
+		DrawerHeight = InDrawerHeight;
+	}
+	DrawerAnimationAlpha = 1.0f;
+	bRequestFocusInput = true;
+}
+
 void FEditorConsoleWidget::Render(float DeltaTime)
 {
-	(void)DeltaTime;
-
 	// 백틱(`) 키 → 콘솔 입력창 포커스
 	// Begin() 전에 호출해야 SetNextWindowFocus 가 올바르게 동작합니다.
 	if (ImGui::IsKeyPressed(ImGuiKey_GraveAccent, false))
@@ -52,10 +90,64 @@ void FEditorConsoleWidget::Render(float DeltaTime)
 		ImGui::SetNextWindowFocus();
 	}
 
-	ImGui::SetNextWindowSize(ImVec2(800, 600), ImGuiCond_FirstUseEver);
-	if (!ImGui::Begin("Console"))
+	const float TargetAlpha = bOpen ? 1.0f : 0.0f;
+	const float AlphaStep = std::clamp(DeltaTime * ConsoleDrawerAnimationSpeed, 0.0f, 1.0f);
+	DrawerAnimationAlpha += (TargetAlpha - DrawerAnimationAlpha) * AlphaStep;
+
+	if (!bOpen && DrawerAnimationAlpha < 0.001f)
+	{
+		DrawerAnimationAlpha = 0.0f;
+	}
+	else if (bOpen && DrawerAnimationAlpha > 0.999f)
+	{
+		DrawerAnimationAlpha = 1.0f;
+	}
+
+	if (!ShouldRender())
+	{
+		return;
+	}
+
+	const ImGuiViewport* Viewport = ImGui::GetMainViewport();
+	const ImVec2 WorkPos = Viewport->WorkPos;
+	const ImVec2 WorkSize = Viewport->WorkSize;
+	const float AvailableHeight = std::max(120.0f, WorkSize.y - EditorBottomBarHeight);
+	const float MinHeight = std::min(220.0f, AvailableHeight * 0.8f);
+	const float MaxHeight = std::max(MinHeight, AvailableHeight * 0.82f);
+
+	if (DrawerHeight <= 0.0f)
+	{
+		DrawerHeight = AvailableHeight * 0.35f;
+	}
+	DrawerHeight = std::clamp(DrawerHeight, MinHeight, MaxHeight);
+
+	const float EasedAlpha = EaseOutCubic(DrawerAnimationAlpha);
+	const float ClosedY = WorkPos.y + WorkSize.y - EditorBottomBarHeight;
+	const float OpenY = ClosedY - DrawerHeight;
+	const float AnimatedY = ClosedY + (OpenY - ClosedY) * EasedAlpha;
+
+	ImGui::SetNextWindowViewport(Viewport->ID);
+	ImGui::SetNextWindowPos(ImVec2(WorkPos.x, AnimatedY), ImGuiCond_Always);
+	ImGui::SetNextWindowSize(ImVec2(WorkSize.x, DrawerHeight), ImGuiCond_Always);
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
+
+	constexpr ImGuiWindowFlags WindowFlags =
+		ImGuiWindowFlags_NoDocking |
+		ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_NoResize |
+		ImGuiWindowFlags_NoSavedSettings;
+
+	bool bWindowOpen = true;
+	if (!ImGui::Begin("Console##Drawer", &bWindowOpen, WindowFlags))
 	{
 		ImGui::End();
+		ImGui::PopStyleVar(2);
+		if (bOpen && !bWindowOpen)
+		{
+			SetOpen(false);
+		}
 		return;
 	}
 
@@ -78,7 +170,10 @@ void FEditorConsoleWidget::Render(float DeltaTime)
 	Filter.Draw("Filter (\"incl,-excl\") (\"error\")", 180);
 	ImGui::Separator();
 
-	const float FooterHeight = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
+	const float WindowBottom = ImGui::GetWindowPos().y + ImGui::GetWindowSize().y;
+	const float BottomBarTop = Viewport->WorkPos.y + Viewport->WorkSize.y - EditorBottomBarHeight;
+	const float BottomSafePadding = WindowBottom > BottomBarTop ? EditorBottomBarHeight : 0.0f;
+	const float FooterHeight = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing() + BottomSafePadding;
 	if (ImGui::BeginChild("ScrollingRegion", ImVec2(0, -FooterHeight), false, ImGuiWindowFlags_HorizontalScrollbar)) {
 		for (auto& Item : Messages) {
 			if (!Filter.PassFilter(Item)) continue;
@@ -138,6 +233,12 @@ void FEditorConsoleWidget::Render(float DeltaTime)
 	ImGui::SetItemDefaultFocus();
 
 	ImGui::End();
+	ImGui::PopStyleVar(2);
+
+	if (bOpen && !bWindowOpen)
+	{
+		SetOpen(false);
+	}
 }
 
 void FEditorConsoleWidget::RegisterCommand(const FString& Name, CommandFn Fn) {

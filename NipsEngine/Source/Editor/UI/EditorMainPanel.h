@@ -62,7 +62,7 @@ private:
 	FEditorCameraShakeWidget CameraShakeWidget;
 	FEditorSkeletalMeshViewerWidget SkeletalMeshViewerWidget;
 
-	bool bShowConsole = true;
+	bool bShowConsole = false;
 	bool bShowCameraShake = true;
 	bool bShowControl = true;
 	bool bShowProperty = true;

@@ -236,7 +236,16 @@ void FEditorContentDrawerWidget::Initialize(UEditorEngine* InEditorEngine)
 
 void FEditorContentDrawerWidget::SetOpen(bool bInOpen)
 {
+	const bool bConsoleWasOpen = bOpen == false && bInOpen && bShowConsole && *bShowConsole;
 	bOpen = bInOpen;
+	if (bOpen && bShowConsole)
+	{
+		*bShowConsole = false;
+	}
+	if (bConsoleWasOpen)
+	{
+		DrawerAnimationAlpha = 1.0f;
+	}
 	if (bOpen && bAssetTreeDirty)
 	{
 		RefreshAssetTree();
@@ -246,6 +255,36 @@ void FEditorContentDrawerWidget::SetOpen(bool bInOpen)
 void FEditorContentDrawerWidget::ToggleOpen()
 {
 	SetOpen(!bOpen);
+}
+
+void FEditorContentDrawerWidget::CloseImmediately()
+{
+	bOpen = false;
+	DrawerAnimationAlpha = 0.0f;
+}
+
+void FEditorContentDrawerWidget::StartConsoleTakeover()
+{
+	if (bOpen || DrawerAnimationAlpha > 0.0f)
+	{
+		bPendingConsoleTakeover = true;
+		PendingConsoleTakeoverHeight = DrawerHeight;
+	}
+
+	CloseImmediately();
+}
+
+bool FEditorContentDrawerWidget::ConsumeConsoleTakeover(float& OutDrawerHeight)
+{
+	if (!bPendingConsoleTakeover)
+	{
+		return false;
+	}
+
+	bPendingConsoleTakeover = false;
+	OutDrawerHeight = PendingConsoleTakeoverHeight;
+	PendingConsoleTakeoverHeight = 0.0f;
+	return true;
 }
 
 void FEditorContentDrawerWidget::RefreshAssetTree()
@@ -342,6 +381,11 @@ void FEditorContentDrawerWidget::RefreshAssetTree()
 	}
 
 	bAssetTreeDirty = false;
+}
+
+void FEditorContentDrawerWidget::SetConsoleVisibilityRef(bool* InShowConsole)
+{
+	bShowConsole = InShowConsole;
 }
 
 void FEditorContentDrawerWidget::Render(float DeltaTime)
@@ -505,19 +549,23 @@ void FEditorContentDrawerWidget::RenderBottomBar(const ImGuiViewport* Viewport, 
 		DrawList->AddLine(BarMin, ImVec2(BarMax.x, BarMin.y), IM_COL32(70, 72, 78, 255));
 
 		const bool bWasOpen = bOpen;
-		if (bWasOpen)
+		auto PushButtonStyle = [](bool bActive)
 		{
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.26f, 0.36f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.23f, 0.32f, 0.44f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.15f, 0.22f, 0.31f, 1.0f));
-		}
-		else
-		{
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.10f, 0.105f, 0.115f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.16f, 0.17f, 0.19f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.08f, 0.085f, 0.095f, 1.0f));
-		}
+			if (bActive)
+			{
+				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.26f, 0.36f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.23f, 0.32f, 0.44f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.15f, 0.22f, 0.31f, 1.0f));
+			}
+			else
+			{
+				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.10f, 0.105f, 0.115f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.16f, 0.17f, 0.19f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.08f, 0.085f, 0.095f, 1.0f));
+			}
+		};
 
+		PushButtonStyle(bWasOpen);
 		if (ImGui::Button("    Content Drawer", ImVec2(142.0f, 22.0f)))
 		{
 			ToggleOpen();
@@ -541,6 +589,45 @@ void FEditorContentDrawerWidget::RenderBottomBar(const ImGuiViewport* Viewport, 
 		if (ImGui::IsItemHovered())
 		{
 			ImGui::SetTooltip("Ctrl+Space");
+		}
+
+		if (bShowConsole)
+		{
+			ImGui::SameLine(0.0f, 6.0f);
+
+			const bool bConsoleVisible = *bShowConsole;
+			PushButtonStyle(bConsoleVisible);
+			if (ImGui::Button("    Console", ImVec2(96.0f, 22.0f)))
+			{
+				const bool bNewConsoleVisible = !bConsoleVisible;
+				*bShowConsole = bNewConsoleVisible;
+				if (bNewConsoleVisible)
+				{
+					StartConsoleTakeover();
+				}
+			}
+
+			const ImVec2 ConsoleButtonMin = ImGui::GetItemRectMin();
+			const ImVec2 ConsoleButtonMax = ImGui::GetItemRectMax();
+			const ImU32 ConsoleColor = bConsoleVisible ? IM_COL32(170, 200, 235, 255) : IM_COL32(190, 194, 202, 255);
+			DrawList->AddRect(
+				ImVec2(ConsoleButtonMin.x + 10.0f, ConsoleButtonMin.y + 6.0f),
+				ImVec2(ConsoleButtonMin.x + 25.0f, ConsoleButtonMax.y - 5.0f),
+				ConsoleColor,
+				2.0f,
+				0,
+				1.5f);
+			DrawList->AddText(
+				ImVec2(ConsoleButtonMin.x + 14.0f, ConsoleButtonMin.y + 4.0f),
+				ConsoleColor,
+				">");
+
+			ImGui::PopStyleColor(3);
+
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip("`");
+			}
 		}
 	}
 	ImGui::End();
