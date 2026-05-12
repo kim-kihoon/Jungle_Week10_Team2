@@ -312,7 +312,7 @@ void FEditorConsoleWidget::RenderResizeHandle(float WorkAreaHeight)
 	DrawList->AddRectFilled(
 		Min,
 		Max,
-		(bHovered || bActive) ? IM_COL32(120, 150, 190, 160) : IM_COL32(85, 90, 100, 110));
+		(bHovered || bActive) ? IM_COL32(36, 36, 36, 220) : IM_COL32(26, 26, 26, 180));
 }
 
 void FEditorConsoleWidget::RegisterCommand(const FString& Name, CommandFn Fn)
@@ -399,8 +399,8 @@ void FEditorConsoleWidget::RenderCompletionCandidates()
 	const ImVec2 PanelMax(InputMax.x, InputMin.y - 2.0f);
 
 	ImDrawList* DrawList = ImGui::GetForegroundDrawList();
-	DrawList->AddRectFilled(PanelMin, PanelMax, IM_COL32(30, 30, 30, 240), 4.0f);
-	DrawList->AddRect(PanelMin, PanelMax, IM_COL32(90, 95, 110, 220), 4.0f);
+	DrawList->AddRectFilled(PanelMin, PanelMax, IM_COL32(21, 21, 21, 245), 4.0f);
+	DrawList->AddRect(PanelMin, PanelMax, IM_COL32(36, 36, 36, 240), 4.0f);
 
 	for (int32 Index = 0; Index < static_cast<int32>(CompletionCandidates.size()); ++Index)
 	{
@@ -411,10 +411,10 @@ void FEditorConsoleWidget::RenderCompletionCandidates()
 			DrawList->AddRectFilled(
 				ImVec2(PanelMin.x + 2.0f, TextPos.y - 1.0f),
 				ImVec2(PanelMax.x - 2.0f, TextPos.y + LineHeight - 1.0f),
-				IM_COL32(70, 110, 180, 255),
+				IM_COL32(36, 36, 36, 255),
 				3.0f);
 		}
-		DrawList->AddText(TextPos, IM_COL32(255, 255, 255, 255), CompletionCandidates[Index].DisplayText.c_str());
+		DrawList->AddText(TextPos, IM_COL32(214, 214, 214, 255), CompletionCandidates[Index].DisplayText.c_str());
 	}
 }
 
