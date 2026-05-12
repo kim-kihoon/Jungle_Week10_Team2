@@ -13,6 +13,13 @@ enum class EShadowAtlasPreviewMode : uint8
 	Point
 };
 
+enum class EViewportSettingsSection : uint8
+{
+	All,
+	Show,
+	Camera
+};
+
 class FEditorViewportOverlayWidget : public FEditorWidget
 {
 private:
@@ -34,7 +41,7 @@ public:
 	void SetViewportSettingsVisible(bool bVisible) { bShowViewportSettings = bVisible; }
 	bool IsShortcutsWindowVisible() const { return bShowShortcutsWindow; }
 	void SetShortcutsWindowVisible(bool bVisible) { bShowShortcutsWindow = bVisible; }
-	void RenderViewportSettings(float DeltaTime, bool bUseWindow = true);
+	void RenderViewportSettings(float DeltaTime, bool bUseWindow = true, EViewportSettingsSection Section = EViewportSettingsSection::All);
 	void Render(float DeltaTime) override;
 
 private:

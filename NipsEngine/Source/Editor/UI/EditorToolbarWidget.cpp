@@ -151,6 +151,8 @@ void FEditorToolbarWidget::Initialize(UEditorEngine* InEditorEngine)
 	ScaleIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Scale.png");
 	WorldSpaceIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/WorldSpace.png");
 	LocalSpaceIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/LocalSpace.png");
+	ShowFlagIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Show_Flag.png");
+	CameraIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Camera.png");
 }
 
 bool FEditorToolbarWidget::OpenSceneFileDialog(FString& OutFilePath) const
@@ -375,21 +377,51 @@ void FEditorToolbarWidget::RenderEditorToolBar(float MenuBarHeight, float ToolBa
 		ImGui::SameLine();
 		ImGui::TextDisabled("|");
 		ImGui::SameLine();
-		if (ImGui::Button("Settings", ImVec2(78.0f, 22.0f)))
+		constexpr ImVec2 SettingsButtonSize(28.0f, 22.0f);
+		constexpr ImVec2 SettingsIconSize(18.0f, 18.0f);
+		const ImVec4 SettingsIconTint(0.78f, 0.80f, 0.84f, 1.0f);
+
+		const bool bShowSettingsClicked = ShowFlagIconTexture && ShowFlagIconTexture->GetSRV()
+			? RenderToolbarIconButton("##ShowSettings", ShowFlagIconTexture, SettingsButtonSize, SettingsIconSize, SettingsIconTint)
+			: ImGui::Button("Show", ImVec2(58.0f, 22.0f));
+		if (bShowSettingsClicked)
 		{
-			ImGui::OpenPopup("ViewportSettingsPopup");
+			ImGui::OpenPopup("ShowSettingsPopup");
 		}
 
-		ImGui::SetNextWindowSize(ImVec2(360.0f, 520.0f), ImGuiCond_Appearing);
-		if (ImGui::BeginPopup("ViewportSettingsPopup"))
+		ImGui::SameLine();
+		const bool bCameraSettingsClicked = CameraIconTexture && CameraIconTexture->GetSRV()
+			? RenderToolbarIconButton("##CameraSettings", CameraIconTexture, SettingsButtonSize, SettingsIconSize, SettingsIconTint)
+			: ImGui::Button("Camera", ImVec2(68.0f, 22.0f));
+		if (bCameraSettingsClicked)
+		{
+			ImGui::OpenPopup("CameraSettingsPopup");
+		}
+
+		ImGui::SetNextWindowSize(ImVec2(360.0f, 430.0f), ImGuiCond_Appearing);
+		if (ImGui::BeginPopup("ShowSettingsPopup"))
 		{
 			if (ViewportOverlayWidget)
 			{
-				ViewportOverlayWidget->RenderViewportSettings(0.0f, false);
+				ViewportOverlayWidget->RenderViewportSettings(0.0f, false, EViewportSettingsSection::Show);
 			}
 			else
 			{
 				ImGui::TextDisabled("Viewport settings unavailable.");
+			}
+			ImGui::EndPopup();
+		}
+
+		ImGui::SetNextWindowSize(ImVec2(360.0f, 240.0f), ImGuiCond_Appearing);
+		if (ImGui::BeginPopup("CameraSettingsPopup"))
+		{
+			if (ViewportOverlayWidget)
+			{
+				ViewportOverlayWidget->RenderViewportSettings(0.0f, false, EViewportSettingsSection::Camera);
+			}
+			else
+			{
+				ImGui::TextDisabled("Camera settings unavailable.");
 			}
 			ImGui::EndPopup();
 		}
