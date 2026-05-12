@@ -103,6 +103,9 @@ public:
 	inline void SetTranslateMode() { UpdateGizmoMode(EGizmoMode::Translate); }
 	inline void SetRotateMode() { UpdateGizmoMode(EGizmoMode::Rotate); }
 	inline void SetScaleMode() { UpdateGizmoMode(EGizmoMode::Scale); }
+	inline bool IsTranslateMode() const { return CurMode == EGizmoMode::Translate; }
+	inline bool IsRotateMode() const { return CurMode == EGizmoMode::Rotate; }
+	inline bool IsScaleMode() const { return CurMode == EGizmoMode::Scale; }
 	void UpdateGizmoTransform();
 	void ApplyScreenSpaceScaling(const FVector& CameraLocation);
 

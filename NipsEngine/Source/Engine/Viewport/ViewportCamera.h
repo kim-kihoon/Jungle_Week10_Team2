@@ -74,6 +74,7 @@ class FViewportCamera
 	 */
 	void SetCustomLookDir(const FVector& InLookDir, const FVector& InViewUp);
 	void ClearCustomLookDir();
+	bool HasCustomLookDir() const { return bHasCustomLookDir; }
 
 	const FVector& GetViewUp() const { return ViewUp; }
 

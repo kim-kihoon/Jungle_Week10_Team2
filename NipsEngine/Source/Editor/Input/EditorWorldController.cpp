@@ -216,6 +216,12 @@ void FEditorWorldController::OnRightMouseClick(float DeltaX, float DeltaY)
 	const FVector Forward = Camera->GetForwardVector().GetSafeNormal();
 	Pitch = MathUtil::RadiansToDegrees(std::asin(MathUtil::Clamp(Forward.Z, -1.f, 1.f)));
 	Yaw   = MathUtil::RadiansToDegrees(std::atan2(Forward.Y, Forward.X));
+
+	if (IsFreeOrthographicCamera())
+	{
+		OrthoOrbitDistance = std::max(Camera->GetOrthoHeight() * 2.0f, 1.0f);
+		OrthoOrbitTarget = Camera->GetLocation() + Forward * OrthoOrbitDistance;
+	}
 }
 
 void FEditorWorldController::OnRightMouseButtonUp(float X, float Y)
@@ -235,7 +241,7 @@ void FEditorWorldController::OnRightMouseDrag(float DeltaX, float DeltaY)
 	if (bCtrlDown || bAltDown || bShiftDown)
 		return;
 
-	if (Camera->IsOrthographic())
+	if (Camera->IsOrthographic() && Camera->HasCustomLookDir())
 	{
 		// Pan: scale movement proportionally to current ortho zoom level
 		const float     PanScale = Camera->GetOrthoHeight() * 0.002f;
@@ -251,6 +257,13 @@ void FEditorWorldController::OnRightMouseDrag(float DeltaX, float DeltaY)
 		Pitch -= DeltaY * RotationSpeed;
 		Pitch  = MathUtil::Clamp(Pitch, -89.f, 89.f);
 		UpdateCameraRotation();
+
+		if (IsFreeOrthographicCamera())
+		{
+			const FVector Forward = Camera->GetForwardVector().GetSafeNormal();
+			TargetLocation = OrthoOrbitTarget - Forward * OrthoOrbitDistance;
+			Camera->SetLocation(TargetLocation);
+		}
 	}
 }
 
@@ -338,8 +351,15 @@ void FEditorWorldController::OnKeyDown(int VK)
 	if (bCtrlDown || bAltDown || bShiftDown)
 		return;
 
-	if (Camera->IsOrthographic())
-		return; // no WASD/arrow input in ortho views
+	if (Camera->IsOrthographic() && Camera->HasCustomLookDir())
+		return; // no WASD/arrow input in fixed-axis ortho views
+
+	const bool bMovementKey =
+		VK == 'W' || VK == 'A' || VK == 'S' || VK == 'D' || VK == 'Q' || VK == 'E';
+	if (bMovementKey && !bWASDAlwaysMove && !FInputRouter::GetRightDragging())
+	{
+		return;
+	}
 
 	// WASD + QE movement — scale by current camera forward/right vectors
 	FVector Move = FVector(0, 0, 0);
@@ -563,6 +583,11 @@ bool FEditorWorldController::TryProjectWorldToViewport(const FVector& WorldPos, 
 	OutViewportY = (1.0f - (NdcY * 0.5f + 0.5f)) * ViewportHeight;
 	OutDepth = NdcZ;
 	return true;
+}
+
+bool FEditorWorldController::IsFreeOrthographicCamera() const
+{
+	return Camera && Camera->IsOrthographic() && !Camera->HasCustomLookDir();
 }
 
 void FEditorWorldController::HandleBoxSelection()

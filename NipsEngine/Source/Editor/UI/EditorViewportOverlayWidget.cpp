@@ -7,6 +7,7 @@
 #include "Editor/Settings/EditorSettings.h"
 
 #include "Engine/Slate/SlateApplication.h"
+#include "Engine/Viewport/ViewportCamera.h"
 #include "Engine/Object/ObjectIterator.h"
 #include "Engine/Asset/StaticMesh.h"
 #include "Engine/Asset/StaticMeshTypes.h"
@@ -134,11 +135,11 @@ void FEditorViewportOverlayWidget::Render(float DeltaTime)
 }
 
 // 뷰포트 설정(표시 플래그, 그리드, 카메라 감도, BVH 관리 정책 등)을 조작하는 창을 렌더링합니다.
-void FEditorViewportOverlayWidget::RenderViewportSettings(float DeltaTime)
+void FEditorViewportOverlayWidget::RenderViewportSettings(float DeltaTime, bool bUseWindow)
 {
 	FEditorSettings& Settings = FEditorSettings::Get();
 
-	if (!ImGui::Begin("Viewport Settings"))
+	if (bUseWindow && !ImGui::Begin("Viewport Settings"))
 	{
 		ImGui::End();
 		return;
@@ -193,21 +194,56 @@ void FEditorViewportOverlayWidget::RenderViewportSettings(float DeltaTime)
 	// Camera Sensitivity
 	ImGui::Text("Camera");
 
+	FViewportCamera* Camera = EditorEngine ? EditorEngine->GetCamera() : nullptr;
+	if (Camera)
+	{
+		float CameraFOV_Deg = MathUtil::RadiansToDegrees(Camera->GetFOV());
+		ImGui::SetNextItemWidth(ItemWidth);
+		if (ImGui::DragFloat("FOV", &CameraFOV_Deg, 0.5f, 1.0f, 90.0f))
+		{
+			Camera->SetFOV(MathUtil::DegreesToRadians(CameraFOV_Deg));
+		}
+
+		float OrthoHeight = Camera->GetOrthoHeight();
+		ImGui::SetNextItemWidth(ItemWidth);
+		if (ImGui::DragFloat("Ortho Height", &OrthoHeight, 0.1f, 0.1f, 1000.0f))
+		{
+			Camera->SetOrthoHeight(MathUtil::Clamp(OrthoHeight, 0.1f, 1000.0f));
+		}
+
+		FVector CamPos = Camera->GetLocation();
+		float CameraLocation[3] = { CamPos.X, CamPos.Y, CamPos.Z };
+		ImGui::SetNextItemWidth(ItemWidth);
+		if (ImGui::DragFloat3("Location", CameraLocation, 0.1f, 0.0f, 0.0f, "%.1f"))
+		{
+			Camera->SetLocation(FVector(CameraLocation[0], CameraLocation[1], CameraLocation[2]));
+		}
+
+		FVector CamRot = Camera->GetRotation().Rotator().Euler();
+		float CameraRotation[3] = { CamRot.X, CamRot.Y, CamRot.Z };
+		ImGui::SetNextItemWidth(ItemWidth);
+		if (ImGui::DragFloat3("Rotation", CameraRotation, 0.1f, 0.0f, 0.0f, "%.1f"))
+		{
+			CameraRotation[1] = MathUtil::Clamp(CameraRotation[1], -89.9f, 89.9f);
+			FRotator NewRotation = FRotator::MakeFromEuler(FVector(CameraRotation[0], CameraRotation[1], CameraRotation[2]));
+			NewRotation.Normalize();
+			Camera->SetRotation(NewRotation);
+		}
+	}
+
+	ImGui::SetNextItemWidth(ItemWidth);
+	ImGui::SliderFloat("Speed", &Settings.CameraSpeed, 0.1f, 100.0f, "%.1f");
+
 	ImGui::SetNextItemWidth(ItemWidth);
 	ImGui::SliderFloat("Move Sensitivity", &Settings.CameraMoveSensitivity, 0.05f, 5.0f, "%.1f");
 	
 	ImGui::SetNextItemWidth(ItemWidth);
 	ImGui::SliderFloat("Rotate Sensitivity", &Settings.CameraRotateSensitivity, 0.05f, 5.0f, "%.1f");
 
-	if (EditorEngine)
-	{
-		FEditorViewportLayout& Layout = EditorEngine->GetViewportLayout();
-		const int32 FocusedIdx = Layout.GetLastFocusedViewportIndex();
-		FEditorViewportClient* FocusedClient = Layout.GetViewportClient(FocusedIdx);
+	ImGui::SetNextItemWidth(ItemWidth);
+	ImGui::SliderFloat("Zoom Speed", &Settings.CameraZoomSpeed, 0.1f, 100.0f, "%.1f");
 
-		ImGui::SetNextItemWidth(ItemWidth);
-		ImGui::SliderFloat("Zoom Speed", &Settings.CameraZoomSpeed, 0.1f, 100.0f, "%.1f");
-	}
+	ImGui::Checkbox("WASD Always Move", &Settings.bCameraWASDAlwaysMove);
 
 	if (Settings.ShowFlags.bBoundingVolume && Settings.ShowFlags.bBVHBoundingVolume)
 	{
@@ -236,7 +272,10 @@ void FEditorViewportOverlayWidget::RenderViewportSettings(float DeltaTime)
 		}
 	}
 
-	ImGui::End();
+	if (bUseWindow)
+	{
+		ImGui::End();
+	}
 }
 
 // 활성화된 뷰포트를 순회하며 설정에 따라 디버그 스탯(FPS, Culling, Memory 등) 오버레이를 화면에 배치하고 렌더링합니다.
@@ -1043,6 +1082,7 @@ namespace
 		switch (Type)
 		{
 		case EVT_Perspective: return "Perspective";
+		case EVT_Orthographic: return "Orthographic";
 		case EVT_OrthoTop:    return "Top";
 		case EVT_OrthoBottom: return "Bottom";
 		case EVT_OrthoFront:  return "Front";

@@ -130,6 +130,8 @@ const char* GetViewportTypeName(EEditorViewportType Type)
 	{
 	case EVT_Perspective:
 		return "Perspective";
+	case EVT_Orthographic:
+		return "Orthographic";
 	case EVT_OrthoTop:
 		return "Top";
 	case EVT_OrthoBottom:
@@ -267,11 +269,35 @@ void FEditorMainPanel::Render(float DeltaTime)
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
 
-	const ImGuiID DockspaceId = ImGui::GetID("EditorDockSpaceV2");
-	ImGui::DockSpaceOverViewport(DockspaceId, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
-	EnsureDefaultDockLayout(DockspaceId);
-
 	ToolbarWidget.Render(DeltaTime);
+
+	const ImGuiID DockspaceId = ImGui::GetID("EditorDockSpaceV3");
+	const ImGuiViewport* MainViewport = ImGui::GetMainViewport();
+	const float ReservedTopHeight = ToolbarWidget.GetReservedTopHeight();
+	ImGui::SetNextWindowPos(ImVec2(MainViewport->Pos.x, MainViewport->Pos.y + ReservedTopHeight));
+	ImGui::SetNextWindowSize(ImVec2(MainViewport->Size.x, std::max(1.0f, MainViewport->Size.y - ReservedTopHeight)));
+	ImGui::SetNextWindowViewport(MainViewport->ID);
+
+	constexpr ImGuiWindowFlags DockspaceWindowFlags =
+		ImGuiWindowFlags_NoTitleBar |
+		ImGuiWindowFlags_NoCollapse |
+		ImGuiWindowFlags_NoResize |
+		ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_NoBringToFrontOnFocus |
+		ImGuiWindowFlags_NoNavFocus |
+		ImGuiWindowFlags_NoDocking |
+		ImGuiWindowFlags_NoBackground |
+		ImGuiWindowFlags_NoSavedSettings;
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+	ImGui::Begin("##EditorDockSpaceHost", nullptr, DockspaceWindowFlags);
+	ImGui::DockSpace(DockspaceId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
+	ImGui::End();
+	ImGui::PopStyleVar(3);
+
+	EnsureDefaultDockLayout(DockspaceId);
 
 	RenderViewportHostWindow();
 
@@ -295,8 +321,6 @@ void FEditorMainPanel::Render(float DeltaTime)
 		ContentDrawerWidget.SetOpen(false);
 	}
 	bShowConsole = ConsoleWidget.IsOpen();
-	if (bShowControl)
-		ControlWidget.Render(DeltaTime);
 	if (bShowMaterialEditor)
 		MaterialWidget.Render(DeltaTime);
 	if (bShowProperty)
@@ -421,32 +445,27 @@ void FEditorMainPanel::EnsureDefaultDockLayout(ImGuiID DockspaceId)
 		return;
 
 	const ImGuiViewport* Viewport = ImGui::GetMainViewport();
+	const float ReservedTopHeight = ToolbarWidget.GetReservedTopHeight();
 	ImGui::DockBuilderRemoveNode(DockspaceId);
 	if (ImGuiWindowSettings* ConsoleSettings = ImGui::FindWindowSettingsByID(ImHashStr("Console")))
 	{
 		ConsoleSettings->DockId = 0;
 	}
 	ImGui::DockBuilderAddNode(DockspaceId, ImGuiDockNodeFlags_DockSpace);
-	ImGui::DockBuilderSetNodePos(DockspaceId, Viewport->WorkPos);
-	ImGui::DockBuilderSetNodeSize(DockspaceId, Viewport->WorkSize);
+	ImGui::DockBuilderSetNodePos(DockspaceId, ImVec2(Viewport->Pos.x, Viewport->Pos.y + ReservedTopHeight));
+	ImGui::DockBuilderSetNodeSize(
+		DockspaceId,
+		ImVec2(Viewport->Size.x, std::max(1.0f, Viewport->Size.y - ReservedTopHeight)));
 
 	ImGuiID MainNode = DockspaceId;
 	ImGuiID RightNode = 0;
-	ImGuiID LeftNode = 0;
-	ImGuiID CenterAndControlNode = 0;
-	ImGuiID CenterNode = 0;
-	ImGuiID ControlNode = 0;
 	ImGuiID RightTopNode = 0;
 	ImGuiID RightBottomNode = 0;
 
 	ImGui::DockBuilderSplitNode(MainNode, ImGuiDir_Right, 0.185f, &RightNode, &MainNode);
-	ImGui::DockBuilderSplitNode(MainNode, ImGuiDir_Left, 0.17f, &LeftNode, &CenterAndControlNode);
-	ImGui::DockBuilderSplitNode(CenterAndControlNode, ImGuiDir_Right, 0.20f, &ControlNode, &CenterNode);
 	ImGui::DockBuilderSplitNode(RightNode, ImGuiDir_Up, 0.22f, &RightTopNode, &RightBottomNode);
 
-	ImGui::DockBuilderDockWindow("Viewport Settings", LeftNode);
-	ImGui::DockBuilderDockWindow("Viewport", CenterNode);
-	ImGui::DockBuilderDockWindow("Control Panel", ControlNode);
+	ImGui::DockBuilderDockWindow("Viewport", MainNode);
 	ImGui::DockBuilderDockWindow("Scene Manager", RightTopNode);
 	ImGui::DockBuilderDockWindow("Stat Profiler", RightTopNode);
 	ImGui::DockBuilderDockWindow("Property Window", RightBottomNode);
@@ -578,10 +597,26 @@ void FEditorMainPanel::RenderViewportMenuBarForIndex(int32 Index)
 	FEditorViewportClient* Client = Layout.GetViewportClient(Index);
 	FEditorViewportState& State = Layout.GetViewportState(Index);
 
-	ImGui::TextDisabled("%s | %s | %s",
-						GetViewportSlotName(Index),
-						GetViewportTypeName(Client->GetViewportType()),
-						GetViewModeName(State.ViewMode));
+	const char* SlotName = GetViewportSlotName(Index);
+	const char* ViewportTypeName = GetViewportTypeName(Client->GetViewportType());
+	const char* ViewModeName = GetViewModeName(State.ViewMode);
+	const ImGuiStyle& Style = ImGui::GetStyle();
+	const float RightGroupWidth =
+		ImGui::CalcTextSize(SlotName).x +
+		ImGui::CalcTextSize(" | ").x +
+		ImGui::CalcTextSize(ViewportTypeName).x +
+		ImGui::CalcTextSize(" | ").x +
+		ImGui::CalcTextSize(ViewModeName).x +
+		ImGui::CalcTextSize("Layout").x +
+		ImGui::CalcTextSize("Type").x +
+		ImGui::CalcTextSize("View").x +
+		ImGui::CalcTextSize("Stats").x +
+		Style.ItemSpacing.x * 8.0f +
+		Style.FramePadding.x * 8.0f;
+	const float RightAlignedX = ImGui::GetWindowContentRegionMax().x - RightGroupWidth;
+	ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), RightAlignedX));
+
+	ImGui::TextDisabled("%s | %s | %s", SlotName, ViewportTypeName, ViewModeName);
 	ImGui::SameLine();
 
 	if (ImGui::BeginMenu("Layout"))
@@ -611,27 +646,34 @@ void FEditorMainPanel::RenderViewportMenuBarForIndex(int32 Index)
 
 	if (ImGui::BeginMenu("Type"))
 	{
-		if (Index == 0)
+		const bool bPerspectiveSelected = (Client->GetViewportType() == EVT_Perspective);
+		if (ImGui::MenuItem("Perspective", nullptr, bPerspectiveSelected))
 		{
-			ImGui::TextDisabled("Viewport 0 is fixed to Perspective.");
-			ImGui::Separator();
-			ImGui::MenuItem("Perspective", nullptr, true, false);
+			Client->SetViewportType(EVT_Perspective);
+			Client->ApplyCameraMode();
 		}
-		else
+
+		const bool bOrthographicSelected = (Client->GetViewportType() == EVT_Orthographic);
+		if (ImGui::MenuItem("Orthographic", nullptr, bOrthographicSelected))
 		{
-			static constexpr EEditorViewportType kOrthoTypes[] = {
-				EVT_OrthoTop, EVT_OrthoBottom,
-				EVT_OrthoFront, EVT_OrthoBack,
-				EVT_OrthoLeft, EVT_OrthoRight
-			};
-			for (EEditorViewportType Type : kOrthoTypes)
+			Client->SetViewportType(EVT_Orthographic);
+			Client->ApplyCameraMode();
+		}
+
+		ImGui::Separator();
+
+		static constexpr EEditorViewportType kOrthoTypes[] = {
+			EVT_OrthoTop, EVT_OrthoBottom,
+			EVT_OrthoFront, EVT_OrthoBack,
+			EVT_OrthoLeft, EVT_OrthoRight
+		};
+		for (EEditorViewportType Type : kOrthoTypes)
+		{
+			const bool bSel = (Client->GetViewportType() == Type);
+			if (ImGui::MenuItem(GetViewportTypeName(Type), nullptr, bSel))
 			{
-				const bool bSel = (Client->GetViewportType() == Type);
-				if (ImGui::MenuItem(GetViewportTypeName(Type), nullptr, bSel))
-				{
-					Client->SetViewportType(Type);
-					Client->ApplyCameraMode();
-				}
+				Client->SetViewportType(Type);
+				Client->ApplyCameraMode();
 			}
 		}
 		ImGui::EndMenu();

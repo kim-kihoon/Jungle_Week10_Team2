@@ -209,6 +209,7 @@ void FEditorViewportClient::Tick(float DeltaTime)
 		Controller.SetMoveSensitivity(Settings->CameraMoveSensitivity);
 		Controller.SetRotateSensitivity(Settings->CameraRotateSensitivity);
 		Controller.SetZoomSpeed(Settings->CameraZoomSpeed);
+		Controller.SetWASDAlwaysMove(Settings->bCameraWASDAlwaysMove);
 	}
 
 	FInputRouteContext RouteContext;
@@ -252,9 +253,6 @@ void FEditorViewportClient::BuildSceneView(FSceneView& OutView) const
 
 void FEditorViewportClient::ApplyCameraMode()
 {
-	// Orthographic views reset rotation so the existing value doesn't interfere with LookAt.
-	Camera.SetRotation(FRotator(0.f, 0.f, 0.f));
-
 	switch (ViewportType)
 	{
 	case EVT_Perspective:
@@ -264,39 +262,50 @@ void FEditorViewportClient::ApplyCameraMode()
 		Camera.SetLookAt(FVector(0.f, 0.f, 0.f));
 		break;
 
-		// Orthographic views (X=Forward, Y=Right, Z=Up)
+	case EVT_Orthographic:
+		Camera.SetProjectionType(EViewportProjectionType::Orthographic);
+		Camera.ClearCustomLookDir();
+		break;
 
+		// Orthographic axis views reset rotation so the existing value doesn't interfere with LookAt.
+		// Orthographic views (X=Forward, Y=Right, Z=Up)
 	case EVT_OrthoTop: // top-down (-Z), screen-up = +X
+		Camera.SetRotation(FRotator(0.f, 0.f, 0.f));
 		Camera.SetProjectionType(EViewportProjectionType::Orthographic);
 		Camera.SetLocation(FVector(0.f, 0.f, 1000.f));
 		Camera.SetCustomLookDir(FVector(0.f, 0.f, -1.f), FVector(1.f, 0.f, 0.f));
 		break;
 
 	case EVT_OrthoBottom: // bottom-up (+Z), screen-up = +X
+		Camera.SetRotation(FRotator(0.f, 0.f, 0.f));
 		Camera.SetProjectionType(EViewportProjectionType::Orthographic);
 		Camera.SetLocation(FVector(0.f, 0.f, -1000.f));
 		Camera.SetCustomLookDir(FVector(0.f, 0.f, 1.f), FVector(1.f, 0.f, 0.f));
 		break;
 
 	case EVT_OrthoFront: // front (-X->+X), screen-up = +Z
+		Camera.SetRotation(FRotator(0.f, 0.f, 0.f));
 		Camera.SetProjectionType(EViewportProjectionType::Orthographic);
 		Camera.SetLocation(FVector(1000.f, 0.f, 0.f));
 		Camera.SetCustomLookDir(FVector(-1.f, 0.f, 0.f), FVector(0.f, 0.f, 1.f));
 		break;
 
 	case EVT_OrthoBack: // back (+X->-X), screen-up = +Z
+		Camera.SetRotation(FRotator(0.f, 0.f, 0.f));
 		Camera.SetProjectionType(EViewportProjectionType::Orthographic);
 		Camera.SetLocation(FVector(-1000.f, 0.f, 0.f));
 		Camera.SetCustomLookDir(FVector(1.f, 0.f, 0.f), FVector(0.f, 0.f, 1.f));
 		break;
 
 	case EVT_OrthoLeft: // left (-Y->+Y), screen-up = +Z
+		Camera.SetRotation(FRotator(0.f, 0.f, 0.f));
 		Camera.SetProjectionType(EViewportProjectionType::Orthographic);
 		Camera.SetLocation(FVector(0.f, -1000.f, 0.f));
 		Camera.SetCustomLookDir(FVector(0.f, 1.f, 0.f), FVector(0.f, 0.f, 1.f));
 		break;
 
 	case EVT_OrthoRight: // right (+Y->-Y), screen-up = +Z
+		Camera.SetRotation(FRotator(0.f, 0.f, 0.f));
 		Camera.SetProjectionType(EViewportProjectionType::Orthographic);
 		Camera.SetLocation(FVector(0.f, 1000.f, 0.f));
 		Camera.SetCustomLookDir(FVector(0.f, -1.f, 0.f), FVector(0.f, 0.f, 1.f));

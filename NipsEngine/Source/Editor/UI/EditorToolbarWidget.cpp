@@ -4,10 +4,18 @@
 #include "Editor/UI/EditorSceneWidget.h"
 #include "Editor/UI/EditorViewportOverlayWidget.h"
 #include "Editor/UI/EditorPlayStreamWidget.h"
+#include "Editor/EditorEngine.h"
+#include "Editor/Selection/SelectionManager.h"
+#include "Editor/Viewport/ViewportLayout.h"
+#include "Component/GizmoComponent.h"
 #include "Core/ResourceManager.h"
+#include "Engine/Viewport/ViewportCamera.h"
+#include "GameFramework/PrimitiveActors.h"
+#include "GameFramework/World.h"
 #include "Serialization/SceneSaveManager.h"
 #include "ImGui/imgui.h"
 
+#include <algorithm>
 #include <Windows.h>
 #include <commdlg.h>
 #include <filesystem>
@@ -15,6 +23,50 @@
 
 namespace
 {
+	template <typename T>
+	AActor* SpawnEditorActor(UWorld* World, const FVector& Location)
+	{
+		if (!World)
+		{
+			return nullptr;
+		}
+
+		T* Actor = World->SpawnActor<T>();
+		if (!Actor)
+		{
+			return nullptr;
+		}
+
+		Actor->InitDefaultComponents();
+		Actor->SetActorLocation(Location);
+		return Actor;
+	}
+
+	struct FAddActorEntry
+	{
+		const char* Label;
+		AActor* (*Spawn)(UWorld*, const FVector&);
+	};
+
+	static const FAddActorEntry AddActorTypes[] = {
+		{ "Pawn", SpawnEditorActor<APawnActor> },
+		{ "Scene", SpawnEditorActor<ASceneActor> },
+		{ "StaticMesh", SpawnEditorActor<AStaticMeshActor> },
+		{ "SkeletalMesh", SpawnEditorActor<ASkeletalMeshActor> },
+		{ "TextRender", SpawnEditorActor<ATextRenderActor> },
+		{ "SubUV", SpawnEditorActor<ASubUVActor> },
+		{ "Billboard", SpawnEditorActor<ABillboardActor> },
+		{ "Decal", SpawnEditorActor<ADecalActor> },
+		{ "Directional Light", SpawnEditorActor<ADirectionalLightActor> },
+		{ "Ambient Light", SpawnEditorActor<AAmbientLightActor> },
+		{ "Point Light", SpawnEditorActor<APointLightActor> },
+		{ "Spot Light", SpawnEditorActor<ASpotLightActor> },
+		{ "Sky Atmosphere", SpawnEditorActor<ASkyAtmosphereActor> },
+		{ "Height Fog", SpawnEditorActor<AHeightFogActor> },
+		{ "Audio Zone", SpawnEditorActor<AAudioZoneActor> },
+		{ "Player Start", SpawnEditorActor<APlayerStartActor> },
+	};
+
 	std::wstring GetSceneDialogInitialDir()
 	{
 		std::filesystem::path SceneDir(FSceneSaveManager::GetSceneDirectory());
@@ -141,6 +193,7 @@ void FEditorToolbarWidget::SetPanelVisibilityRefs(
 void FEditorToolbarWidget::Render(float DeltaTime)
 {
 	(void)DeltaTime;
+	constexpr float EditorToolBarHeight = 34.0f;
 
 	const ImGuiIO& IO = ImGui::GetIO();
 	if (bShowConsole && ImGui::IsKeyPressed(ImGuiKey_GraveAccent, false) && (*bShowConsole || !IO.WantTextInput))
@@ -184,6 +237,8 @@ void FEditorToolbarWidget::Render(float DeltaTime)
 
 	ImVec2 OriginalPadding = ImGui::GetStyle().FramePadding;
 	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(OriginalPadding.x, 5.0f));
+	const float MenuBarHeight = ImGui::GetFrameHeight();
+	ReservedTopHeight = MenuBarHeight + EditorToolBarHeight;
 
 	bool bMenuBarOpened = ImGui::BeginMainMenuBar();
 
@@ -205,6 +260,215 @@ void FEditorToolbarWidget::Render(float DeltaTime)
 	}
 
 	ImGui::EndMainMenuBar();
+	RenderEditorToolBar(MenuBarHeight, EditorToolBarHeight);
+}
+
+void FEditorToolbarWidget::RenderEditorToolBar(float MenuBarHeight, float ToolBarHeight)
+{
+	const ImGuiViewport* MainViewport = ImGui::GetMainViewport();
+	if (!MainViewport)
+	{
+		return;
+	}
+
+	ImGui::SetNextWindowPos(ImVec2(MainViewport->Pos.x, MainViewport->Pos.y + MenuBarHeight));
+	ImGui::SetNextWindowSize(ImVec2(MainViewport->Size.x, ToolBarHeight));
+	ImGui::SetNextWindowViewport(MainViewport->ID);
+
+	constexpr ImGuiWindowFlags ToolBarFlags =
+		ImGuiWindowFlags_NoTitleBar |
+		ImGuiWindowFlags_NoResize |
+		ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_NoScrollbar |
+		ImGuiWindowFlags_NoSavedSettings |
+		ImGuiWindowFlags_NoDocking |
+		ImGuiWindowFlags_NoCollapse |
+		ImGuiWindowFlags_NoNavFocus;
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 5.0f));
+	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.0f, 3.0f));
+	ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.08f, 0.08f, 0.08f, 1.0f));
+
+	if (ImGui::Begin("##EditorGlobalToolBar", nullptr, ToolBarFlags))
+	{
+		int32 FocusedViewportIndex = 0;
+		if (EditorEngine)
+		{
+			FocusedViewportIndex = EditorEngine->GetViewportLayout().GetLastFocusedViewportIndex();
+		}
+
+		RenderAddActorMenu(FocusedViewportIndex);
+		ImGui::SameLine();
+		ImGui::TextDisabled("|");
+		ImGui::SameLine();
+		RenderGizmoTools();
+		ImGui::SameLine();
+		ImGui::TextDisabled("|");
+		ImGui::SameLine();
+		if (ImGui::Button("Settings", ImVec2(78.0f, 22.0f)))
+		{
+			ImGui::OpenPopup("ViewportSettingsPopup");
+		}
+
+		ImGui::SetNextWindowSize(ImVec2(360.0f, 520.0f), ImGuiCond_Appearing);
+		if (ImGui::BeginPopup("ViewportSettingsPopup"))
+		{
+			if (ViewportOverlayWidget)
+			{
+				ViewportOverlayWidget->RenderViewportSettings(0.0f, false);
+			}
+			else
+			{
+				ImGui::TextDisabled("Viewport settings unavailable.");
+			}
+			ImGui::EndPopup();
+		}
+	}
+
+	ImGui::End();
+	ImGui::PopStyleColor();
+	ImGui::PopStyleVar(4);
+}
+
+void FEditorToolbarWidget::RenderAddActorMenu(int32 ViewportIndex)
+{
+	constexpr ImVec2 ToolButtonSize(68.0f, 22.0f);
+	constexpr float CountWidth = 48.0f;
+
+	ImGui::PushID(ViewportIndex);
+	if (ImGui::Button("+  Add", ToolButtonSize))
+	{
+		ImGui::OpenPopup("AddActorMenu");
+	}
+	ImGui::SameLine();
+	ImGui::SetNextItemWidth(CountWidth);
+	if (ImGui::DragInt("##SpawnCount", &SpawnCount, 0.1f, 1, 100))
+	{
+		SpawnCount = std::clamp(SpawnCount, 1, 100);
+	}
+	if (ImGui::IsItemHovered())
+	{
+		ImGui::SetTooltip("Spawn count");
+	}
+
+	if (!ImGui::BeginPopup("AddActorMenu"))
+	{
+		ImGui::PopID();
+		return;
+	}
+
+	if (!EditorEngine)
+	{
+		ImGui::TextDisabled("No editor world.");
+		ImGui::EndPopup();
+		ImGui::PopID();
+		return;
+	}
+
+	UWorld* World = EditorEngine->GetFocusedWorld();
+	if (!World)
+	{
+		ImGui::TextDisabled("No focused world.");
+		ImGui::EndPopup();
+		ImGui::PopID();
+		return;
+	}
+
+	for (const FAddActorEntry& Entry : AddActorTypes)
+	{
+		if (ImGui::Selectable(Entry.Label))
+		{
+			AActor* LastSpawnedActor = nullptr;
+			const FVector BaseLocation = GetActorPlacementLocation(ViewportIndex);
+			const int32 ClampedCount = std::clamp(SpawnCount, 1, 100);
+			for (int32 Index = 0; Index < ClampedCount; ++Index)
+			{
+				const FVector Offset(static_cast<float>(Index) * 1.5f, 0.0f, 0.0f);
+				LastSpawnedActor = Entry.Spawn(World, BaseLocation + Offset);
+			}
+
+			if (LastSpawnedActor)
+			{
+				EditorEngine->GetSelectionManager().Select(LastSpawnedActor);
+			}
+			SpawnCount = 1;
+		}
+	}
+
+	ImGui::EndPopup();
+	ImGui::PopID();
+}
+
+void FEditorToolbarWidget::RenderGizmoTools()
+{
+	if (!EditorEngine || !EditorEngine->GetGizmo())
+	{
+		ImGui::TextDisabled("Gizmo unavailable");
+		return;
+	}
+
+	constexpr ImVec2 GizmoModeButtonSize(58.0f, 22.0f);
+
+	UGizmoComponent* Gizmo = EditorEngine->GetGizmo();
+	if (ImGui::Selectable("Move", Gizmo->IsTranslateMode(), 0, GizmoModeButtonSize))
+	{
+		Gizmo->SetTranslateMode();
+	}
+	ImGui::SameLine();
+	if (ImGui::Selectable("Rotate", Gizmo->IsRotateMode(), 0, GizmoModeButtonSize))
+	{
+		Gizmo->SetRotateMode();
+	}
+	ImGui::SameLine();
+	if (ImGui::Selectable("Scale", Gizmo->IsScaleMode(), 0, GizmoModeButtonSize))
+	{
+		Gizmo->SetScaleMode();
+	}
+	ImGui::SameLine();
+
+	const char* SpaceLabel = Gizmo->IsWorldSpace() ? "World" : "Local";
+	ImGui::SetNextItemWidth(76.0f);
+	if (ImGui::BeginCombo("##GizmoSpace", SpaceLabel))
+	{
+		const bool bWorldSelected = Gizmo->IsWorldSpace();
+		if (ImGui::Selectable("World", bWorldSelected))
+		{
+			Gizmo->SetWorldSpace(true);
+		}
+		if (ImGui::Selectable("Local", !bWorldSelected))
+		{
+			Gizmo->SetWorldSpace(false);
+		}
+		ImGui::EndCombo();
+	}
+}
+
+FVector FEditorToolbarWidget::GetActorPlacementLocation(int32 ViewportIndex) const
+{
+	if (!EditorEngine)
+	{
+		return FVector::ZeroVector;
+	}
+
+	const FEditorViewportLayout& Layout = EditorEngine->GetViewportLayout();
+	const int32 ClampedViewportIndex =
+		std::clamp(ViewportIndex, 0, FEditorViewportLayout::MaxViewports - 1);
+	const FEditorViewportClient* Client = Layout.GetViewportClient(ClampedViewportIndex);
+	const FViewportCamera* Camera = Client ? Client->GetCamera() : nullptr;
+	if (!Camera)
+	{
+		return FVector::ZeroVector;
+	}
+
+	FVector Forward = Camera->GetEffectiveForward();
+	if (Forward.IsNearlyZero())
+	{
+		Forward = Camera->GetForwardVector();
+	}
+	Forward.NormalizeSafe();
+	return Camera->GetLocation() + Forward * 5.0f;
 }
 
 void FEditorToolbarWidget::RenderFilesMenu()
@@ -285,7 +549,6 @@ void FEditorToolbarWidget::RenderViewMenu()
 			}
 		}
 	}
-	if (bShowControl) ImGui::MenuItem("Control Panel", nullptr, bShowControl);
 	if (bShowProperty) ImGui::MenuItem("Property", nullptr, bShowProperty);
 	if (bShowSceneManager) ImGui::MenuItem("Scene Manager", nullptr, bShowSceneManager);
 	if (bShowMaterialEditor) ImGui::MenuItem("Material Editor", nullptr, bShowMaterialEditor);
@@ -303,15 +566,6 @@ void FEditorToolbarWidget::RenderViewMenu()
 	else
 	{
 		ImGui::MenuItem("Content Drawer", "Ctrl+Space", false, false);
-	}
-
-	if (ViewportOverlayWidget)
-	{
-		bool bShowViewportSettings = ViewportOverlayWidget->IsViewportSettingsVisible();
-		if (ImGui::MenuItem("Viewport Settings", nullptr, bShowViewportSettings))
-		{
-			ViewportOverlayWidget->SetViewportSettingsVisible(!bShowViewportSettings);
-		}
 	}
 
 	ImGui::EndMenu();
