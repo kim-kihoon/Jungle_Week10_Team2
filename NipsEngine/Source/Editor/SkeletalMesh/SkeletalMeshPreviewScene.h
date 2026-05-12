@@ -11,6 +11,7 @@ class UEditorEngine;
 class UWorld;
 class AActor;
 class USkeletalMesh;
+class USkeletalMeshComponent;
 
 class FSkeletalMeshPreviewScene
 {
@@ -25,6 +26,12 @@ public:
 	void SetVisible(bool bInVisible);
 	void SetSkeletalMesh(USkeletalMesh* Mesh);
 	void ResetPose();
+
+	USkeletalMeshComponent* GetPreviewMeshComponent() const;
+	USkeletalMesh* GetCurrentSkeletalMesh() const;
+
+	void SelectBone(int32 BoneIndex);
+	int32 GetSelectedBoneIndex() const;
 
 	FSceneViewport& GetSceneViewport() { return PreviewViewport; }
 	const FSceneViewport& GetSceneViewport() const { return PreviewViewport; }
@@ -58,4 +65,6 @@ private:
 	FViewportRect PreviewInputRect;
 	bool bPreviewHovered = false;
 	bool bPreviewInputCaptured = false;
+
+	int32 SelectedBoneIndex = -1;
 };
