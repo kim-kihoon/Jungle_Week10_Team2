@@ -22,6 +22,11 @@ public:
 
 	virtual void Render(float DeltaTime) override;
 
+	void SetOpen(bool bInOpen);
+	bool IsOpen() const { return bOpen; }
+	void ToggleOpen();
+	bool ConsumeOpenRequest();
+
 	void Clear()
 	{
 		for (int32 i = 0; i < Messages.Size; i++) free(Messages[i]);
@@ -41,6 +46,10 @@ private:
 	ImGuiTextFilter Filter;
 	static bool AutoScroll;
 	static bool ScrollToBottom;
+	bool bOpen = false;
+	bool bOpenedThisFrame = false;
+	float DrawerHeight = 0.0f;
+	float DrawerAnimationAlpha = 0.0f;
 
 	// 백틱(`) 키로 포커스 요청 시 true — 다음 InputText 렌더링 직전에 SetKeyboardFocusHere 호출
 	bool bRequestFocusInput = false;
@@ -52,6 +61,7 @@ private:
 	void RegisterCommand(const FString& Name, CommandFn Fn);
 	void ExecCommand(const char* CommandLine);
 	static int32 TextEditCallback(ImGuiInputTextCallbackData* Data);
+	void RenderResizeHandle(float WorkAreaHeight);
 
 private:
 	void CmdStat(const TArray<FString>& Args);

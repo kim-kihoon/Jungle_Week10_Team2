@@ -138,6 +138,7 @@ void FEditorMainPanel::Create(FWindowsWindow* InWindow, FRenderer& InRenderer, U
 	ConsoleWidget.Initialize(InEditorEngine);
 	ControlWidget.Initialize(InEditorEngine);
 	ContentDrawerWidget.Initialize(InEditorEngine);
+	ContentDrawerWidget.SetConsoleWidget(&ConsoleWidget);
 	MaterialWidget.Initialize(InEditorEngine);
 	PropertyWidget.Initialize(InEditorEngine);
 	SceneWidget.Initialize(InEditorEngine);
@@ -168,7 +169,7 @@ void FEditorMainPanel::Render(float DeltaTime)
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
 
-	const ImGuiID DockspaceId = ImGui::GetID("EditorDockSpace");
+	const ImGuiID DockspaceId = ImGui::GetID("EditorDockSpaceV2");
 	ImGui::DockSpaceOverViewport(DockspaceId, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
 	EnsureDefaultDockLayout(DockspaceId);
 
@@ -176,8 +177,13 @@ void FEditorMainPanel::Render(float DeltaTime)
 
 	RenderViewportHostWindow();
 
-	if (bShowConsole)
-		ConsoleWidget.Render(DeltaTime);
+	ConsoleWidget.SetOpen(bShowConsole);
+	ConsoleWidget.Render(DeltaTime);
+	if (ConsoleWidget.ConsumeOpenRequest())
+	{
+		ContentDrawerWidget.SetOpen(false);
+	}
+	bShowConsole = ConsoleWidget.IsOpen();
 	if (bShowControl)
 		ControlWidget.Render(DeltaTime);
 	if (bShowMaterialEditor)
@@ -195,6 +201,12 @@ void FEditorMainPanel::Render(float DeltaTime)
 	bShowSkeletalMeshViewer = SkeletalMeshViewerWidget.IsOpen();
 	ViewportOverlayWidget.Render(DeltaTime);
 	ContentDrawerWidget.Render(DeltaTime);
+	if (ContentDrawerWidget.ConsumeOpenRequest())
+	{
+		ConsoleWidget.SetOpen(false);
+		bShowConsole = false;
+	}
+	bShowConsole = ConsoleWidget.IsOpen();
 
 	// 게임 UI는 PIE 중에만 표시합니다. 편집 중에는 씬 작업을 방해하지 않습니다.
 	if (EditorEngine && EditorEngine->GetEditorState() == EViewportPlayState::Playing)
@@ -288,7 +300,6 @@ void FEditorMainPanel::EnsureDefaultDockLayout(ImGuiID DockspaceId)
 
 	ImGuiID MainNode = DockspaceId;
 	ImGuiID RightNode = 0;
-	ImGuiID BottomNode = 0;
 	ImGuiID LeftNode = 0;
 	ImGuiID CenterAndControlNode = 0;
 	ImGuiID CenterNode = 0;
@@ -297,7 +308,6 @@ void FEditorMainPanel::EnsureDefaultDockLayout(ImGuiID DockspaceId)
 	ImGuiID RightBottomNode = 0;
 
 	ImGui::DockBuilderSplitNode(MainNode, ImGuiDir_Right, 0.185f, &RightNode, &MainNode);
-	ImGui::DockBuilderSplitNode(MainNode, ImGuiDir_Down, 0.22f, &BottomNode, &MainNode);
 	ImGui::DockBuilderSplitNode(MainNode, ImGuiDir_Left, 0.17f, &LeftNode, &CenterAndControlNode);
 	ImGui::DockBuilderSplitNode(CenterAndControlNode, ImGuiDir_Right, 0.20f, &ControlNode, &CenterNode);
 	ImGui::DockBuilderSplitNode(RightNode, ImGuiDir_Up, 0.22f, &RightTopNode, &RightBottomNode);
@@ -305,7 +315,6 @@ void FEditorMainPanel::EnsureDefaultDockLayout(ImGuiID DockspaceId)
 	ImGui::DockBuilderDockWindow("Viewport Settings", LeftNode);
 	ImGui::DockBuilderDockWindow("Viewport", CenterNode);
 	ImGui::DockBuilderDockWindow("Jungle Control Panel", ControlNode);
-	ImGui::DockBuilderDockWindow("Console", BottomNode);
 	ImGui::DockBuilderDockWindow("Scene Manager", RightTopNode);
 	ImGui::DockBuilderDockWindow("Stat Profiler", RightTopNode);
 	ImGui::DockBuilderDockWindow("Jungle Property Window", RightBottomNode);
