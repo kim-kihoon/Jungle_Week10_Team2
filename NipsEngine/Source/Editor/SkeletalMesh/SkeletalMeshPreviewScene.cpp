@@ -6,7 +6,11 @@
 #include "GameFramework/WorldContext.h"
 #include "Component/SkeletalMeshComponent.h"
 #include "Core/ResourceManager.h"
+#include "Engine/Viewport/ViewportCamera.h"
 
+#include <algorithm>
+#include <cfloat>
+#include <cmath>
 #include <string>
 #include <windows.h>
 
@@ -16,6 +20,39 @@ namespace
 {
 int32 GPreviewWorldCounter = 0;
 constexpr const char* DefaultSkeletalMeshPath = "Asset/Fbx/Quinn_UE5/SKM_Quinn_Simple.FBX";
+
+float GetBoneJointPickRadius()
+{
+	return 0.05f;
+}
+
+bool IntersectRayJointSphere(const FRay& Ray, const FVector& JointPosition, float Radius, float& OutRayT, float& OutDistanceSq)
+{
+	const FVector ToJoint = JointPosition - Ray.Origin;
+	float RayT = FVector::DotProduct(ToJoint, Ray.Direction);
+
+	if (RayT < 0.0f)
+	{
+		const bool bRayStartsInsideJoint = ToJoint.SizeSquared() <= Radius * Radius;
+		if (!bRayStartsInsideJoint)
+		{
+			return false;
+		}
+
+		RayT = 0.0f;
+	}
+
+	const FVector ClosestPoint = Ray.Origin + Ray.Direction * RayT;
+	const float DistanceSq = (JointPosition - ClosestPoint).SizeSquared();
+	if (DistanceSq > Radius * Radius)
+	{
+		return false;
+	}
+
+	OutRayT = RayT;
+	OutDistanceSq = DistanceSq;
+	return true;
+}
 }
 
 FSkeletalMeshPreviewScene::~FSkeletalMeshPreviewScene()
@@ -209,6 +246,43 @@ void FSkeletalMeshPreviewScene::SelectBone(int32 BoneIndex)
 int32 FSkeletalMeshPreviewScene::GetSelectedBoneIndex() const
 {
 	return SelectedBoneIndex;
+}
+
+bool FSkeletalMeshPreviewScene::PickBoneJoint(const FRay& Ray, int32& OutBoneIndex) const
+{
+	OutBoneIndex = -1;
+
+	USkeletalMeshComponent* MeshComp = GetPreviewMeshComponent();
+	if (MeshComp == nullptr || !MeshComp->HasValidMesh()) return false;
+
+	USkeletalMesh* Mesh = MeshComp->GetSkeletalMesh();
+	if (Mesh == nullptr || !Mesh->HasValidSkeleton()) return false;
+
+	const TArray<FSkeletalBone>& Bones = Mesh->GetBones();
+
+	float BestHitT = FLT_MAX;
+
+	for (int32 BoneIndex = 0; BoneIndex < static_cast<int32>(Bones.size()); ++BoneIndex)
+	{
+		const FVector JointPosition = MeshComp->GetBoneWorldTransform(BoneIndex).GetLocation();
+		const float PickRadius = GetBoneJointPickRadius();
+
+		float RayT = 0.0f;
+		float DistanceSq = 0.0f;
+
+		if (IntersectRayJointSphere(Ray, JointPosition, PickRadius, RayT, DistanceSq))
+		{
+			float HitT = RayT - std::sqrt(PickRadius * PickRadius - DistanceSq);
+
+			if (HitT < BestHitT)
+			{
+				BestHitT = HitT;
+				OutBoneIndex = BoneIndex;
+			}
+		}
+	}
+
+	return OutBoneIndex >= 0;
 }
 
 void FSkeletalMeshPreviewScene::SetViewportSize(uint32 Width, uint32 Height)

@@ -13,6 +13,19 @@ constexpr int VK_A = 'A';
 constexpr int VK_D = 'D';
 constexpr int VK_Q = 'Q';
 constexpr int VK_E = 'E';
+
+FRay MakeCameraOriginRay(FViewportCamera* Camera, float X, float Y, float ViewportWidth, float ViewportHeight)
+{
+	FRay Ray = Camera->DeprojectScreenToWorld(X, Y, ViewportWidth, ViewportHeight);
+	const FVector NearPoint = Ray.Origin;
+	Ray.Origin = Camera->GetLocation();
+	Ray.Direction = (NearPoint - Ray.Origin).GetSafeNormal();
+	if (Ray.Direction.IsNearlyZero())
+	{
+		Ray.Direction = Camera->GetForwardVector().GetSafeNormal();
+	}
+	return Ray;
+}
 }
 
 void FSkeletalMeshPreviewController::SetViewportClient(FSkeletalMeshPreviewViewportClient* InViewportClient)
@@ -159,7 +172,7 @@ void FSkeletalMeshPreviewController::OnMouseMoveAbsolute(float X, float Y)
 	{
 	    if (FViewportCamera* Camera = ViewportClient->GetCamera())
 	    {
-			FRay Ray = Camera->DeprojectScreenToWorld(X, Y, ViewportWidth, ViewportHeight);
+			FRay Ray = MakeCameraOriginRay(Camera, X, Y, ViewportWidth, ViewportHeight);
 			FHitResult HitResult;
 			GizmoComponent->RaycastMesh(Ray, HitResult);
 	    }
@@ -171,24 +184,32 @@ void FSkeletalMeshPreviewController::OnLeftMouseClick(float X, float Y)
 	if (!ViewportClient || !PreviewScene) return;
 
 	UGizmoComponent* Gizmo = PreviewScene->GetPreviewGizmo();
-	if (!Gizmo || !Gizmo->HasTarget()) return;
 
 	if (FViewportCamera* Camera = ViewportClient->GetCamera())
 	{
-		FRay Ray = Camera->DeprojectScreenToWorld(X, Y, ViewportWidth, ViewportHeight);
+		FRay Ray = MakeCameraOriginRay(Camera, X, Y, ViewportWidth, ViewportHeight);
 		FHitResult HitResult;
 
 		// 기즈모를 맞췄다면 조작 시작
-		if (Gizmo->RaycastMesh(Ray, HitResult))
+		if (Gizmo && Gizmo->HasTarget() && Gizmo->RaycastMesh(Ray, HitResult))
 		{
 			Gizmo->SetPressedOnHandle(true);
 			return; 
 		}
-		else
+
+		if (Gizmo)
 		{
 			Gizmo->SetPressedOnHandle(false);
-			PreviewScene->SelectBone(-1);
 		}
+
+		int32 PickedBoneIndex = -1;
+		if (PreviewScene->IsFullSkeletonVisible() && PreviewScene->PickBoneJoint(Ray, PickedBoneIndex))
+		{
+			PreviewScene->SelectBone(PickedBoneIndex);
+			return;
+		}
+
+		PreviewScene->SelectBone(-1);
 	}
 }
 
@@ -224,7 +245,7 @@ void FSkeletalMeshPreviewController::OnLeftMouseDrag(float X, float Y)
 	{
 		if (FViewportCamera* Camera = ViewportClient->GetCamera())
 		{
-			FRay Ray = Camera->DeprojectScreenToWorld(X, Y, ViewportWidth, ViewportHeight);
+			FRay Ray = MakeCameraOriginRay(Camera, X, Y, ViewportWidth, ViewportHeight);
 			Gizmo->UpdateDrag(Ray);
 		}
 	}

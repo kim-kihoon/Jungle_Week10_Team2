@@ -6,6 +6,7 @@
 #include "Editor/Viewport/SkeletalMeshPreviewViewportClient.h"
 #include "Editor/Input/SkeletalMeshPreviewController.h"
 #include "Engine/Input/InputRouter.h"
+#include "Engine/Geometry/Ray.h"
 
 class UEditorEngine;
 class UWorld;
@@ -33,6 +34,7 @@ public:
 
 	void SelectBone(int32 BoneIndex);
 	int32 GetSelectedBoneIndex() const;
+	bool PickBoneJoint(const FRay& Ray, int32& OutBoneIndex) const;
 
 	FSceneViewport& GetSceneViewport() { return PreviewViewport; }
 	const FSceneViewport& GetSceneViewport() const { return PreviewViewport; }

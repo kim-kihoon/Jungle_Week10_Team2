@@ -795,16 +795,7 @@ void FOverlayRenderCollector::CollectSkeleton(USkeletalMeshComponent* MeshComp, 
 		return;
 	}
 
-	const FVector ReferencePos = bHasValidSelection
-		? MeshComp->GetBoneWorldTransform(SelectedBoneIndex).GetLocation()
-		: (BoneCount > 0 ? MeshComp->GetBoneWorldTransform(0).GetLocation() : MeshComp->GetWorldLocation());
-
-	const FVector CameraToReference = ReferencePos - RenderBus.GetCameraPosition();
-	const float DistanceScale = RenderBus.IsOrthographic()
-		? RenderBus.GetSceneView().CameraOrthoHeight * 0.006f
-		: CameraToReference.Size() * 0.012f;
-
-	const float JointRadius = std::max(0.025f, DistanceScale);
+	constexpr float JointRadius = 0.05f;
 	const float ConnectedJointRadius = JointRadius * 0.65f;
 	const float AxisLength = JointRadius * 4.0f;
 
