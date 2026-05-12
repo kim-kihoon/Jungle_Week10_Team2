@@ -21,6 +21,7 @@ public:
 	virtual void OnKeyReleased(int VK) = 0;
 	virtual void OnWheelScrolled(float Notch) = 0;
 	virtual void Tick(float InDeltaTime) { DeltaTime = InDeltaTime; }
+	virtual bool IsMouseInteractionActive() const { return false; }
 	void SetInputEnabled(bool bEnabled) { bInputEnabled = bEnabled; }
 	bool IsInputEnabled() const { return bInputEnabled; }
 

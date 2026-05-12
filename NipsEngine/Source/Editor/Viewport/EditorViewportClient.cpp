@@ -199,7 +199,7 @@ void FEditorViewportClient::SetViewportSize(float InWidth, float InHeight)
 
 void FEditorViewportClient::Tick(float DeltaTime)
 {
-	if (State && !State->bHovered)
+	if (State && !State->bHovered && !EditorWorldController.IsMouseInteractionActive())
 		return;
 
 	if (bHasCamera && Settings)
@@ -215,7 +215,7 @@ void FEditorViewportClient::Tick(float DeltaTime)
 	FInputRouteContext RouteContext;
 	RouteContext.Window = Window;
 	RouteContext.ViewportRect = Viewport ? Viewport->GetRect() : FViewportRect(0, 0, static_cast<int32>(WindowWidth), static_cast<int32>(WindowHeight));
-	RouteContext.bHovered = State ? State->bHovered : true;
+	RouteContext.bHovered = State ? (State->bHovered || EditorWorldController.IsMouseInteractionActive()) : true;
 	const bool bUIWantsMouse = GameUISystem::Get().WantsMouseCursor();
 	RouteContext.bControlLocked = bControlLocked || bUIWantsMouse;
 	RouteContext.bInputActive = !bUIWantsMouse;
