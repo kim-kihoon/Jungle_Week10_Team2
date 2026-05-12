@@ -333,6 +333,13 @@ void FEditorWorldController::OnKeyDown(int VK)
 	if (Camera->IsOrthographic())
 		return; // no WASD/arrow input in ortho views
 
+	const bool bMovementKey =
+		VK == 'W' || VK == 'A' || VK == 'S' || VK == 'D' || VK == 'Q' || VK == 'E';
+	if (bMovementKey && !bWASDAlwaysMove && !FInputRouter::GetRightDragging())
+	{
+		return;
+	}
+
 	// WASD + QE movement — scale by current camera forward/right vectors
 	FVector Move = FVector(0, 0, 0);
 	const float ActualMoveSpeed = MoveSpeed * MoveSensitivity;

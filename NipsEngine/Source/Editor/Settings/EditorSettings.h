@@ -41,6 +41,7 @@ public:
 	float CameraMoveSensitivity = 1.0f;
 	float CameraRotateSensitivity = 1.0f;
 	float CameraZoomSpeed = 5.0f;
+	bool bCameraWASDAlwaysMove = true;
 
 	// Spatial index / BVH maintenance
 	int32 SpatialBatchRefitMinDirtyCount = 8;

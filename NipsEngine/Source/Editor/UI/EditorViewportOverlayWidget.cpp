@@ -7,6 +7,7 @@
 #include "Editor/Settings/EditorSettings.h"
 
 #include "Engine/Slate/SlateApplication.h"
+#include "Engine/Viewport/ViewportCamera.h"
 #include "Engine/Object/ObjectIterator.h"
 #include "Engine/Asset/StaticMesh.h"
 #include "Engine/Asset/StaticMeshTypes.h"
@@ -191,21 +192,62 @@ void FEditorViewportOverlayWidget::RenderViewportSettings(float DeltaTime)
 	// Camera Sensitivity
 	ImGui::Text("Camera");
 
+	FViewportCamera* Camera = EditorEngine ? EditorEngine->GetCamera() : nullptr;
+	if (Camera)
+	{
+		bool bIsOrtho = (Camera->GetProjectionType() == EViewportProjectionType::Orthographic);
+		if (ImGui::Checkbox("Orthographic", &bIsOrtho))
+		{
+			Camera->SetProjectionType(bIsOrtho ? EViewportProjectionType::Orthographic : EViewportProjectionType::Perspective);
+		}
+
+		float CameraFOV_Deg = MathUtil::RadiansToDegrees(Camera->GetFOV());
+		ImGui::SetNextItemWidth(ItemWidth);
+		if (ImGui::DragFloat("FOV", &CameraFOV_Deg, 0.5f, 1.0f, 90.0f))
+		{
+			Camera->SetFOV(MathUtil::DegreesToRadians(CameraFOV_Deg));
+		}
+
+		float OrthoHeight = Camera->GetOrthoHeight();
+		ImGui::SetNextItemWidth(ItemWidth);
+		if (ImGui::DragFloat("Ortho Height", &OrthoHeight, 0.1f, 0.1f, 1000.0f))
+		{
+			Camera->SetOrthoHeight(MathUtil::Clamp(OrthoHeight, 0.1f, 1000.0f));
+		}
+
+		FVector CamPos = Camera->GetLocation();
+		float CameraLocation[3] = { CamPos.X, CamPos.Y, CamPos.Z };
+		ImGui::SetNextItemWidth(ItemWidth);
+		if (ImGui::DragFloat3("Location", CameraLocation, 0.1f, 0.0f, 0.0f, "%.1f"))
+		{
+			Camera->SetLocation(FVector(CameraLocation[0], CameraLocation[1], CameraLocation[2]));
+		}
+
+		FVector CamRot = Camera->GetRotation().Rotator().Euler();
+		float CameraRotation[3] = { CamRot.X, CamRot.Y, CamRot.Z };
+		ImGui::SetNextItemWidth(ItemWidth);
+		if (ImGui::DragFloat3("Rotation", CameraRotation, 0.1f, 0.0f, 0.0f, "%.1f"))
+		{
+			CameraRotation[1] = MathUtil::Clamp(CameraRotation[1], -89.9f, 89.9f);
+			FRotator NewRotation = FRotator::MakeFromEuler(FVector(CameraRotation[0], CameraRotation[1], CameraRotation[2]));
+			NewRotation.Normalize();
+			Camera->SetRotation(NewRotation);
+		}
+	}
+
+	ImGui::SetNextItemWidth(ItemWidth);
+	ImGui::SliderFloat("Speed", &Settings.CameraSpeed, 0.1f, 100.0f, "%.1f");
+
 	ImGui::SetNextItemWidth(ItemWidth);
 	ImGui::SliderFloat("Move Sensitivity", &Settings.CameraMoveSensitivity, 0.05f, 5.0f, "%.1f");
 	
 	ImGui::SetNextItemWidth(ItemWidth);
 	ImGui::SliderFloat("Rotate Sensitivity", &Settings.CameraRotateSensitivity, 0.05f, 5.0f, "%.1f");
 
-	if (EditorEngine)
-	{
-		FEditorViewportLayout& Layout = EditorEngine->GetViewportLayout();
-		const int32 FocusedIdx = Layout.GetLastFocusedViewportIndex();
-		FEditorViewportClient* FocusedClient = Layout.GetViewportClient(FocusedIdx);
+	ImGui::SetNextItemWidth(ItemWidth);
+	ImGui::SliderFloat("Zoom Speed", &Settings.CameraZoomSpeed, 0.1f, 100.0f, "%.1f");
 
-		ImGui::SetNextItemWidth(ItemWidth);
-		ImGui::SliderFloat("Zoom Speed", &Settings.CameraZoomSpeed, 0.1f, 100.0f, "%.1f");
-	}
+	ImGui::Checkbox("WASD Always Move", &Settings.bCameraWASDAlwaysMove);
 
 	if (Settings.ShowFlags.bBoundingVolume && Settings.ShowFlags.bBVHBoundingVolume)
 	{

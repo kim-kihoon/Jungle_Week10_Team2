@@ -50,6 +50,8 @@ class FEditorWorldController : public IBaseEditorController
 	void  SetRotateSensitivity(float InSens) { RotateSensitivity = InSens; }
 	float GetZoomSpeed() const { return ZoomSpeed; }
 	void  SetZoomSpeed(float InSpeed) { ZoomSpeed = InSpeed; }
+	bool  GetWASDAlwaysMove() const { return bWASDAlwaysMove; }
+	void  SetWASDAlwaysMove(bool bInAlwaysMove) { bWASDAlwaysMove = bInAlwaysMove; }
 	FVector GetTargetLocation() const { return TargetLocation; }
 	void  SetTargetLocation(FVector InTargetLoc) { TargetLocation = InTargetLoc; }
 	void  ResetTargetLocation()
@@ -93,6 +95,7 @@ class FEditorWorldController : public IBaseEditorController
 	float   MoveSensitivity = 1.0f;
 	float   RotateSensitivity = 1.0f;
 	float   ZoomSpeed = 15.0f;
+	bool    bWASDAlwaysMove = true;
 	FVector TargetLocation;
 	bool    bTargetLocationInitialized = false;
 	std::function<void()> OnRequestStartPIE;

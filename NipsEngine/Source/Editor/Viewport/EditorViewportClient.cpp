@@ -208,6 +208,7 @@ void FEditorViewportClient::Tick(float DeltaTime)
 		Controller.SetMoveSensitivity(Settings->CameraMoveSensitivity);
 		Controller.SetRotateSensitivity(Settings->CameraRotateSensitivity);
 		Controller.SetZoomSpeed(Settings->CameraZoomSpeed);
+		Controller.SetWASDAlwaysMove(Settings->bCameraWASDAlwaysMove);
 	}
 
 	FInputRouteContext RouteContext;
