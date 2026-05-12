@@ -135,7 +135,7 @@ void FEditorViewportOverlayWidget::Render(float DeltaTime)
 }
 
 // 뷰포트 설정(표시 플래그, 그리드, 카메라 감도, BVH 관리 정책 등)을 조작하는 창을 렌더링합니다.
-void FEditorViewportOverlayWidget::RenderViewportSettings(float DeltaTime, bool bUseWindow)
+void FEditorViewportOverlayWidget::RenderViewportSettings(float DeltaTime, bool bUseWindow, EViewportSettingsSection Section)
 {
 	FEditorSettings& Settings = FEditorSettings::Get();
 
@@ -148,128 +148,137 @@ void FEditorViewportOverlayWidget::RenderViewportSettings(float DeltaTime, bool 
 	// 위젯 너비를 현재 창 콘텐츠 영역의 50%로 설정하는 람다 또는 변수
 	float ItemWidth = ImGui::GetContentRegionAvail().x * 0.5f;
 
-	// Show Flags
-	ImGui::Text("Show");
-	ImGui::Checkbox("Primitives", &Settings.ShowFlags.bPrimitives);
-	ImGui::Checkbox("BillboardText", &Settings.ShowFlags.bBillboardText);
-	ImGui::Checkbox("Axis", &Settings.ShowFlags.bAxis);
-	ImGui::Checkbox("Grid", &Settings.ShowFlags.bGrid);
-	ImGui::Checkbox("Gizmo", &Settings.ShowFlags.bGizmo);
-	ImGui::Checkbox("Bounding Volume", &Settings.ShowFlags.bBoundingVolume);
-	if (Settings.ShowFlags.bBoundingVolume)
+	if (Section == EViewportSettingsSection::All || Section == EViewportSettingsSection::Show)
 	{
-		ImGui::Indent();
-		ImGui::Checkbox("BVH Bounding Volume", &Settings.ShowFlags.bBVHBoundingVolume);
-		ImGui::Unindent();
-	}
-	ImGui::Checkbox("Audio Range", &Settings.ShowFlags.bAudioRange);
-	if (Settings.ShowFlags.bAudioRange)
-	{
-		ImGui::Indent();
-		ImGui::Checkbox("Audio Component Range", &Settings.ShowFlags.bAudioComponentRange);
-		ImGui::Checkbox("Audio Zone Range", &Settings.ShowFlags.bAudioZoneRange);
-		ImGui::Unindent();
-	}
-	ImGui::Checkbox("LOD", &Settings.ShowFlags.bEnableLOD);
-	ImGui::Checkbox("Decals", &Settings.ShowFlags.bDecals);
-	ImGui::Checkbox("Fog", &Settings.ShowFlags.bFog);
-	ImGui::Checkbox("Shadow", &Settings.ShowFlags.bShadow);
-
-	ImGui::Separator();
-
-	// Grid Settings
-	ImGui::Text("Grid");
-	ImGui::SetNextItemWidth(ItemWidth);
-	ImGui::SliderFloat("Spacing", &Settings.GridSpacing, 0.1f, 10.0f, "%.1f");
-	
-	ImGui::SetNextItemWidth(ItemWidth);
-	ImGui::SliderInt("Half Line Count", &Settings.GridHalfLineCount, 10, 500);
-
-	ImGui::Separator();
-	ImGui::Text("Post Process");
-	ImGui::Checkbox("Enable FXAA", &Settings.bEnableFXAA);
-
-	ImGui::Separator();
-
-	// Camera Sensitivity
-	ImGui::Text("Camera");
-
-	FViewportCamera* Camera = EditorEngine ? EditorEngine->GetCamera() : nullptr;
-	if (Camera)
-	{
-		float CameraFOV_Deg = MathUtil::RadiansToDegrees(Camera->GetFOV());
-		ImGui::SetNextItemWidth(ItemWidth);
-		if (ImGui::DragFloat("FOV", &CameraFOV_Deg, 0.5f, 1.0f, 90.0f))
+		// Show Flags
+		ImGui::Text("Show");
+		ImGui::Checkbox("Primitives", &Settings.ShowFlags.bPrimitives);
+		ImGui::Checkbox("BillboardText", &Settings.ShowFlags.bBillboardText);
+		ImGui::Checkbox("Axis", &Settings.ShowFlags.bAxis);
+		ImGui::Checkbox("Grid", &Settings.ShowFlags.bGrid);
+		ImGui::Checkbox("Gizmo", &Settings.ShowFlags.bGizmo);
+		ImGui::Checkbox("Bounding Volume", &Settings.ShowFlags.bBoundingVolume);
+		if (Settings.ShowFlags.bBoundingVolume)
 		{
-			Camera->SetFOV(MathUtil::DegreesToRadians(CameraFOV_Deg));
+			ImGui::Indent();
+			ImGui::Checkbox("BVH Bounding Volume", &Settings.ShowFlags.bBVHBoundingVolume);
+			ImGui::Unindent();
 		}
-
-		float OrthoHeight = Camera->GetOrthoHeight();
-		ImGui::SetNextItemWidth(ItemWidth);
-		if (ImGui::DragFloat("Ortho Height", &OrthoHeight, 0.1f, 0.1f, 1000.0f))
+		ImGui::Checkbox("Audio Range", &Settings.ShowFlags.bAudioRange);
+		if (Settings.ShowFlags.bAudioRange)
 		{
-			Camera->SetOrthoHeight(MathUtil::Clamp(OrthoHeight, 0.1f, 1000.0f));
+			ImGui::Indent();
+			ImGui::Checkbox("Audio Component Range", &Settings.ShowFlags.bAudioComponentRange);
+			ImGui::Checkbox("Audio Zone Range", &Settings.ShowFlags.bAudioZoneRange);
+			ImGui::Unindent();
 		}
+		ImGui::Checkbox("LOD", &Settings.ShowFlags.bEnableLOD);
+		ImGui::Checkbox("Decals", &Settings.ShowFlags.bDecals);
+		ImGui::Checkbox("Fog", &Settings.ShowFlags.bFog);
+		ImGui::Checkbox("Shadow", &Settings.ShowFlags.bShadow);
 
-		FVector CamPos = Camera->GetLocation();
-		float CameraLocation[3] = { CamPos.X, CamPos.Y, CamPos.Z };
-		ImGui::SetNextItemWidth(ItemWidth);
-		if (ImGui::DragFloat3("Location", CameraLocation, 0.1f, 0.0f, 0.0f, "%.1f"))
-		{
-			Camera->SetLocation(FVector(CameraLocation[0], CameraLocation[1], CameraLocation[2]));
-		}
-
-		FVector CamRot = Camera->GetRotation().Rotator().Euler();
-		float CameraRotation[3] = { CamRot.X, CamRot.Y, CamRot.Z };
-		ImGui::SetNextItemWidth(ItemWidth);
-		if (ImGui::DragFloat3("Rotation", CameraRotation, 0.1f, 0.0f, 0.0f, "%.1f"))
-		{
-			CameraRotation[1] = MathUtil::Clamp(CameraRotation[1], -89.9f, 89.9f);
-			FRotator NewRotation = FRotator::MakeFromEuler(FVector(CameraRotation[0], CameraRotation[1], CameraRotation[2]));
-			NewRotation.Normalize();
-			Camera->SetRotation(NewRotation);
-		}
-	}
-
-	ImGui::SetNextItemWidth(ItemWidth);
-	ImGui::SliderFloat("Speed", &Settings.CameraSpeed, 0.1f, 100.0f, "%.1f");
-
-	ImGui::SetNextItemWidth(ItemWidth);
-	ImGui::SliderFloat("Move Sensitivity", &Settings.CameraMoveSensitivity, 0.05f, 5.0f, "%.1f");
-	
-	ImGui::SetNextItemWidth(ItemWidth);
-	ImGui::SliderFloat("Rotate Sensitivity", &Settings.CameraRotateSensitivity, 0.05f, 5.0f, "%.1f");
-
-	ImGui::SetNextItemWidth(ItemWidth);
-	ImGui::SliderFloat("Zoom Speed", &Settings.CameraZoomSpeed, 0.1f, 100.0f, "%.1f");
-
-	ImGui::Checkbox("WASD Always Move", &Settings.bCameraWASDAlwaysMove);
-
-	if (Settings.ShowFlags.bBoundingVolume && Settings.ShowFlags.bBVHBoundingVolume)
-	{
 		ImGui::Separator();
-		ImGui::Text("BVH Maintenance");
-		bool bPolicyChanged = false;
+
+		// Grid Settings
+		ImGui::Text("Grid");
+		ImGui::SetNextItemWidth(ItemWidth);
+		ImGui::SliderFloat("Spacing", &Settings.GridSpacing, 0.1f, 10.0f, "%.1f");
 
 		ImGui::SetNextItemWidth(ItemWidth);
-		bPolicyChanged |= ImGui::SliderInt("Batch Refit Min Dirty", &Settings.SpatialBatchRefitMinDirtyCount, 1, 256);
+		ImGui::SliderInt("Half Line Count", &Settings.GridHalfLineCount, 10, 500);
 
-		ImGui::SetNextItemWidth(ItemWidth);
-		bPolicyChanged |= ImGui::SliderInt("Batch Refit Dirty %", &Settings.SpatialBatchRefitDirtyPercentThreshold, 1, 100);
+		ImGui::Separator();
+		ImGui::Text("Post Process");
+		ImGui::Checkbox("Enable FXAA", &Settings.bEnableFXAA);
 
-		ImGui::SetNextItemWidth(ItemWidth);
-		bPolicyChanged |= ImGui::SliderInt("Rotation Structural Changes", &Settings.SpatialRotationStructuralChangeThreshold, 1, 256);
-
-		ImGui::SetNextItemWidth(ItemWidth);
-		bPolicyChanged |= ImGui::SliderInt("Rotation Dirty Count", &Settings.SpatialRotationDirtyCountThreshold, 1, 512);
-
-		ImGui::SetNextItemWidth(ItemWidth);
-		bPolicyChanged |= ImGui::SliderInt("Rotation Dirty %", &Settings.SpatialRotationDirtyPercentThreshold, 1, 100);
-
-		if (bPolicyChanged && EditorEngine)
+		if (Settings.ShowFlags.bBoundingVolume && Settings.ShowFlags.bBVHBoundingVolume)
 		{
-			EditorEngine->ApplySpatialIndexMaintenanceSettings();
+			ImGui::Separator();
+			ImGui::Text("BVH Maintenance");
+			bool bPolicyChanged = false;
+
+			ImGui::SetNextItemWidth(ItemWidth);
+			bPolicyChanged |= ImGui::SliderInt("Batch Refit Min Dirty", &Settings.SpatialBatchRefitMinDirtyCount, 1, 256);
+
+			ImGui::SetNextItemWidth(ItemWidth);
+			bPolicyChanged |= ImGui::SliderInt("Batch Refit Dirty %", &Settings.SpatialBatchRefitDirtyPercentThreshold, 1, 100);
+
+			ImGui::SetNextItemWidth(ItemWidth);
+			bPolicyChanged |= ImGui::SliderInt("Rotation Structural Changes", &Settings.SpatialRotationStructuralChangeThreshold, 1, 256);
+
+			ImGui::SetNextItemWidth(ItemWidth);
+			bPolicyChanged |= ImGui::SliderInt("Rotation Dirty Count", &Settings.SpatialRotationDirtyCountThreshold, 1, 512);
+
+			ImGui::SetNextItemWidth(ItemWidth);
+			bPolicyChanged |= ImGui::SliderInt("Rotation Dirty %", &Settings.SpatialRotationDirtyPercentThreshold, 1, 100);
+
+			if (bPolicyChanged && EditorEngine)
+			{
+				EditorEngine->ApplySpatialIndexMaintenanceSettings();
+			}
 		}
+
+		if (Section == EViewportSettingsSection::All)
+		{
+			ImGui::Separator();
+		}
+	}
+
+	if (Section == EViewportSettingsSection::All || Section == EViewportSettingsSection::Camera)
+	{
+		// Camera Sensitivity
+		ImGui::Text("Camera");
+
+		FViewportCamera* Camera = EditorEngine ? EditorEngine->GetCamera() : nullptr;
+		if (Camera)
+		{
+			float CameraFOV_Deg = MathUtil::RadiansToDegrees(Camera->GetFOV());
+			ImGui::SetNextItemWidth(ItemWidth);
+			if (ImGui::DragFloat("FOV", &CameraFOV_Deg, 0.5f, 1.0f, 90.0f))
+			{
+				Camera->SetFOV(MathUtil::DegreesToRadians(CameraFOV_Deg));
+			}
+
+			float OrthoHeight = Camera->GetOrthoHeight();
+			ImGui::SetNextItemWidth(ItemWidth);
+			if (ImGui::DragFloat("Ortho Height", &OrthoHeight, 0.1f, 0.1f, 1000.0f))
+			{
+				Camera->SetOrthoHeight(MathUtil::Clamp(OrthoHeight, 0.1f, 1000.0f));
+			}
+
+			FVector CamPos = Camera->GetLocation();
+			float CameraLocation[3] = { CamPos.X, CamPos.Y, CamPos.Z };
+			ImGui::SetNextItemWidth(ItemWidth);
+			if (ImGui::DragFloat3("Location", CameraLocation, 0.1f, 0.0f, 0.0f, "%.1f"))
+			{
+				Camera->SetLocation(FVector(CameraLocation[0], CameraLocation[1], CameraLocation[2]));
+			}
+
+			FVector CamRot = Camera->GetRotation().Rotator().Euler();
+			float CameraRotation[3] = { CamRot.X, CamRot.Y, CamRot.Z };
+			ImGui::SetNextItemWidth(ItemWidth);
+			if (ImGui::DragFloat3("Rotation", CameraRotation, 0.1f, 0.0f, 0.0f, "%.1f"))
+			{
+				CameraRotation[1] = MathUtil::Clamp(CameraRotation[1], -89.9f, 89.9f);
+				FRotator NewRotation = FRotator::MakeFromEuler(FVector(CameraRotation[0], CameraRotation[1], CameraRotation[2]));
+				NewRotation.Normalize();
+				Camera->SetRotation(NewRotation);
+			}
+		}
+
+		ImGui::SetNextItemWidth(ItemWidth);
+		ImGui::SliderFloat("Speed", &Settings.CameraSpeed, 0.1f, 100.0f, "%.1f");
+
+		ImGui::SetNextItemWidth(ItemWidth);
+		ImGui::SliderFloat("Move Sensitivity", &Settings.CameraMoveSensitivity, 0.05f, 5.0f, "%.1f");
+
+		ImGui::SetNextItemWidth(ItemWidth);
+		ImGui::SliderFloat("Rotate Sensitivity", &Settings.CameraRotateSensitivity, 0.05f, 5.0f, "%.1f");
+
+		ImGui::SetNextItemWidth(ItemWidth);
+		ImGui::SliderFloat("Zoom Speed", &Settings.CameraZoomSpeed, 0.1f, 100.0f, "%.1f");
+
+		ImGui::Checkbox("WASD Always Move", &Settings.bCameraWASDAlwaysMove);
 	}
 
 	if (bUseWindow)

@@ -52,6 +52,8 @@ private:
 	UTexture* ScaleIconTexture = nullptr;
 	UTexture* WorldSpaceIconTexture = nullptr;
 	UTexture* LocalSpaceIconTexture = nullptr;
+	UTexture* ShowFlagIconTexture = nullptr;
+	UTexture* CameraIconTexture = nullptr;
 
 	bool* bShowConsole = nullptr;
 	bool* bShowControl = nullptr;
