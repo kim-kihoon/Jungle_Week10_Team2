@@ -193,7 +193,7 @@ void FEditorToolbarWidget::SetPanelVisibilityRefs(
 void FEditorToolbarWidget::Render(float DeltaTime)
 {
 	(void)DeltaTime;
-	constexpr float EditorToolBarHeight = 34.0f;
+	constexpr float EditorToolBarHeight = 40.0f;
 
 	const ImGuiIO& IO = ImGui::GetIO();
 	if (bShowConsole && ImGui::IsKeyPressed(ImGuiKey_GraveAccent, false) && (*bShowConsole || !IO.WantTextInput))
@@ -253,11 +253,6 @@ void FEditorToolbarWidget::Render(float DeltaTime)
 	RenderViewMenu();
 	RenderEditMenu();
 	RenderHelpMenu();
-
-	if (PlayStreamWidget)
-	{
-		PlayStreamWidget->Render(DeltaTime);
-	}
 
 	ImGui::EndMainMenuBar();
 	RenderEditorToolBar(MenuBarHeight, EditorToolBarHeight);
@@ -324,6 +319,12 @@ void FEditorToolbarWidget::RenderEditorToolBar(float MenuBarHeight, float ToolBa
 				ImGui::TextDisabled("Viewport settings unavailable.");
 			}
 			ImGui::EndPopup();
+		}
+
+		if (PlayStreamWidget)
+		{
+			ImGui::SameLine();
+			PlayStreamWidget->Render(0.0f);
 		}
 	}
 

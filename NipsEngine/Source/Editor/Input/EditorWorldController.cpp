@@ -374,6 +374,10 @@ void FEditorWorldController::OnKeyDown(int VK)
 	case 'Q': Move += FVector(0, 0, 1)           * -ActualMoveSpeed * DeltaTime; break;
 	}
 	TargetLocation += Move;
+	if (IsFreeOrthographicCamera())
+	{
+		OrthoOrbitTarget += Move;
+	}
 
 	// Arrow key rotation
 	constexpr float AngleVelocity = 60.f;
@@ -390,6 +394,12 @@ void FEditorWorldController::OnKeyDown(int VK)
 	{
 		Pitch = MathUtil::Clamp(Pitch, -89.f, 89.f);
 		UpdateCameraRotation();
+		if (IsFreeOrthographicCamera())
+		{
+			const FVector Forward = Camera->GetForwardVector().GetSafeNormal();
+			TargetLocation = OrthoOrbitTarget - Forward * OrthoOrbitDistance;
+			Camera->SetLocation(TargetLocation);
+		}
 	}
 }
 
@@ -496,7 +506,12 @@ void FEditorWorldController::OnMiddleMouseDrag(float DeltaX, float DeltaY)
 								 : 20.0f) * MoveSensitivity;
 	const FVector Right    = Camera->GetEffectiveRight();
 	const FVector Up       = Camera->GetEffectiveUp();
-	TargetLocation += Right * (-DeltaX * PanScale * DeltaTime) + Up * (DeltaY * PanScale * DeltaTime);
+	const FVector PanMove = Right * (-DeltaX * PanScale * DeltaTime) + Up * (DeltaY * PanScale * DeltaTime);
+	TargetLocation += PanMove;
+	if (IsFreeOrthographicCamera())
+	{
+		OrthoOrbitTarget += PanMove;
+	}
 }
 
 void FEditorWorldController::SetSelectionManager(FSelectionManager* InSM)
