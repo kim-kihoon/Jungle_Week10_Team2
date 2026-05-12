@@ -155,6 +155,7 @@ void FEditorRenderPipeline::RenderSkeletalMeshPreview(FRenderer& Renderer, FSkel
 	const FFrustum& ViewFrustum = SceneView.CameraFrustum;
 	Collector.CollectWorld(PreviewScene.GetWorld(), Settings.ShowFlags, SceneView.ViewMode, Bus, &ViewFrustum);
 	Collector.CollectDebugBounds(PreviewScene.GetWorld(), Settings.ShowFlags, SceneView.ViewMode, Bus);
+	Collector.CollectSkeleton(PreviewScene.GetPreviewMeshComponent(), PreviewScene.GetSelectedBoneIndex(), Bus, &Renderer.GetEditorLineBatcher());
 
 	Renderer.PrepareBatchers(Bus);
 	Renderer.Render(Bus);

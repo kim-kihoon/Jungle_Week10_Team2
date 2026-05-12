@@ -36,6 +36,8 @@ private:
 
 	USkeletalMesh* CurrentSkeletalMesh = nullptr;
 	int32 SelectedBoneIndex = -1;
+	FVector CachedEulerRotation;
+	int32 LastEditedBoneIndex = -1;
 
 	TArray<TArray<int32>> CachedBoneChildren;
 

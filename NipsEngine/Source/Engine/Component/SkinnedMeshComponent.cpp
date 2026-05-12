@@ -121,7 +121,7 @@ void USkinnedMeshComponent::RefreshBoneTransforms()
         else
         {
 			//루트 이거나 데이터가 잘못 들어와서 현재 본보다 부모의 인덱스가 뒤에 있을 때
-            ComponentSpaceBoneTransforms[BoneIndex] = Bone.ReferenceLocalTransform;
+            ComponentSpaceBoneTransforms[BoneIndex] = CurrentLocalTransform;
         }
     }
 
