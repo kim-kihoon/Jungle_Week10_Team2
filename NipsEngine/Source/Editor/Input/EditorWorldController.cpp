@@ -213,11 +213,11 @@ void FEditorWorldController::OnRightMouseClick(float DeltaX, float DeltaY)
 	// Seed Yaw/Pitch from current camera orientation so the first drag doesn't snap
 	if (!Camera)
 		return;
-	const FVector Forward = Camera->GetForwardVector().GetSafeNormal();
+	const FVector Forward = Camera->GetEffectiveForward().GetSafeNormal();
 	Pitch = MathUtil::RadiansToDegrees(std::asin(MathUtil::Clamp(Forward.Z, -1.f, 1.f)));
 	Yaw   = MathUtil::RadiansToDegrees(std::atan2(Forward.Y, Forward.X));
 
-	if (IsFreeOrthographicCamera())
+	if (Camera->IsOrthographic())
 	{
 		OrthoOrbitDistance = std::max(Camera->GetOrthoHeight() * 2.0f, 1.0f);
 		OrthoOrbitTarget = Camera->GetLocation() + Forward * OrthoOrbitDistance;
@@ -241,24 +241,20 @@ void FEditorWorldController::OnRightMouseDrag(float DeltaX, float DeltaY)
 	if (bCtrlDown || bAltDown || bShiftDown)
 		return;
 
-	if (Camera->IsOrthographic() && Camera->HasCustomLookDir())
+	if (Camera->IsOrthographic())
 	{
-		// Pan: scale movement proportionally to current ortho zoom level
-		const float     PanScale = Camera->GetOrthoHeight() * 0.002f;
-		const FVector   Right    = Camera->GetEffectiveRight();
-		const FVector   Up       = Camera->GetEffectiveUp();
-		TargetLocation += Right * (-DeltaX * PanScale) + Up * (DeltaY * PanScale);
+		const float RotationSpeed = 0.15f * RotateSensitivity;
+		if (Camera->HasCustomLookDir())
+		{
+			ConvertFixedOrthographicToFree();
+		}
+		OrbitFreeOrthographic(DeltaX * RotationSpeed, -DeltaY * RotationSpeed);
+		return;
 	}
-	else
+
 	{
 		// Accumulate yaw/pitch and rebuild rotation quaternion
 		const float RotationSpeed = 0.15f * RotateSensitivity;
-		if (IsFreeOrthographicCamera())
-		{
-			OrbitFreeOrthographicAroundWorldUp(DeltaX * RotationSpeed);
-			return;
-		}
-
 		Yaw   += DeltaX * RotationSpeed;
 		Pitch -= DeltaY * RotationSpeed;
 		Pitch  = MathUtil::Clamp(Pitch, -89.f, 89.f);
@@ -350,9 +346,6 @@ void FEditorWorldController::OnKeyDown(int VK)
 	if (bCtrlDown || bAltDown || bShiftDown)
 		return;
 
-	if (Camera->IsOrthographic() && Camera->HasCustomLookDir())
-		return; // no WASD/arrow input in fixed-axis ortho views
-
 	const bool bMovementKey =
 		VK == 'W' || VK == 'A' || VK == 'S' || VK == 'D' || VK == 'Q' || VK == 'E';
 	if (bMovementKey && !bWASDAlwaysMove && !FInputRouter::GetRightDragging())
@@ -363,14 +356,31 @@ void FEditorWorldController::OnKeyDown(int VK)
 	// WASD + QE movement — scale by current camera forward/right vectors
 	FVector Move = FVector(0, 0, 0);
 	const float ActualMoveSpeed = MoveSpeed * MoveSensitivity;
-	switch (VK)
+	if (IsFreeOrthographicCamera())
 	{
-	case 'W': Move += Camera->GetForwardVector() *  ActualMoveSpeed * DeltaTime; break;
-	case 'S': Move += Camera->GetForwardVector() * -ActualMoveSpeed * DeltaTime; break;
-	case 'D': Move += Camera->GetRightVector()   *  ActualMoveSpeed * DeltaTime; break;
-	case 'A': Move += Camera->GetRightVector()   * -ActualMoveSpeed * DeltaTime; break;
-	case 'E': Move += FVector(0, 0, 1)           *  ActualMoveSpeed * DeltaTime; break;
-	case 'Q': Move += FVector(0, 0, 1)           * -ActualMoveSpeed * DeltaTime; break;
+		const FVector PlanarForward = GetFreeOrthographicPlanarForward();
+		const FVector PlanarRight = GetFreeOrthographicPlanarRight();
+		switch (VK)
+		{
+		case 'W': Move += PlanarForward *  ActualMoveSpeed * DeltaTime; break;
+		case 'S': Move += PlanarForward * -ActualMoveSpeed * DeltaTime; break;
+		case 'D': Move += PlanarRight   *  ActualMoveSpeed * DeltaTime; break;
+		case 'A': Move += PlanarRight   * -ActualMoveSpeed * DeltaTime; break;
+		case 'E': Move += FVector(0, 0, 1) *  ActualMoveSpeed * DeltaTime; break;
+		case 'Q': Move += FVector(0, 0, 1) * -ActualMoveSpeed * DeltaTime; break;
+		}
+	}
+	else
+	{
+		switch (VK)
+		{
+		case 'W': Move += Camera->GetForwardVector() *  ActualMoveSpeed * DeltaTime; break;
+		case 'S': Move += Camera->GetForwardVector() * -ActualMoveSpeed * DeltaTime; break;
+		case 'D': Move += Camera->GetRightVector()   *  ActualMoveSpeed * DeltaTime; break;
+		case 'A': Move += Camera->GetRightVector()   * -ActualMoveSpeed * DeltaTime; break;
+		case 'E': Move += FVector(0, 0, 1)           *  ActualMoveSpeed * DeltaTime; break;
+		case 'Q': Move += FVector(0, 0, 1)           * -ActualMoveSpeed * DeltaTime; break;
+		}
 	}
 	TargetLocation += Move;
 	if (IsFreeOrthographicCamera())
@@ -386,27 +396,29 @@ void FEditorWorldController::OnKeyDown(int VK)
 	{
 	case VK_LEFT:  Yaw   -= ActualRotateSpeed * DeltaTime; bRotationChanged = true; break;
 	case VK_RIGHT: Yaw   += ActualRotateSpeed * DeltaTime; bRotationChanged = true; break;
-	case VK_UP:
-		if (!IsFreeOrthographicCamera())
-		{
-			Pitch += ActualRotateSpeed * DeltaTime;
-			bRotationChanged = true;
-		}
-		break;
-	case VK_DOWN:
-		if (!IsFreeOrthographicCamera())
-		{
-			Pitch -= ActualRotateSpeed * DeltaTime;
-			bRotationChanged = true;
-		}
-		break;
+	case VK_UP:    Pitch += ActualRotateSpeed * DeltaTime; bRotationChanged = true; break;
+	case VK_DOWN:  Pitch -= ActualRotateSpeed * DeltaTime; bRotationChanged = true; break;
 	}
 	if (bRotationChanged)
 	{
-		if (IsFreeOrthographicCamera())
+		if (Camera->IsOrthographic())
 		{
-			const float DeltaYaw = (VK == VK_RIGHT ? 1.0f : -1.0f) * ActualRotateSpeed * DeltaTime;
-			OrbitFreeOrthographicAroundWorldUp(DeltaYaw);
+			if (Camera->HasCustomLookDir())
+			{
+				ConvertFixedOrthographicToFree();
+			}
+
+			float DeltaYaw = 0.0f;
+			float DeltaPitch = 0.0f;
+			switch (VK)
+			{
+			case VK_LEFT:  DeltaYaw = -ActualRotateSpeed * DeltaTime; break;
+			case VK_RIGHT: DeltaYaw =  ActualRotateSpeed * DeltaTime; break;
+			case VK_UP:    DeltaPitch =  ActualRotateSpeed * DeltaTime; break;
+			case VK_DOWN:  DeltaPitch = -ActualRotateSpeed * DeltaTime; break;
+			default: break;
+			}
+			OrbitFreeOrthographic(DeltaYaw, DeltaPitch);
 		}
 		else
 		{
@@ -495,7 +507,7 @@ void FEditorWorldController::OnWheelScrolled(float Notch)
 
 	if (Camera->IsOrthographic())
 	{
-		float NewWidth = Camera->GetOrthoHeight() - Notch * 300.f * MoveSensitivity * DeltaTime;
+		float NewWidth = Camera->GetOrthoHeight() - Notch * 30.f * MoveSensitivity;
 		Camera->SetOrthoHeight(MathUtil::Clamp(NewWidth, 0.1f, 1000.0f));
 	}
 	else
@@ -519,7 +531,8 @@ void FEditorWorldController::OnMiddleMouseDrag(float DeltaX, float DeltaY)
 								 : 20.0f) * MoveSensitivity;
 	const FVector Right    = Camera->GetEffectiveRight();
 	const FVector Up       = Camera->GetEffectiveUp();
-	const FVector PanMove = Right * (-DeltaX * PanScale * DeltaTime) + Up * (DeltaY * PanScale * DeltaTime);
+	const float TimeScale = Camera->IsOrthographic() ? 1.0f : DeltaTime;
+	const FVector PanMove = Right * (-DeltaX * PanScale * TimeScale) + Up * (DeltaY * PanScale * TimeScale);
 	TargetLocation += PanMove;
 	if (IsFreeOrthographicCamera())
 	{
@@ -575,27 +588,107 @@ void FEditorWorldController::UpdateCameraRotation()
 	Camera->SetRotation(NewRotation);
 }
 
-void FEditorWorldController::OrbitFreeOrthographicAroundWorldUp(float DeltaYawDegrees)
+void FEditorWorldController::UpdateCameraRotationFromForward(const FVector& InForward)
+{
+	if (!Camera)
+		return;
+
+	FVector Forward = InForward.GetSafeNormal();
+	if (Forward.IsNearlyZero())
+		return;
+
+	FVector UpRef = FVector::UpVector;
+	if (std::abs(FVector::DotProduct(Forward, UpRef)) > 0.99f)
+	{
+		UpRef = FVector(1.0f, 0.0f, 0.0f);
+	}
+
+	FVector Right = FVector::CrossProduct(UpRef, Forward).GetSafeNormal();
+	if (Right.IsNearlyZero())
+		return;
+
+	FVector Up = FVector::CrossProduct(Forward, Right).GetSafeNormal();
+
+	FMatrix RotMat = FMatrix::Identity;
+	RotMat.SetAxes(Forward, Right, Up);
+
+	FQuat NewRotation(RotMat);
+	NewRotation.Normalize();
+	Camera->SetRotation(NewRotation);
+
+	Pitch = MathUtil::RadiansToDegrees(std::asin(MathUtil::Clamp(Forward.Z, -1.f, 1.f)));
+	Yaw = MathUtil::RadiansToDegrees(std::atan2(Forward.Y, Forward.X));
+}
+
+void FEditorWorldController::OrbitFreeOrthographic(float DeltaYawDegrees, float DeltaPitchDegrees)
 {
 	if (!IsFreeOrthographicCamera())
 		return;
 
-	const FQuat YawDelta(FVector::UpVector, MathUtil::DegreesToRadians(DeltaYawDegrees));
 	FVector Offset = Camera->GetLocation() - OrthoOrbitTarget;
 	if (Offset.IsNearlyZero())
 	{
 		Offset = -Camera->GetForwardVector().GetSafeNormal() * std::max(OrthoOrbitDistance, 1.0f);
 	}
 
+	const FQuat YawDelta(FVector::UpVector, MathUtil::DegreesToRadians(DeltaYawDegrees));
 	Offset = YawDelta.RotateVector(Offset);
+	FVector ForwardAfterYaw = (-Offset).GetSafeNormal();
+	FVector RightAxis = FVector::CrossProduct(FVector::UpVector, ForwardAfterYaw).GetSafeNormal();
+	if (!RightAxis.IsNearlyZero())
+	{
+		const FQuat PitchDelta(RightAxis, MathUtil::DegreesToRadians(DeltaPitchDegrees));
+		const FVector CandidateOffset = PitchDelta.RotateVector(Offset);
+		const FVector CandidateForward = (-CandidateOffset).GetSafeNormal();
+		const float CandidatePitch = MathUtil::RadiansToDegrees(std::asin(MathUtil::Clamp(CandidateForward.Z, -1.f, 1.f)));
+		if (CandidatePitch > -89.0f && CandidatePitch < 89.0f)
+		{
+			Offset = CandidateOffset;
+		}
+	}
+
 	OrthoOrbitDistance = std::max(Offset.Size(), 1.0f);
 	TargetLocation = OrthoOrbitTarget + Offset;
 	Camera->SetLocation(TargetLocation);
-	Camera->SetLookAt(OrthoOrbitTarget);
+	UpdateCameraRotationFromForward(-Offset);
+}
 
-	const FVector Forward = Camera->GetForwardVector().GetSafeNormal();
-	Pitch = MathUtil::RadiansToDegrees(std::asin(MathUtil::Clamp(Forward.Z, -1.f, 1.f)));
-	Yaw = MathUtil::RadiansToDegrees(std::atan2(Forward.Y, Forward.X));
+void FEditorWorldController::ConvertFixedOrthographicToFree()
+{
+	if (!Camera || !Camera->IsOrthographic() || !Camera->HasCustomLookDir())
+		return;
+
+	const FVector Forward = Camera->GetEffectiveForward().GetSafeNormal();
+	Camera->ClearCustomLookDir();
+	UpdateCameraRotationFromForward(Forward);
+	TargetLocation = Camera->GetLocation();
+	OrthoOrbitDistance = std::max(Camera->GetOrthoHeight() * 2.0f, 1.0f);
+	OrthoOrbitTarget = Camera->GetLocation() + Forward * OrthoOrbitDistance;
+}
+
+FVector FEditorWorldController::GetFreeOrthographicPlanarForward() const
+{
+	if (!Camera)
+		return FVector(1.0f, 0.0f, 0.0f);
+
+	FVector Forward = Camera->GetForwardVector();
+	Forward.Z = 0.0f;
+	if (Forward.IsNearlyZero())
+	{
+		Forward = FVector(1.0f, 0.0f, 0.0f);
+	}
+	return Forward.GetSafeNormal();
+}
+
+FVector FEditorWorldController::GetFreeOrthographicPlanarRight() const
+{
+	const FVector Forward = GetFreeOrthographicPlanarForward();
+	FVector Right = FVector::CrossProduct(FVector::UpVector, Forward).GetSafeNormal();
+	if (Right.IsNearlyZero())
+	{
+		Right = FVector(0.0f, 1.0f, 0.0f);
+	}
+	return Right;
 }
 
 bool FEditorWorldController::IsActiveOperation() const

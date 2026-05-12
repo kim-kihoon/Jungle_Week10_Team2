@@ -9,6 +9,7 @@
 #include "Component/StaticMeshComponent.h"
 #include "Core/Paths.h"
 #include "Core/ResourceManager.h"
+#include "Engine/Input/InputRouter.h"
 #include "GameFramework/PrimitiveActors.h"
 #include "GameFramework/World.h"
 #include "ImGui/imgui.h"
@@ -21,6 +22,7 @@
 namespace
 {
 	constexpr float ContentDrawerAnimationSpeed = 12.0f;
+	constexpr float ContentDrawerBottomBarHeight = 28.0f;
 
 	constexpr const char* AssetKindLabels[] = {
 		"All",
@@ -58,6 +60,17 @@ namespace
 	FString ToLowerPathKey(const FString& Path)
 	{
 		return ToLowerString(NormalizeAssetPath(Path));
+	}
+
+	void BlockViewportInputForOverlay(bool bKeyboard = false)
+	{
+		FGuiInputState& GuiState = FInputRouter::GetGuiInputState();
+		GuiState.bBlockViewportInput = true;
+		GuiState.bUsingMouse = true;
+		if (bKeyboard)
+		{
+			GuiState.bUsingKeyboard = true;
+		}
 	}
 
 	std::unordered_set<FString> MakePathSet(const TArray<FString>& Paths)
@@ -394,11 +407,12 @@ void FEditorContentDrawerWidget::RefreshAssetTree()
 void FEditorContentDrawerWidget::Render(float DeltaTime)
 {
 	(void)DeltaTime;
+	bViewportInputBlocking = false;
 
 	const ImGuiViewport* Viewport = ImGui::GetMainViewport();
 	const ImVec2 WorkPos = Viewport->WorkPos;
 	const ImVec2 WorkSize = Viewport->WorkSize;
-	const float BottomBarHeight = 28.0f;
+	const float BottomBarHeight = ContentDrawerBottomBarHeight;
 	const float TargetAlpha = bOpen ? 1.0f : 0.0f;
 	const float AlphaStep = std::clamp(DeltaTime * ContentDrawerAnimationSpeed, 0.0f, 1.0f);
 	DrawerAnimationAlpha += (TargetAlpha - DrawerAnimationAlpha) * AlphaStep;
@@ -453,6 +467,12 @@ void FEditorContentDrawerWidget::Render(float DeltaTime)
 	bool bWindowOpen = bOpen;
 	if (ImGui::Begin("Content Drawer", &bWindowOpen, WindowFlags))
 	{
+		if (ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows) || ImGui::IsAnyItemActive())
+		{
+			bViewportInputBlocking = true;
+			BlockViewportInputForOverlay(true);
+		}
+
 		RenderResizeHandle(AvailableHeight);
 		RenderDrawerToolbar();
 		ImGui::Separator();
@@ -546,6 +566,12 @@ void FEditorContentDrawerWidget::RenderBottomBar(const ImGuiViewport* Viewport, 
 
 	if (ImGui::Begin("##ContentDrawerBottomBar", nullptr, WindowFlags))
 	{
+		if (ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows) || ImGui::IsAnyItemActive())
+		{
+			bViewportInputBlocking = true;
+			BlockViewportInputForOverlay(false);
+		}
+
 		ImDrawList* DrawList = ImGui::GetWindowDrawList();
 		const ImVec2 BarMin = ImGui::GetWindowPos();
 		const ImVec2 BarMax = ImVec2(BarMin.x + ImGui::GetWindowWidth(), BarMin.y + ImGui::GetWindowHeight());

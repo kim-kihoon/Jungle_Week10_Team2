@@ -826,6 +826,7 @@ void APlayerCameraManager::FillSceneView(FSceneView& OutView, const FCameraViewI
 	OutView.NearPlane = CameraView.NearPlane;
 	OutView.FarPlane = CameraView.FarPlane;
 	OutView.bOrthographic = CameraView.bOrthographic;
+	OutView.bFixedOrthographic = false;
 	OutView.CameraOrthoHeight = CameraView.OrthoHeight;
 	OutView.CameraFrustum.UpdateFromCamera(OutView.View, OutView.Proj);
 	OutView.ViewRect = ViewRect;
