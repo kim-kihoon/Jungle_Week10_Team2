@@ -65,10 +65,11 @@ void FEditorSkeletalMeshViewerWidget::Render(float DeltaTime)
 		RenderToolbar();
 
 		const ImVec2 LayoutSize = ImGui::GetContentRegionAvail();
-		if (ImGui::BeginTable("ViewerLayout", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV, LayoutSize))
+		if (ImGui::BeginTable("ViewerLayout", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV, LayoutSize))
 		{
 			ImGui::TableSetupColumn("Hierarchy", ImGuiTableColumnFlags_WidthFixed, 250.0f);
 			ImGui::TableSetupColumn("Viewport", ImGuiTableColumnFlags_WidthStretch);
+			ImGui::TableSetupColumn("Details", ImGuiTableColumnFlags_WidthFixed, 300.0f);
 			ImGui::TableNextRow();
 
 			ImGui::TableSetColumnIndex(0);
@@ -78,10 +79,7 @@ void FEditorSkeletalMeshViewerWidget::Render(float DeltaTime)
 
 			ImGui::TableSetColumnIndex(1);
 
-			const float DetailsHeight = 150.0f;
 			ImVec2 ViewportAvail = ImGui::GetContentRegionAvail();
-			ViewportAvail.y -= (DetailsHeight + ImGui::GetStyle().ItemSpacing.y);
-			if (ViewportAvail.y < 100.0f) ViewportAvail.y = 100.0f;
 
 			ImGui::BeginChild("ViewportPanel", ViewportAvail, false);
 
@@ -120,7 +118,9 @@ void FEditorSkeletalMeshViewerWidget::Render(float DeltaTime)
 			}
 			ImGui::EndChild();
 
-			ImGui::BeginChild("DetailsPanel", ImVec2(0, DetailsHeight), true);
+			ImGui::TableSetColumnIndex(2);
+
+			ImGui::BeginChild("DetailsPanel", ImVec2(0, LayoutSize.y), true);
 			RenderBoneDetailsPanel();
 			ImGui::EndChild();
 
@@ -288,9 +288,9 @@ void FEditorSkeletalMeshViewerWidget::RenderBoneTree(int32 BoneIndex, const TArr
 	{
 		Flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
 	}
-	else if (Bone.ParentIndex == -1) // 최상위 루트는 기본적으로 열어둠
+	else
 	{
-		Flags |= ImGuiTreeNodeFlags_DefaultOpen;
+		Flags |= ImGuiTreeNodeFlags_DefaultOpen; // 모든 하위 트리를 기본적으로 열어둠
 	}
 
 	const bool bIsOpen = ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<intptr_t>(BoneIndex)), Flags, "%s", Bone.Name.c_str());
