@@ -13,6 +13,9 @@
     <Filter Include="Source\Editor">
       <UniqueIdentifier>{01c06a87-3b33-f1be-c238-04f144aa4c78}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Editor\Importer">
+      <UniqueIdentifier>{9e6c7a48-9e6b-4d36-9100-42c5d995d28e}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Source\Editor\Input">
       <UniqueIdentifier>{31909b73-9f17-7a2d-92bc-5d16be3d4d7a}</UniqueIdentifier>
     </Filter>
@@ -386,8 +389,8 @@
     <ClCompile Include="Source\Engine\Asset\FontAtlasLoader.cpp">
       <Filter>Source\Engine\Asset</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Engine\Asset\ObjLoader.cpp">
-      <Filter>Source\Engine\Asset</Filter>
+    <ClCompile Include="Source\Editor\Importer\ObjStaticMeshImporter.cpp">
+      <Filter>Source\Editor\Importer</Filter>
     </ClCompile>
     <ClCompile Include="Source\Engine\Asset\ParticleAtlasLoader.cpp">
       <Filter>Source\Engine\Asset</Filter>
@@ -785,8 +788,8 @@
     <ClCompile Include="Source\Engine\Render\Resource\MeshBufferManager.cpp">
       <Filter>Source\Engine\Render\Resource</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Engine\Render\Resource\ObjMtlLoader.cpp">
-      <Filter>Source\Engine\Render\Resource</Filter>
+    <ClCompile Include="Source\Editor\Importer\ObjMtlImporter.cpp">
+      <Filter>Source\Editor\Importer</Filter>
     </ClCompile>
     <ClCompile Include="Source\Engine\Render\Resource\Shader.cpp">
       <Filter>Source\Engine\Render\Resource</Filter>
@@ -1072,11 +1075,11 @@
     <ClInclude Include="Source\Engine\Asset\IAssetLoader.h">
       <Filter>Source\Engine\Asset</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Engine\Asset\ObjLoader.h">
-      <Filter>Source\Engine\Asset</Filter>
+    <ClInclude Include="Source\Editor\Importer\ObjStaticMeshImporter.h">
+      <Filter>Source\Editor\Importer</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Engine\Asset\ObjRawTypes.h">
-      <Filter>Source\Engine\Asset</Filter>
+    <ClInclude Include="Source\Editor\Importer\ObjRawTypes.h">
+      <Filter>Source\Editor\Importer</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Asset\ParticleAtlasLoader.h">
       <Filter>Source\Engine\Asset</Filter>
@@ -1591,8 +1594,8 @@
     <ClInclude Include="Source\Engine\Render\Resource\MeshBufferManager.h">
       <Filter>Source\Engine\Render\Resource</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Engine\Render\Resource\ObjMtlLoader.h">
-      <Filter>Source\Engine\Render\Resource</Filter>
+    <ClInclude Include="Source\Editor\Importer\ObjMtlImporter.h">
+      <Filter>Source\Editor\Importer</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Render\Resource\RenderResources.h">
       <Filter>Source\Engine\Render\Resource</Filter>

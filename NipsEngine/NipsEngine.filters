@@ -10,6 +10,9 @@
     <Filter Include="Source\Editor">
       <UniqueIdentifier>{5343bfca-300e-f36e-9de5-e72bf22ecc4f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Editor\Importer">
+      <UniqueIdentifier>{9e6c7a48-9e6b-4d36-9100-42c5d995d28e}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Source\Editor\Selection">
       <UniqueIdentifier>{5441c9c6-3d41-f8ea-1303-9d77d5d292cd}</UniqueIdentifier>
     </Filter>
@@ -151,6 +154,12 @@
     <ClCompile Include="Source\Editor\EditorRenderPipeline.cpp">
       <Filter>Source\Editor</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Editor\Importer\ObjStaticMeshImporter.cpp">
+      <Filter>Source\Editor\Importer</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Editor\Importer\ObjMtlImporter.cpp">
+      <Filter>Source\Editor\Importer</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Editor\Selection\SelectionManager.cpp">
       <Filter>Source\Editor\Selection</Filter>
     </ClCompile>
@@ -209,9 +218,6 @@
       <Filter>Source\Engine\Asset</Filter>
     </ClCompile>
     <ClCompile Include="Source\Engine\Asset\FontAtlasLoader.cpp">
-      <Filter>Source\Engine\Asset</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Engine\Asset\ObjLoader.cpp">
       <Filter>Source\Engine\Asset</Filter>
     </ClCompile>
     <ClCompile Include="Source\Engine\Asset\ParticleAtlasLoader.cpp">
@@ -457,6 +463,15 @@
     <ClInclude Include="Source\Editor\EditorUtils.h">
       <Filter>Source\Editor</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Editor\Importer\ObjStaticMeshImporter.h">
+      <Filter>Source\Editor\Importer</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Editor\Importer\ObjRawTypes.h">
+      <Filter>Source\Editor\Importer</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Editor\Importer\ObjMtlImporter.h">
+      <Filter>Source\Editor\Importer</Filter>
+    </ClInclude>
     <ClInclude Include="Source\Editor\Selection\SelectionManager.h">
       <Filter>Source\Editor\Selection</Filter>
     </ClInclude>
@@ -524,12 +539,6 @@
       <Filter>Source\Engine\Asset</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Asset\IAssetLoader.h">
-      <Filter>Source\Engine\Asset</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Asset\ObjLoader.h">
-      <Filter>Source\Engine\Asset</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Asset\ObjRawTypes.h">
       <Filter>Source\Engine\Asset</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Asset\ParticleAtlasLoader.h">

@@ -282,7 +282,7 @@ if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" xcopy /Y /D
     <ClCompile Include="Source\Engine\Asset\FontAtlasLoader.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
-    <ClCompile Include="Source\Engine\Asset\ObjLoader.cpp">
+    <ClCompile Include="Source\Editor\Importer\ObjStaticMeshImporter.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
     <ClCompile Include="Source\Engine\Asset\ParticleAtlasLoader.cpp">
@@ -678,7 +678,7 @@ if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" xcopy /Y /D
     <ClCompile Include="Source\Engine\Render\Resource\MeshBufferManager.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
-    <ClCompile Include="Source\Engine\Render\Resource\ObjMtlLoader.cpp">
+    <ClCompile Include="Source\Editor\Importer\ObjMtlImporter.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
     <ClCompile Include="Source\Engine\Render\Resource\Shader.cpp">
@@ -893,8 +893,8 @@ if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" xcopy /Y /D
     <ClInclude Include="Source\Engine\Asset\FileUtils.h" />
     <ClInclude Include="Source\Engine\Asset\FontAtlasLoader.h" />
     <ClInclude Include="Source\Engine\Asset\IAssetLoader.h" />
-    <ClInclude Include="Source\Engine\Asset\ObjLoader.h" />
-    <ClInclude Include="Source\Engine\Asset\ObjRawTypes.h" />
+    <ClInclude Include="Source\Editor\Importer\ObjStaticMeshImporter.h" />
+    <ClInclude Include="Source\Editor\Importer\ObjRawTypes.h" />
     <ClInclude Include="Source\Engine\Asset\ParticleAtlasLoader.h" />
     <ClInclude Include="Source\Engine\Asset\SkeletalMesh.h" />
     <ClInclude Include="Source\Engine\Asset\SkeletalMeshTypes.h" />
@@ -1066,7 +1066,7 @@ if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" xcopy /Y /D
     <ClInclude Include="Source\Engine\Render\Resource\Buffer.h" />
     <ClInclude Include="Source\Engine\Render\Resource\Material.h" />
     <ClInclude Include="Source\Engine\Render\Resource\MeshBufferManager.h" />
-    <ClInclude Include="Source\Engine\Render\Resource\ObjMtlLoader.h" />
+    <ClInclude Include="Source\Editor\Importer\ObjMtlImporter.h" />
     <ClInclude Include="Source\Engine\Render\Resource\RenderResources.h" />
     <ClInclude Include="Source\Engine\Render\Resource\Shader.h" />
     <ClInclude Include="Source\Engine\Render\Resource\Texture.h" />

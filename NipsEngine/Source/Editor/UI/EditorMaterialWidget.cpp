@@ -470,7 +470,7 @@ void FEditorMaterialWidget::RenderMaterialDetails(UPrimitiveComponent* Primitive
 
 	if (BaseMaterial && !bCanEditBaseMaterial)
 	{
-		ImGui::TextDisabled("Base .mtl materials are read-only. Create an instance to override parameters.");
+		ImGui::TextDisabled("Base material assets are read-only. Create an instance to override parameters.");
 	}
 
 	MAT_SEPARATOR();

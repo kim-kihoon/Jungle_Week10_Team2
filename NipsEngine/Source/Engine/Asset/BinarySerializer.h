@@ -6,20 +6,33 @@
 
 struct FStaticMesh;
 
+enum class ECompiledAssetType : uint32
+{
+	Unknown = 0,
+	StaticMesh = 1,
+	SkeletalMesh = 2,
+	Skeleton = 3,
+};
+
 /*
  *	[주의사항]
  *	- Header나 Body 정보가 변경되면 반드시 Version을 바꿔야 합니다.
  */
 struct FStaticMeshBinaryHeader
 {
-	uint32 MagicNumber = 0x4853454D;
-	uint32 Version = 1;
+	uint32 Magic = 0;
+	uint32 HeaderVersion = 1;
+	ECompiledAssetType AssetType = ECompiledAssetType::StaticMesh;
+	uint32 PayloadVersion = 1;
+	uint32 Flags = 0;
+
 	uint32 VertexCount = 0;
 	uint32 IndexCount = 0;
 	uint32 SectionCount = 0;
 	uint32 SlotCount = 0;
 	
 	uint64 SourceFileWriteTime = 0;
+	uint64 SourceFileHash = 0;
 };
 
 class FBinarySerializer

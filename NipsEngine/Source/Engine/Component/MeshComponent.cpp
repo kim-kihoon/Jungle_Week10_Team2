@@ -63,11 +63,13 @@ void UMeshComponent::Serialize(FArchive& Ar)
 		{
 			if (UMaterialInstance* MatInst = Cast<UMaterialInstance>(Mat))
 			{
-				MaterialPaths.push_back(MatInst->IsComponentTransient() ? "" : MatInst->GetName());
+				MaterialPaths.push_back(MatInst->IsComponentTransient()
+					? ""
+					: (MatInst->GetFilePath().empty() ? MatInst->GetName() : MatInst->GetFilePath()));
 				continue;
 			}
 
-			MaterialPaths.push_back(Mat ? Mat->GetName() : "");
+			MaterialPaths.push_back(Mat ? (Mat->GetFilePath().empty() ? Mat->GetName() : Mat->GetFilePath()) : "");
 		}
 		Ar << "Materials" << MaterialPaths;
 	}

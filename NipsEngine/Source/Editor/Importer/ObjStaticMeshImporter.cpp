@@ -1,16 +1,195 @@
-﻿#include "ObjLoader.h"
-#include "FileUtils.h"
+#include "Editor/Importer/ObjStaticMeshImporter.h"
+#include "Asset/FileUtils.h"
 #include "Asset/StaticMeshTypes.h"
+#include "Core/Paths.h"
 #include "Math/Utils.h"
 #include "Core/Logger.h"
 #include "Core/PlatformTime.h"
 #include "Core/ResourceManager.h"
+#include "Core/StringUtils.h"
+#include "Editor/Importer/ObjMtlImporter.h"
 
 #include <algorithm>
 #include <cfloat>
+#include <chrono>
+#include <cctype>
+#include <filesystem>
+#include <fstream>
 
 namespace
 {
+	constexpr const char* DefaultUberLitShaderPath = "Shaders/UberLit.hlsl";
+
+	FString ToLowerAscii(FString Value)
+	{
+		std::transform(Value.begin(), Value.end(), Value.begin(), [](unsigned char Ch)
+		{
+			return static_cast<char>(std::tolower(Ch));
+		});
+		return Value;
+	}
+
+	bool IsObjSourcePath(const FString& Path)
+	{
+		return ToLowerAscii(std::filesystem::path(FPaths::ToWide(Path)).extension().string()) == ".obj";
+	}
+
+	FString SanitizeAssetFileToken(FString Value)
+	{
+		if (Value.empty())
+		{
+			return "DefaultWhite";
+		}
+
+		for (char& Ch : Value)
+		{
+			const unsigned char Byte = static_cast<unsigned char>(Ch);
+			if (!std::isalnum(Byte) &&
+				Ch != '_' &&
+				Ch != '-' &&
+				Ch != '.')
+			{
+				Ch = '_';
+			}
+		}
+
+		return Value;
+	}
+
+	FString ReadObjMtllibPath(const FString& SourcePath)
+	{
+		namespace fs = std::filesystem;
+
+		const fs::path ObjPath(FPaths::ToAbsolute(FPaths::ToWide(SourcePath)));
+		std::ifstream ObjFile(ObjPath);
+		if (!ObjFile.is_open())
+		{
+			return {};
+		}
+
+		FString Line;
+		while (std::getline(ObjFile, Line))
+		{
+			Line = StringUtils::Trim(Line);
+			if (!StringUtils::StartWith(Line, "mtllib "))
+			{
+				continue;
+			}
+
+			FString MtlToken = StringUtils::Trim(Line.substr(7));
+			const size_t SpacePos = MtlToken.find_first_of(" \t");
+			if (SpacePos != FString::npos)
+			{
+				MtlToken = MtlToken.substr(0, SpacePos);
+			}
+
+			if (MtlToken.empty())
+			{
+				return {};
+			}
+
+			fs::path MtlPath = fs::path(FPaths::ToWide(MtlToken));
+			if (MtlPath.is_relative())
+			{
+				MtlPath = ObjPath.parent_path() / MtlPath;
+			}
+			MtlPath = MtlPath.lexically_normal();
+
+			if (!fs::exists(MtlPath))
+			{
+				return {};
+			}
+
+			return FPaths::ToRelativeString(MtlPath.generic_wstring());
+		}
+
+		return {};
+	}
+
+	uint64 GetFileWriteTimeTicks(const FString& Path)
+	{
+		namespace fs = std::filesystem;
+
+		fs::path FilePath(FPaths::ToAbsolute(FPaths::ToWide(Path)));
+		if (!fs::exists(FilePath))
+		{
+			return 0;
+		}
+
+		auto WriteTime = fs::last_write_time(FilePath);
+		auto Duration = WriteTime.time_since_epoch();
+
+		return static_cast<uint64>(
+			std::chrono::duration_cast<std::chrono::seconds>(Duration).count());
+	}
+
+	uint64 HashFileFNV1a(const FString& Path)
+	{
+		std::ifstream File(std::filesystem::path(FPaths::ToAbsolute(FPaths::ToWide(Path))), std::ios::binary);
+		if (!File.is_open())
+		{
+			return 0;
+		}
+
+		uint64 Hash = 14695981039346656037ull;
+		char Buffer[64 * 1024];
+		while (File.good())
+		{
+			File.read(Buffer, sizeof(Buffer));
+			const std::streamsize ReadBytes = File.gcount();
+			for (std::streamsize Index = 0; Index < ReadBytes; ++Index)
+			{
+				Hash ^= static_cast<unsigned char>(Buffer[Index]);
+				Hash *= 1099511628211ull;
+			}
+		}
+
+		return Hash;
+	}
+
+	FString MakeObjMaterialAssetPath(const FString& SourcePath, const FString& SlotName)
+	{
+		namespace fs = std::filesystem;
+
+		const fs::path SourceFsPath(FPaths::ToWide(FPaths::Normalize(SourcePath)));
+		const std::wstring MaterialFileName =
+			SourceFsPath.stem().wstring() + L"_" + FPaths::ToWide(SanitizeAssetFileToken(SlotName)) + L".mat";
+		fs::path MaterialPath = SourceFsPath.parent_path() / MaterialFileName;
+
+		return FPaths::ToUtf8(MaterialPath.lexically_normal().generic_wstring());
+	}
+
+	bool TryLoadKnownMaterialShader(FResourceManager& ResourceManager, const FString& ShaderName)
+	{
+		if (ShaderName == "Shaders/UberLit.hlsl" || ShaderName == "Shaders/UberUnlit.hlsl")
+		{
+			return ResourceManager.LoadShader(ShaderName, "mainVS", "mainPS", static_cast<const D3D_SHADER_MACRO*>(nullptr));
+		}
+
+		if (ShaderName == "Shaders/OutlinePostProcess.hlsl")
+		{
+			return ResourceManager.LoadShader(ShaderName, "VS", "PS", static_cast<const D3D_SHADER_MACRO*>(nullptr));
+		}
+
+		return false;
+	}
+
+	UShader* GetOrTryLoadMaterialShader(FResourceManager& ResourceManager, const FString& ShaderName)
+	{
+		if (UShader* Shader = ResourceManager.GetShader(ShaderName))
+		{
+			return Shader;
+		}
+
+		UE_LOG("Shader cache miss for imported material: %s. Attempting lazy load.", ShaderName.c_str());
+		if (!TryLoadKnownMaterialShader(ResourceManager, ShaderName))
+		{
+			return nullptr;
+		}
+
+		return ResourceManager.GetShader(ShaderName);
+	}
+
 	void BuildFallbackBasis(const FVector& InNormal, FVector& OutTangent, FVector& OutBitangent)
 	{
 		FVector Normal = InNormal.GetSafeNormal();
@@ -117,22 +296,21 @@ namespace
 }
 
 //	v, vt, vn, mtllib, usemtl, f
-FStaticMesh* FObjLoader::Load(const FString& Path, const FStaticMeshLoadOptions& LoadOptions)
+FStaticMesh* FObjStaticMeshImporter::ImportStaticMesh(const FString& Path, const FStaticMeshLoadOptions& LoadOptions)
 {
 	FStaticMesh* StaticMesh = new FStaticMesh();
 	BuiltMaterialSlotName.clear();
 
 	const double StartTime = FPlatformTime::Seconds();
-	UE_LOG("[ObjLoader] Start loading OBJ: %s", Path.c_str());
-
-	volatile int hello = 0;
+	UE_LOG("[ObjStaticMeshImporter] Start loading OBJ: %s", Path.c_str());
 
 	FObjRawData RawData;
 
 	/* Obj Parse - Build Raw Data */
 	if (!ParseObj(Path, RawData))
 	{
-		UE_LOG("[ObjLoader] Failed to parse OBJ: %s", Path.c_str());
+		UE_LOG("[ObjStaticMeshImporter] Failed to parse OBJ: %s", Path.c_str());
+		delete StaticMesh;
 		return nullptr;
 	}
 
@@ -145,11 +323,12 @@ FStaticMesh* FObjLoader::Load(const FString& Path, const FStaticMeshLoadOptions&
 	/* Build Cooked Data from Raw Data */
 	if (!BuildStaticMesh(Path, StaticMesh, RawData))
 	{
-		UE_LOG("[ObjLoader] Failed to build static mesh: %s", Path.c_str());
+		UE_LOG("[ObjStaticMeshImporter] Failed to build static mesh: %s", Path.c_str());
+		delete StaticMesh;
 		return nullptr;
 	}
 
-	UE_LOG("[ObjLoader] OBJ Loaded: %s (Vertices: %zu, Indices: %zu, Sections: %zu, Slots: %zu)",
+	UE_LOG("[ObjStaticMeshImporter] OBJ Loaded: %s (Vertices: %zu, Indices: %zu, Sections: %zu, Slots: %zu)",
 		Path.c_str(),
 		StaticMesh->Vertices.size(),
 		StaticMesh->Indices.size(),
@@ -157,22 +336,138 @@ FStaticMesh* FObjLoader::Load(const FString& Path, const FStaticMeshLoadOptions&
 		StaticMesh->Slots.size());
 
 	const double EndTime = FPlatformTime::Seconds();
-	UE_LOG("[ObjLoader] Loaded %s in %.3f sec", Path.c_str(), EndTime - StartTime);
+	UE_LOG("[ObjStaticMeshImporter] Loaded %s in %.3f sec", Path.c_str(), EndTime - StartTime);
 
 	return StaticMesh;
 }
 
-bool FObjLoader::SupportsExtension(const FString& Extension) const
+bool FObjStaticMeshImporter::ImportIfNeeded(FResourceManager& ResourceManager, const FString& SourcePath, TArray<FString>* OutMaterialPaths)
 {
-	return Extension == FString("obj") || Extension == FString(".obj") || Extension == FString("OBJ") || Extension == FString(".OBJ");
+	if (!IsObjSourcePath(SourcePath))
+	{
+		return false;
+	}
+
+	TMap<FString, FString> MaterialAssetPaths;
+	EnsureMaterialAssets(ResourceManager, SourcePath, MaterialAssetPaths, OutMaterialPaths);
+
+	const FString BinaryPath = ResourceManager.MakeStaticMeshBinaryPath(SourcePath);
+	if (!IsStaticMeshBinaryValid(SourcePath, BinaryPath))
+	{
+		const auto ObjStart = std::chrono::steady_clock::now();
+		FStaticMeshLoadOptions LoadOptions;
+		LoadOptions.bNormalizeToUnitCube = false;
+		FStaticMesh* MeshData = ImportStaticMesh(SourcePath, LoadOptions);
+		const auto ObjEnd = std::chrono::steady_clock::now();
+		const double ObjLoadSec = std::chrono::duration<double>(ObjEnd - ObjStart).count();
+
+		if (MeshData == nullptr)
+		{
+			UE_LOG("[ObjStaticMeshImporter] Failed to compile static mesh source: %s", SourcePath.c_str());
+			return false;
+		}
+
+		MeshData->PathFileName = BinaryPath;
+		for (FStaticMeshMaterialSlot& Slot : MeshData->Slots)
+		{
+			auto It = MaterialAssetPaths.find(Slot.SlotName);
+			Slot.MaterialAssetPath = (It != MaterialAssetPaths.end()) ? It->second : FString("DefaultWhite");
+		}
+
+		const bool bSaveBinaryOk = BinarySerializer.SaveStaticMesh(BinaryPath, SourcePath, *MeshData);
+		UE_LOG("[ObjStaticMeshImporter] Source=%s | Binary=%s | ObjSec=%.6f | BinarySave=%s",
+			SourcePath.c_str(),
+			BinaryPath.c_str(),
+			ObjLoadSec,
+			bSaveBinaryOk ? "OK" : "FAIL");
+
+		delete MeshData;
+
+		if (!bSaveBinaryOk)
+		{
+			return false;
+		}
+	}
+
+	return ResourceManager.RegisterStaticMeshBinary(BinaryPath);
 }
 
-FString FObjLoader::GetLoaderName() const
+bool FObjStaticMeshImporter::EnsureMaterialAssets(FResourceManager& ResourceManager, const FString& SourcePath, TMap<FString, FString>& OutMaterialAssetPaths, TArray<FString>* OutMaterialPaths)
 {
-	return FString{ "FObjLoader" };
+	const FString MtlPath = ReadObjMtllibPath(SourcePath);
+	if (MtlPath.empty())
+	{
+		return false;
+	}
+
+	TMap<FString, UMaterial*> ParsedMaterials;
+	if (!FObjMtlImporter::Load(MtlPath, ParsedMaterials, ResourceManager.GetCachedDevice()))
+	{
+		UE_LOG("[ObjStaticMeshImporter] Failed to parse MTL for %s: %s", SourcePath.c_str(), MtlPath.c_str());
+		return false;
+	}
+
+	UShader* Shader = GetOrTryLoadMaterialShader(ResourceManager, DefaultUberLitShaderPath);
+	for (auto& [SlotName, Material] : ParsedMaterials)
+	{
+		if (Material == nullptr)
+		{
+			continue;
+		}
+
+		const FString MaterialPath = MakeObjMaterialAssetPath(SourcePath, SlotName);
+		OutMaterialAssetPaths[SlotName] = MaterialPath;
+
+		if (!std::filesystem::exists(std::filesystem::path(FPaths::ToAbsolute(FPaths::ToWide(MaterialPath)))))
+		{
+			Material->Name = SlotName;
+			Material->FilePath = MaterialPath;
+			Material->SetShader(Shader);
+			if (ResourceManager.SerializeMaterial(MaterialPath, Material))
+			{
+				UE_LOG("[ObjStaticMeshImporter] Created material asset: %s", MaterialPath.c_str());
+			}
+		}
+
+		if (OutMaterialPaths &&
+			std::find(OutMaterialPaths->begin(), OutMaterialPaths->end(), MaterialPath) == OutMaterialPaths->end())
+		{
+			OutMaterialPaths->push_back(MaterialPath);
+		}
+	}
+
+	for (auto& [SlotName, Material] : ParsedMaterials)
+	{
+		UObjectManager::Get().DestroyObject(Material);
+	}
+
+	return !OutMaterialAssetPaths.empty();
 }
 
-bool FObjLoader::ParseObj(const FString& Path, FObjRawData& InRawData)
+bool FObjStaticMeshImporter::IsStaticMeshBinaryValid(const FString& SourcePath, const FString& BinaryPath) const
+{
+	FStaticMeshBinaryHeader Header;
+	if (!BinarySerializer.ReadStaticMeshHeader(BinaryPath, Header))
+	{
+		return false;
+	}
+
+	const uint64 SourceWriteTime = GetFileWriteTimeTicks(SourcePath);
+	if (SourceWriteTime == 0 || Header.SourceFileWriteTime != SourceWriteTime)
+	{
+		return false;
+	}
+
+	const uint64 SourceHash = HashFileFNV1a(SourcePath);
+	if (SourceHash == 0 || Header.SourceFileHash != SourceHash)
+	{
+		return false;
+	}
+
+	return true;
+}
+
+bool FObjStaticMeshImporter::ParseObj(const FString& Path, FObjRawData& InRawData)
 {
 	TArray<FString> Lines;
 
@@ -238,7 +533,7 @@ bool FObjLoader::ParseObj(const FString& Path, FObjRawData& InRawData)
 	return !InRawData.Positions.empty() && !InRawData.Faces.empty();
 }
 
-bool FObjLoader::BuildStaticMesh(const FString& Path, FStaticMesh* InStaticMesh, FObjRawData& RawData)
+bool FObjStaticMeshImporter::BuildStaticMesh(const FString& Path, FStaticMesh* InStaticMesh, FObjRawData& RawData)
 {
 	// Mesh를 생성할 Raw Data 존재 확인
 	if (RawData.Positions.empty() || RawData.Faces.empty())
@@ -318,7 +613,7 @@ bool FObjLoader::BuildStaticMesh(const FString& Path, FStaticMesh* InStaticMesh,
 	return !InStaticMesh->Vertices.empty() && !InStaticMesh->Indices.empty();
 }
 
-int32 FObjLoader::GetOrAddMaterialSlot(const FString& MaterialName)
+int32 FObjStaticMeshImporter::GetOrAddMaterialSlot(const FString& MaterialName)
 {
 	FString SlotName = MaterialName.empty() ? FString("DefaultWhite") : MaterialName;
 	
@@ -335,7 +630,7 @@ int32 FObjLoader::GetOrAddMaterialSlot(const FString& MaterialName)
 	return static_cast<int32>(BuiltMaterialSlotName.size() - 1);
 }
 
-FAABB FObjLoader::BuildLocalBounds(FStaticMesh* InStaticMesh) const
+FAABB FObjStaticMeshImporter::BuildLocalBounds(FStaticMesh* InStaticMesh) const
 {
 	FAABB Bounds;
 	Bounds.Reset();
@@ -351,7 +646,7 @@ FAABB FObjLoader::BuildLocalBounds(FStaticMesh* InStaticMesh) const
 #pragma region __HELPER__
 
 //	v
-bool FObjLoader::ParsePositionLine(const FString& Line, FObjRawData& InRawData)
+bool FObjStaticMeshImporter::ParsePositionLine(const FString& Line, FObjRawData& InRawData)
 {
 	TArray<FString> Tokens = StringUtils::Split(Line);
 
@@ -371,7 +666,7 @@ bool FObjLoader::ParsePositionLine(const FString& Line, FObjRawData& InRawData)
 }
 
 //	vt
-bool FObjLoader::ParseTexCoordLine(const FString& Line, FObjRawData& InRawData)
+bool FObjStaticMeshImporter::ParseTexCoordLine(const FString& Line, FObjRawData& InRawData)
 {
 	TArray<FString> Tokens = StringUtils::Split(Line);
 
@@ -390,7 +685,7 @@ bool FObjLoader::ParseTexCoordLine(const FString& Line, FObjRawData& InRawData)
 }
 
 //	vn
-bool FObjLoader::ParseNormalLine(const FString& Line, FObjRawData& InRawData)
+bool FObjStaticMeshImporter::ParseNormalLine(const FString& Line, FObjRawData& InRawData)
 {
 	TArray<FString> Tokens = StringUtils::Split(Line);
 
@@ -410,7 +705,7 @@ bool FObjLoader::ParseNormalLine(const FString& Line, FObjRawData& InRawData)
 }
 
 //	mtllib
-void FObjLoader::ParseMtllibLine(const FString& Line, FObjRawData& InRawData)
+void FObjStaticMeshImporter::ParseMtllibLine(const FString& Line, FObjRawData& InRawData)
 {
 	TArray<FString> Tokens = StringUtils::Split(Line);
 
@@ -422,7 +717,7 @@ void FObjLoader::ParseMtllibLine(const FString& Line, FObjRawData& InRawData)
 }
 
 //	usemtl
-void FObjLoader::ParseUseMtlLine(const FString& Line, FString& CurrentMaterialName, FObjRawData& InRawData)
+void FObjStaticMeshImporter::ParseUseMtlLine(const FString& Line, FString& CurrentMaterialName, FObjRawData& InRawData)
 {
 	TArray<FString> Tokens = StringUtils::Split(Line);
 
@@ -433,7 +728,7 @@ void FObjLoader::ParseUseMtlLine(const FString& Line, FString& CurrentMaterialNa
 }
 
 
-bool FObjLoader::ParseFaceLine(const FString& Line, const FString& CurrentMaterialName, FObjRawData& InRawData)
+bool FObjStaticMeshImporter::ParseFaceLine(const FString& Line, const FString& CurrentMaterialName, FObjRawData& InRawData)
 {
 	TArray<FString> Tokens = StringUtils::Split(Line);
 
@@ -465,7 +760,7 @@ bool FObjLoader::ParseFaceLine(const FString& Line, const FString& CurrentMateri
 
 //	Obj index는 1-based이기에 0-based로 변경
 //	NOTE : Obj는 종종 negative index를 사용할 때도 있음 (그러나 지원하지 않는게 편할 듯) - 필요하면 추가할 것
-bool FObjLoader::ParseFaceVertexToken(const FString& Token, FObjRawIndex& OutIndex, FObjRawData& InRawData)
+bool FObjStaticMeshImporter::ParseFaceVertexToken(const FString& Token, FObjRawIndex& OutIndex, FObjRawData& InRawData)
 {
 	TArray<FString> Parts;
 	Parts.reserve(3);
@@ -506,7 +801,7 @@ bool FObjLoader::ParseFaceVertexToken(const FString& Token, FObjRawIndex& OutInd
 	return OutIndex.PositionIndex >= 0;
 }
 
-// int32 FObjLoader::GetOrAddMaterialSlot(const FString& MaterialName)
+// int32 FObjStaticMeshImporter::GetOrAddMaterialSlot(const FString& MaterialName)
 // {
 // 	FString SlotName = MaterialName;
 // 	if (SlotName.empty())
@@ -531,7 +826,7 @@ bool FObjLoader::ParseFaceVertexToken(const FString& Token, FObjRawIndex& OutInd
 // }
 
 //	Raw Index -> 최종 Vertex 생성
-FNormalVertex FObjLoader::MakeVertex(const FObjRawIndex& RawIndex, FObjRawData& RawData) const
+FNormalVertex FObjStaticMeshImporter::MakeVertex(const FObjRawIndex& RawIndex, FObjRawData& RawData) const
 {
 	FNormalVertex Vertex = {};
 
@@ -563,7 +858,7 @@ FNormalVertex FObjLoader::MakeVertex(const FObjRawIndex& RawIndex, FObjRawData& 
 	return Vertex;
 }
 
-uint32 FObjLoader::GetOrCreateVertexIndex(const FObjRawIndex& RawIndex, TMap<FObjVertexKey, uint32>& VertexMap, FStaticMesh* StaticMesh, FObjRawData& RawData)
+uint32 FObjStaticMeshImporter::GetOrCreateVertexIndex(const FObjRawIndex& RawIndex, TMap<FObjVertexKey, uint32>& VertexMap, FStaticMesh* StaticMesh, FObjRawData& RawData)
 {
 	FObjVertexKey Key = {};
 	Key.ObjRawIndex.PositionIndex = RawIndex.PositionIndex;
@@ -588,7 +883,7 @@ uint32 FObjLoader::GetOrCreateVertexIndex(const FObjRawIndex& RawIndex, TMap<FOb
 // Static Mesh Raw Data를 단위 큐브 크기로 정규화합니다. 
 // - 정규화하지 않은 메시 파일과 서로 다른 binary cache를 갖습니다.
 // - 개별 StaticMesh 컴포넌트에서 Import할 때 Normalize On Import 설정을 켜고 꺼서 조절할 수 있습니다.
-void FObjLoader::NormalizeObjRawData(FObjRawData& RawData)
+void FObjStaticMeshImporter::NormalizeObjRawData(FObjRawData& RawData)
 {
 	if (RawData.Positions.empty())
 	{
@@ -626,7 +921,7 @@ void FObjLoader::NormalizeObjRawData(FObjRawData& RawData)
 	}
 }
 
-void FObjLoader::NormalizeRawSizeToUnitCube(FObjRawData& RawData)
+void FObjStaticMeshImporter::NormalizeRawSizeToUnitCube(FObjRawData& RawData)
 {
 	if (RawData.Positions.empty())
 	{
@@ -657,7 +952,7 @@ void FObjLoader::NormalizeRawSizeToUnitCube(FObjRawData& RawData)
 
 // vn(normal 벡터 정보)이 없는 .obj 파일을 불러올 때 각 정점의 normal 값을 복원합니다.
 // 각 삼각형의 벡터를 외적하여 법선벡터를 계산합니다. (큰 삼각형일수록 큰 가중치를 갖습니다.)
-void FObjLoader::ComputeNormals(FObjRawData& RawData)
+void FObjStaticMeshImporter::ComputeNormals(FObjRawData& RawData)
 {
 	const int32 PositionCount = static_cast<int32>(RawData.Positions.size());
 

@@ -115,12 +115,12 @@ namespace
 
 	bool IsMaterialExtension(const FString& Extension)
 	{
-		return Extension == ".mat" || Extension == ".matinst" || Extension == ".mtl";
+		return Extension == ".mat" || Extension == ".matinst";
 	}
 
 	bool ShouldSkipAssetFile(const std::filesystem::path& Path, const FString& Extension)
 	{
-		if (Extension == ".meta" || Extension == ".bin")
+		if (Extension == ".meta")
 		{
 			return true;
 		}
@@ -196,7 +196,7 @@ namespace
 	{
 		const FString PathKey = ToLowerPathKey(RelativePath);
 
-		if (StaticMeshPaths.contains(PathKey) || Extension == ".obj")
+		if (StaticMeshPaths.contains(PathKey))
 		{
 			return EEditorAssetKind::StaticMesh;
 		}

@@ -2,7 +2,6 @@
 
 #include "Asset/BinarySerializer.h"
 #include "Asset/FontAtlasLoader.h"
-#include "Asset/ObjLoader.h"
 #include "Asset/ParticleAtlasLoader.h"
 #include "Asset/StaticMesh.h"
 #include "Asset/FbxLoader.h"
@@ -139,6 +138,8 @@ public:
 	UStaticMesh* LoadStaticMesh(const FString& Path, bool bNormalizeToUnitCube);
 	UStaticMesh* FindStaticMesh(const FString& Path) const;
 	TArray<FString> GetStaticMeshPaths() const;
+	FString MakeStaticMeshBinaryPath(const FString& SourcePath) const;
+	bool RegisterStaticMeshBinary(const FString& BinaryPath);
 
 	USkeletalMesh* LoadSkeletalMesh(const FString& Path);
     USkeletalMesh* FindSkeletalMesh(const FString& Path) const;
@@ -157,16 +158,15 @@ public:
 	void DeleteAllCacheFiles();
 
 private:
-	uint64 GetFileWriteTimeTicks(const FString& Path) const;
-	FString MakeStaticMeshBinaryPath(const FString& SourcePath, bool bNormalized = false) const;
 	FString MakeSkeletalMeshMaterialOverridePath(const FString& SourcePath) const;
-	bool IsStaticMeshBinaryValid(const FString& SourcePath, const FString& BinaryPath) const;
 	void PreloadStaticMeshes();
 	UStaticMesh* LoadStaticMeshWithOptions(const FString& Path, const FStaticMeshLoadOptions& LoadOptions);
 	bool LoadShaderInternal(const FShaderCompileKey& CompileKey,
 	                        const D3D11_INPUT_ELEMENT_DESC* InputElements,
 	                        UINT InputElementCount,
 	                        bool bRegisterPathAlias);
+	void RegisterMaterialAliases(UMaterial* Material, const FString& FilePath, const FString& LegacyName);
+	void RegisterMaterialInstanceAliases(UMaterialInstance* MaterialInstance, const FString& FilePath, const FString& LegacyName);
 	
 	FTextureAssetMeta LoadOrCreateTextureMeta(const std::filesystem::path& FilePath) const;
 
@@ -175,7 +175,6 @@ private:
 
 	TComPtr<ID3D11Device> CachedDevice;
 
-	FObjLoader ObjLoader;
 	FFontAtlasLoader FontLoader;
 	FParticleAtlasLoader ParticleLoader;
 	

@@ -32,8 +32,9 @@
  */
 
 /* Validation Check Constants */
-constexpr uint32 STATIC_MESH_BINARY_MAGIC = 0x4853454D; // 'MESH'
-constexpr uint32 STATIC_MESH_BINARY_VERSION = 2;
+constexpr uint32 COMPILED_ASSET_MAGIC = 0x4153504E; // 'NPSA'
+constexpr uint32 COMPILED_ASSET_HEADER_VERSION = 1;
+constexpr uint32 STATIC_MESH_PAYLOAD_VERSION = 3;
 
 //	Vailidation Checkers
 constexpr uint32 MAX_STATIC_MESH_VERTEX_COUNT   = 10'000'000;
@@ -44,12 +45,22 @@ constexpr uint32 MAX_STRING_LENGTH              = 4096;
 
 static bool IsValidStaticMeshHeader(const FStaticMeshBinaryHeader& Header)
 {
-	if (Header.MagicNumber != STATIC_MESH_BINARY_MAGIC)
+	if (Header.Magic != COMPILED_ASSET_MAGIC)
 	{
 		return false;
 	}
 
-	if (Header.Version != STATIC_MESH_BINARY_VERSION)
+	if (Header.HeaderVersion != COMPILED_ASSET_HEADER_VERSION)
+	{
+		return false;
+	}
+
+	if (Header.AssetType != ECompiledAssetType::StaticMesh)
+	{
+		return false;
+	}
+
+	if (Header.PayloadVersion != STATIC_MESH_PAYLOAD_VERSION)
 	{
 		return false;
 	}
@@ -82,7 +93,7 @@ static uint64 GetFileWriteTimeTicks(const FString& Path)
 {
 	namespace fs = std::filesystem;
 
-	fs::path FilePath(FPaths::ToWide(Path));
+	fs::path FilePath(FPaths::ToAbsolute(FPaths::ToWide(Path)));
 	if (!fs::exists(FilePath))
 	{
 		return 0;
@@ -91,6 +102,32 @@ static uint64 GetFileWriteTimeTicks(const FString& Path)
 	auto WriteTime = fs::last_write_time(FilePath);
 	auto Duration = WriteTime.time_since_epoch();
 	return static_cast<uint64>(std::chrono::duration_cast<std::chrono::seconds>(Duration).count());
+}
+
+static uint64 HashFileFNV1a(const FString& Path)
+{
+	namespace fs = std::filesystem;
+
+	std::ifstream File(fs::path(FPaths::ToAbsolute(FPaths::ToWide(Path))), std::ios::binary);
+	if (!File.is_open())
+	{
+		return 0;
+	}
+
+	uint64 Hash = 14695981039346656037ull;
+	char Buffer[64 * 1024];
+	while (File.good())
+	{
+		File.read(Buffer, sizeof(Buffer));
+		const std::streamsize ReadBytes = File.gcount();
+		for (std::streamsize Index = 0; Index < ReadBytes; ++Index)
+		{
+			Hash ^= static_cast<unsigned char>(Buffer[Index]);
+			Hash *= 1099511628211ull;
+		}
+	}
+
+	return Hash;
 }
 
 /* Primitive LE Writers */
@@ -213,24 +250,36 @@ bool FBinarySerializer::ReadFloatLE(std::ifstream& In, float& OutValue) const
 /* Header Serialization */
 void FBinarySerializer::WriteHeader(std::ofstream& Out, const FStaticMeshBinaryHeader& Header)
 {
-	WriteUInt32LE(Out, Header.MagicNumber);
-	WriteUInt32LE(Out, Header.Version);
+	WriteUInt32LE(Out, Header.Magic);
+	WriteUInt32LE(Out, Header.HeaderVersion);
+	WriteUInt32LE(Out, static_cast<uint32>(Header.AssetType));
+	WriteUInt32LE(Out, Header.PayloadVersion);
+	WriteUInt32LE(Out, Header.Flags);
 	WriteUInt32LE(Out, Header.VertexCount);
 	WriteUInt32LE(Out, Header.IndexCount);
 	WriteUInt32LE(Out, Header.SectionCount);
 	WriteUInt32LE(Out, Header.SlotCount);
 	WriteUInt64LE(Out, Header.SourceFileWriteTime);
+	WriteUInt64LE(Out, Header.SourceFileHash);
 }
 
 bool FBinarySerializer::ReadHeader(std::ifstream& In, FStaticMeshBinaryHeader& OutHeader) const
 {
-	return ReadUInt32LE(In, OutHeader.MagicNumber)
-		&& ReadUInt32LE(In, OutHeader.Version)
+	uint32 AssetTypeValue = 0;
+	const bool bOk = ReadUInt32LE(In, OutHeader.Magic)
+		&& ReadUInt32LE(In, OutHeader.HeaderVersion)
+		&& ReadUInt32LE(In, AssetTypeValue)
+		&& ReadUInt32LE(In, OutHeader.PayloadVersion)
+		&& ReadUInt32LE(In, OutHeader.Flags)
 		&& ReadUInt32LE(In, OutHeader.VertexCount)
 		&& ReadUInt32LE(In, OutHeader.IndexCount)
 		&& ReadUInt32LE(In, OutHeader.SectionCount)
 		&& ReadUInt32LE(In, OutHeader.SlotCount)
-		&& ReadUInt64LE(In, OutHeader.SourceFileWriteTime);
+		&& ReadUInt64LE(In, OutHeader.SourceFileWriteTime)
+		&& ReadUInt64LE(In, OutHeader.SourceFileHash);
+
+	OutHeader.AssetType = static_cast<ECompiledAssetType>(AssetTypeValue);
+	return bOk;
 }
 
 void FBinarySerializer::WriteString(std::ofstream& Out, const FString& String)
@@ -500,7 +549,13 @@ bool FBinarySerializer::ReadBounds(std::ifstream& In, FStaticMesh& OutData) cons
 //	보내는 순서와 읽는 순서는 동일 (Header + Body 순서를 고정 -> protocol의 정의)
 bool FBinarySerializer::SaveStaticMesh(const FString& BinaryPath, const FString& SourcePath, const FStaticMesh& Data)
 {
-	std::ofstream Out(BinaryPath, std::ios::binary);
+	namespace fs = std::filesystem;
+
+	const fs::path AbsoluteBinaryPath(FPaths::ToAbsolute(FPaths::ToWide(BinaryPath)));
+	std::error_code Ec;
+	fs::create_directories(AbsoluteBinaryPath.parent_path(), Ec);
+
+	std::ofstream Out(AbsoluteBinaryPath, std::ios::binary);
 	if (!Out.is_open())
 	{
 		return false;
@@ -508,14 +563,18 @@ bool FBinarySerializer::SaveStaticMesh(const FString& BinaryPath, const FString&
 	
 	//	Packet Header와 유사한 개념 (쓰레기 데이터를 읽지 않기 위함)
 	FStaticMeshBinaryHeader Header;
-	Header.MagicNumber = STATIC_MESH_BINARY_MAGIC;	//	우리의 포맷인지 확인
-	Header.Version = STATIC_MESH_BINARY_VERSION;	//	포맷이 변경되었을 시 Version을 통해 무력화 혹은 대응 가능
+	Header.Magic = COMPILED_ASSET_MAGIC;	//	우리의 포맷인지 확인
+	Header.HeaderVersion = COMPILED_ASSET_HEADER_VERSION;
+	Header.AssetType = ECompiledAssetType::StaticMesh;
+	Header.PayloadVersion = STATIC_MESH_PAYLOAD_VERSION;	//	포맷이 변경되었을 시 Version을 통해 무력화 혹은 대응 가능
+	Header.Flags = 0;
 	//	Count류 -> Parsing 안정성
 	Header.VertexCount = static_cast<uint32>(Data.Vertices.size());
 	Header.IndexCount = static_cast<uint32>(Data.Indices.size());
 	Header.SectionCount = static_cast<uint32>(Data.Sections.size());
 	Header.SlotCount = static_cast<uint32>(Data.Slots.size());
 	Header.SourceFileWriteTime = GetFileWriteTimeTicks(SourcePath);
+	Header.SourceFileHash = HashFileFNV1a(SourcePath);
 
 	if (!IsValidStaticMeshHeader(Header))
 	{
@@ -524,7 +583,7 @@ bool FBinarySerializer::SaveStaticMesh(const FString& BinaryPath, const FString&
 
 	WriteHeader(Out, Header);
 
-	WriteString(Out, Data.PathFileName);
+	WriteString(Out, FPaths::Normalize(BinaryPath));
 	WriteVertices(Out, Data);
 	WriteIndexArray(Out, Data.Indices);
 	WriteSections(Out, Data);
@@ -534,6 +593,7 @@ bool FBinarySerializer::SaveStaticMesh(const FString& BinaryPath, const FString&
 	for (const auto& Slot : Data.Slots)
 	{
 		WriteString(Out, Slot.SlotName);
+		WriteString(Out, Slot.MaterialAssetPath);
 	}
 
 	WriteBounds(Out, Data);
@@ -543,7 +603,7 @@ bool FBinarySerializer::SaveStaticMesh(const FString& BinaryPath, const FString&
 
 bool FBinarySerializer::LoadStaticMesh(const FString& BinaryPath, FStaticMesh& OutData)
 {
-	std::ifstream In(BinaryPath, std::ios::binary);
+	std::ifstream In(std::filesystem::path(FPaths::ToAbsolute(FPaths::ToWide(BinaryPath))), std::ios::binary);
 	if (!In.is_open())
 	{
 		return false;
@@ -595,7 +655,8 @@ bool FBinarySerializer::LoadStaticMesh(const FString& BinaryPath, FStaticMesh& O
 
 	for (uint32 i = 0; i < Count; i++)
 	{
-		if (!ReadString(In, OutData.Slots[i].SlotName))
+		if (!ReadString(In, OutData.Slots[i].SlotName) ||
+			!ReadString(In, OutData.Slots[i].MaterialAssetPath))
 		{
 			return false;
 		}
@@ -619,7 +680,7 @@ bool FBinarySerializer::LoadStaticMesh(const FString& BinaryPath, FStaticMesh& O
 
 bool FBinarySerializer::ReadStaticMeshHeader(const FString& BinaryPath, FStaticMeshBinaryHeader& OutHeader) const
 {
-	std::ifstream In(BinaryPath, std::ios::binary);
+	std::ifstream In(std::filesystem::path(FPaths::ToAbsolute(FPaths::ToWide(BinaryPath))), std::ios::binary);
 	if (!In.is_open())
 	{
 		return false;

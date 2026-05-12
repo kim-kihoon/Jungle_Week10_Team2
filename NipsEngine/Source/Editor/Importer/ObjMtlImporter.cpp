@@ -1,4 +1,4 @@
-﻿#include "ObjMtlLoader.h"
+#include "Editor/Importer/ObjMtlImporter.h"
 #include "Asset/FileUtils.h"
 #include "Core/Paths.h"
 #include "Core/ResourceManager.h"
@@ -114,16 +114,17 @@ namespace
 	}
 }
 
-bool FObjMtlLoader::Load(const FString& FilePath, TMap<FString, UMaterial*>& OutMaterialAssets, ID3D11Device* Device)
+bool FObjMtlImporter::Load(const FString& FilePath, TMap<FString, UMaterial*>& OutMaterialAssets, ID3D11Device* Device)
 {
-	std::ifstream File(std::filesystem::path(FPaths::ToWide(FilePath)));
+	const std::filesystem::path AbsoluteMtlPath(FPaths::ToAbsolute(FPaths::ToWide(FilePath)));
+	std::ifstream File(AbsoluteMtlPath);
 	if (!File.is_open())
 	{
 		return false;
 	}
 
 	// 한글 경로 안전을 위해 wide string 기반으로 filesystem 연산 수행
-	std::filesystem::path MtlDir = std::filesystem::path(FPaths::ToWide(FilePath)).parent_path();
+	std::filesystem::path MtlDir = AbsoluteMtlPath.parent_path();
 
 	auto ResolveTexPath = [&](std::istringstream& InISS) -> FString
 		{
@@ -138,16 +139,19 @@ bool FObjMtlLoader::Load(const FString& FilePath, TMap<FString, UMaterial*>& Out
 			std::filesystem::path FileName = std::filesystem::path(FPaths::ToWide(RelPath)).filename();
 
 			FString outTexPath = "";
-			FFileUtils::FindFileRecursively(
+			if (!FFileUtils::FindFileRecursively(
 				FPaths::ToUtf8(MtlDir.generic_wstring()),
 				FPaths::ToUtf8(FileName.generic_wstring()),
-				outTexPath);
+				outTexPath))
+			{
+				return {};
+			}
 
 			// 기존: std::filesystem::path TexPath = (MtlDir / outTexPath).lexically_normal();
 			// 변경: UTF-8 문자열(outTexPath)을 wide로 명시 변환 후 결합
 			std::filesystem::path TexPath = (MtlDir / std::filesystem::path(FPaths::ToWide(outTexPath))).lexically_normal();
 
-			return FPaths::ToUtf8(TexPath.generic_wstring());
+			return FPaths::ToRelativeString(TexPath.generic_wstring());
 		};
 
 	UMaterial* Current = nullptr;
@@ -230,7 +234,7 @@ bool FObjMtlLoader::Load(const FString& FilePath, TMap<FString, UMaterial*>& Out
 		else if (LowerToken == "map_kd")
 		{
 			Current->MaterialData.DiffuseTexPath = ResolveTexPath(ISS);
-			Current->MaterialData.bHasDiffuseTexture = true;
+			Current->MaterialData.bHasDiffuseTexture = !Current->MaterialData.DiffuseTexPath.empty();
 		}
 		else if (LowerToken == "map_ka")
 		{
@@ -239,12 +243,12 @@ bool FObjMtlLoader::Load(const FString& FilePath, TMap<FString, UMaterial*>& Out
 		else if (LowerToken == "map_ks")
 		{
 			Current->MaterialData.SpecularTexPath = ResolveTexPath(ISS);
-			Current->MaterialData.bHasSpecularTexture = true;
+			Current->MaterialData.bHasSpecularTexture = !Current->MaterialData.SpecularTexPath.empty();
 		}
 		else if (LowerToken == "norm" || LowerToken == "map_norm" || LowerToken == "map_kn")
 		{
 			Current->MaterialData.NormalTexPath = ResolveTexPath(ISS);
-			Current->MaterialData.bHasNormalTexture = true;
+			Current->MaterialData.bHasNormalTexture = !Current->MaterialData.NormalTexPath.empty();
 		}
 		// 범프 맵은 그레이스케일로 높이값이 저장되어 있고 추후 노말로 변환한다고 한다.
 		else if (LowerToken == "map_bump" || LowerToken == "bump")
@@ -253,13 +257,13 @@ bool FObjMtlLoader::Load(const FString& FilePath, TMap<FString, UMaterial*>& Out
 			if (IsStrongNormalStem(ResolvedTexPath))
 			{
 				Current->MaterialData.NormalTexPath = ResolvedTexPath;
-				Current->MaterialData.bHasNormalTexture = true;
-				UE_LOG("[ObjMtlLoader] Promoted bump token to NormalMap by filename heuristic: %s", ResolvedTexPath.c_str());
+				Current->MaterialData.bHasNormalTexture = !ResolvedTexPath.empty();
+				UE_LOG("[ObjMtlImporter] Promoted bump token to NormalMap by filename heuristic: %s", ResolvedTexPath.c_str());
 			}
 			else
 			{
 				Current->MaterialData.BumpTexPath = ResolvedTexPath;
-				Current->MaterialData.bHasBumpTexture = true;
+				Current->MaterialData.bHasBumpTexture = !ResolvedTexPath.empty();
 			}
 		}
 	}
