@@ -23,7 +23,7 @@
       <UniqueIdentifier>{1393aad3-59b4-8a7e-bf2a-94277bd1f371}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source\Editor\SkeletalMesh">
-      <UniqueIdentifier>{ab3f9928-d8ed-4c5f-8c74-81cf49324462}</UniqueIdentifier>
+      <UniqueIdentifier>{f599a749-a940-f3e1-89fc-e972d4a902a0}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source\Editor\UI">
       <UniqueIdentifier>{bc6f9cd9-3513-78f0-0505-1eb95e34498d}</UniqueIdentifier>
@@ -302,14 +302,14 @@
     <ClCompile Include="Source\Editor\Input\SkeletalMeshPreviewController.cpp">
       <Filter>Source\Editor\Input</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Editor\SkeletalMesh\SkeletalMeshPreviewScene.cpp">
-      <Filter>Source\Editor\SkeletalMesh</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Editor\Selection\SelectionManager.cpp">
       <Filter>Source\Editor\Selection</Filter>
     </ClCompile>
     <ClCompile Include="Source\Editor\Settings\EditorSettings.cpp">
       <Filter>Source\Editor\Settings</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Editor\SkeletalMesh\SkeletalMeshPreviewScene.cpp">
+      <Filter>Source\Editor\SkeletalMesh</Filter>
     </ClCompile>
     <ClCompile Include="Source\Editor\UI\BezierUI.cpp">
       <Filter>Source\Editor\UI</Filter>
@@ -318,6 +318,9 @@
       <Filter>Source\Editor\UI</Filter>
     </ClCompile>
     <ClCompile Include="Source\Editor\UI\EditorConsoleWidget.cpp">
+      <Filter>Source\Editor\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Editor\UI\EditorContentDrawerWidget.cpp">
       <Filter>Source\Editor\UI</Filter>
     </ClCompile>
     <ClCompile Include="Source\Editor\UI\EditorControlWidget.cpp">
@@ -474,6 +477,9 @@
       <Filter>Source\Engine\Component</Filter>
     </ClCompile>
     <ClCompile Include="Source\Engine\Component\SceneComponent.cpp">
+      <Filter>Source\Engine\Component</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Component\SkeletalMeshComponent.cpp">
       <Filter>Source\Engine\Component</Filter>
     </ClCompile>
     <ClCompile Include="Source\Engine\Component\SkinnedMeshComponent.cpp">
@@ -952,9 +958,6 @@
     </ClCompile>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="HighPerformanceGpuHint.cpp" />
-    <ClCompile Include="Source\Engine\Component\SkeletalMeshComponent.cpp">
-      <Filter>Source\Engine\Component</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Editor\EditorEngine.h">
@@ -975,14 +978,14 @@
     <ClInclude Include="Source\Editor\Input\SkeletalMeshPreviewController.h">
       <Filter>Source\Editor\Input</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Editor\SkeletalMesh\SkeletalMeshPreviewScene.h">
-      <Filter>Source\Editor\SkeletalMesh</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Editor\Selection\SelectionManager.h">
       <Filter>Source\Editor\Selection</Filter>
     </ClInclude>
     <ClInclude Include="Source\Editor\Settings\EditorSettings.h">
       <Filter>Source\Editor\Settings</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Editor\SkeletalMesh\SkeletalMeshPreviewScene.h">
+      <Filter>Source\Editor\SkeletalMesh</Filter>
     </ClInclude>
     <ClInclude Include="Source\Editor\UI\BezierUI.h">
       <Filter>Source\Editor\UI</Filter>
@@ -991,6 +994,9 @@
       <Filter>Source\Editor\UI</Filter>
     </ClInclude>
     <ClInclude Include="Source\Editor\UI\EditorConsoleWidget.h">
+      <Filter>Source\Editor\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Editor\UI\EditorContentDrawerWidget.h">
       <Filter>Source\Editor\UI</Filter>
     </ClInclude>
     <ClInclude Include="Source\Editor\UI\EditorControlWidget.h">
@@ -1165,6 +1171,9 @@
       <Filter>Source\Engine\Component</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Component\SceneComponent.h">
+      <Filter>Source\Engine\Component</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Component\SkeletalMeshComponent.h">
       <Filter>Source\Engine\Component</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Component\SkinnedMeshComponent.h">
@@ -1805,9 +1814,6 @@
     </ClInclude>
     <ClInclude Include="ThirdParty\ImGui\imstb_truetype.h">
       <Filter>ThirdParty\ImGui</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Component\SkeletalMeshComponent.h">
-      <Filter>Source\Engine\Component</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

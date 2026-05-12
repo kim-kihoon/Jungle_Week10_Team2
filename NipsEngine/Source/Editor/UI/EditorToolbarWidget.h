@@ -5,6 +5,7 @@
 class FEditorViewportOverlayWidget;
 class FEditorSceneWidget;
 class FEditorPlayStreamWidget;
+class FEditorContentDrawerWidget;
 
 class FEditorToolbarWidget : public FEditorWidget
 {
@@ -12,6 +13,7 @@ public:
 	void SetViewportOverlayWidget(FEditorViewportOverlayWidget* InViewportOverlayWidget);
 	void SetSceneWidget(FEditorSceneWidget* InSceneWidget);
 	void SetPlayStreamWidget(FEditorPlayStreamWidget* InPlayStreamWidget);
+	void SetContentDrawerWidget(FEditorContentDrawerWidget* InContentDrawerWidget);
 	void SetPanelVisibilityRefs(
 		bool* InShowConsole,
 		bool* InShowControl,
@@ -33,6 +35,7 @@ private:
 	FEditorViewportOverlayWidget* ViewportOverlayWidget = nullptr;
 	FEditorSceneWidget* SceneWidget = nullptr;
 	FEditorPlayStreamWidget* PlayStreamWidget = nullptr;
+	FEditorContentDrawerWidget* ContentDrawerWidget = nullptr;
 
 	bool* bShowConsole = nullptr;
 	bool* bShowControl = nullptr;
