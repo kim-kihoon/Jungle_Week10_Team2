@@ -518,7 +518,8 @@ void FRenderer::InitializePassBatchers()
 					Cmd.Constants.Grid.GridSpacing,
 					Cmd.Constants.Grid.GridHalfLineCount,
 					CameraPos, CameraFwd,
-					Cmd.Constants.Grid.bOrthographic);
+					Cmd.Constants.Grid.bOrthographic,
+					Cmd.Constants.Grid.bFixedOrthographic);
 			} },
 	};
 

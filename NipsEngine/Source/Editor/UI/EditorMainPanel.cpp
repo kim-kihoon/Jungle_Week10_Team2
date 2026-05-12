@@ -252,7 +252,7 @@ void FEditorMainPanel::Create(FWindowsWindow* InWindow, FRenderer& InRenderer, U
 	ToolbarWidget.SetPlayStreamWidget(&PlayStreamWidget);
 	ToolbarWidget.SetContentDrawerWidget(&ContentDrawerWidget);
 	ToolbarWidget.SetPanelVisibilityRefs(&bShowConsole, &bShowControl, &bShowProperty, &bShowSceneManager,
-										 &bShowMaterialEditor, &bShowStatProfiler, nullptr);
+										 &bShowMaterialEditor, &bShowStatProfiler, &bShowCameraShake, nullptr);
 }
 
 void FEditorMainPanel::Release()
@@ -320,16 +320,27 @@ void FEditorMainPanel::Render(float DeltaTime)
 		ContentDrawerWidget.SetOpen(false);
 	}
 	bShowConsole = ConsoleWidget.IsOpen();
-	if (bShowMaterialEditor)
-		MaterialWidget.Render(DeltaTime);
-	if (bShowProperty)
-		PropertyWidget.Render(DeltaTime);
-	if (bShowSceneManager)
-		SceneWidget.Render(DeltaTime);
-	if (bShowStatProfiler)
-		StatWidget.Render(DeltaTime);
-	if (bShowCameraShake)
-		CameraShakeWidget.Render(DeltaTime);
+
+	MaterialWidget.SetOpen(bShowMaterialEditor);
+	MaterialWidget.Render(DeltaTime);
+	bShowMaterialEditor = MaterialWidget.IsOpen();
+
+	PropertyWidget.SetOpen(bShowProperty);
+	PropertyWidget.Render(DeltaTime);
+	bShowProperty = PropertyWidget.IsOpen();
+
+	SceneWidget.SetOpen(bShowSceneManager);
+	SceneWidget.Render(DeltaTime);
+	bShowSceneManager = SceneWidget.IsOpen();
+
+	StatWidget.SetOpen(bShowStatProfiler);
+	StatWidget.Render(DeltaTime);
+	bShowStatProfiler = StatWidget.IsOpen();
+
+	CameraShakeWidget.SetOpen(bShowCameraShake);
+	CameraShakeWidget.Render(DeltaTime);
+	bShowCameraShake = CameraShakeWidget.IsOpen();
+
 	FEditorSkeletalMeshViewerWidget* FocusedViewerThisFrame = nullptr;
 	bool bFocusedViewerStillOpen = false;
 	for (auto It = SkeletalMeshViewers.begin(); It != SkeletalMeshViewers.end(); )
@@ -418,6 +429,8 @@ void FEditorMainPanel::Update()
 		if (Viewer->IsViewportInputActive()) bSkeletalMeshViewerBlockingInput = true;
 		if (Viewer->IsViewportInputCaptured()) bSkeletalMeshViewerCapturedInput = true;
 	}
+	const bool bOverlayBlockingMouseInput =
+		ContentDrawerWidget.IsViewportInputBlocking() || ConsoleWidget.IsViewportInputBlocking();
 
 	if (bViewportOperationActive || bSkeletalMeshViewerCapturedInput)
 	{
@@ -429,9 +442,13 @@ void FEditorMainPanel::Update()
 	}
 
 	FGuiInputState& GuiState = FInputRouter::GetGuiInputState();
-	GuiState.bBlockViewportInput = bPropertyModalBlockingInput || bSkeletalMeshViewerBlockingInput;
+	GuiState.bBlockViewportInput =
+		bPropertyModalBlockingInput || bSkeletalMeshViewerBlockingInput || bOverlayBlockingMouseInput;
 	GuiState.bUsingMouse =
-		bPropertyModalBlockingInput || bSkeletalMeshViewerBlockingInput || (bViewportOperationActive ? false : IO.WantCaptureMouse);
+		bPropertyModalBlockingInput ||
+		bSkeletalMeshViewerBlockingInput ||
+		bOverlayBlockingMouseInput ||
+		(bViewportOperationActive ? false : IO.WantCaptureMouse);
 	GuiState.bUsingKeyboard = bPropertyModalBlockingInput || bSkeletalMeshViewerBlockingInput || IO.WantCaptureKeyboard;
 
 	// IME는 ImGui가 텍스트 입력을 원할 때만 활성화.

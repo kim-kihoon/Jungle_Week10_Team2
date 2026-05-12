@@ -32,5 +32,6 @@ struct FSceneView
 	FCameraOverlaySettings CameraOverlaySettings;
 
 	bool bOrthographic = false;
+	bool bFixedOrthographic = false;
 };
 

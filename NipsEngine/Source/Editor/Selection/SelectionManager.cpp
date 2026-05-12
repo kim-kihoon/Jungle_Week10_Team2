@@ -2,6 +2,24 @@
 
 #include "Object/Object.h"
 #include "Component/GizmoComponent.h"
+#include "Component/SceneComponent.h"
+#include "GameFramework/AActor.h"
+
+#include <algorithm>
+
+namespace
+{
+	bool IsValidSelectableActor(AActor* Actor)
+	{
+		if (!UObject::IsValid(Actor))
+		{
+			return false;
+		}
+
+		USceneComponent* Root = Actor->GetRootComponent();
+		return UObject::IsValid(Root);
+	}
+}
 
 void FSelectionManager::Init()
 {
@@ -24,7 +42,7 @@ void FSelectionManager::Shutdown()
 void FSelectionManager::Select(AActor* Actor)
 {
 	SelectedActors.clear();
-	if (Actor)
+	if (IsValidSelectableActor(Actor))
 	{
 		SelectedActors.push_back(Actor);
 	}
@@ -33,7 +51,7 @@ void FSelectionManager::Select(AActor* Actor)
 
 void FSelectionManager::AddSelect(AActor* Actor)
 {
-	if (!Actor)
+	if (!IsValidSelectableActor(Actor))
 	{
 		return;
 	}
@@ -48,7 +66,7 @@ void FSelectionManager::AddSelect(AActor* Actor)
 
 void FSelectionManager::SelectRange(AActor* ClickedActor, const TArray<AActor*>& ActorList)
 {
-	if (!ClickedActor) return;
+	if (!IsValidSelectableActor(ClickedActor)) return;
 
 	// Find index of clicked actor
 	int32 ClickedIdx = -1;
@@ -85,7 +103,7 @@ void FSelectionManager::SelectRange(AActor* ClickedActor, const TArray<AActor*>&
 	SelectedActors.clear();
 	for (int32 i = Lo; i <= Hi; ++i)
 	{
-		if (ActorList[i])
+		if (IsValidSelectableActor(ActorList[i]))
 		{
 			SelectedActors.push_back(ActorList[i]);
 		}
@@ -95,7 +113,7 @@ void FSelectionManager::SelectRange(AActor* ClickedActor, const TArray<AActor*>&
 
 void FSelectionManager::ToggleSelect(AActor* Actor)
 {
-	if (!Actor) return;
+	if (!IsValidSelectableActor(Actor)) return;
 
 	auto It = std::find(SelectedActors.begin(), SelectedActors.end(), Actor);
 	if (It != SelectedActors.end())
@@ -128,6 +146,13 @@ void FSelectionManager::ClearSelection()
 void FSelectionManager::SyncGizmo()
 {
 	if (!Gizmo) return;
+
+	SelectedActors.erase(
+		std::remove_if(SelectedActors.begin(), SelectedActors.end(), [](AActor* Actor)
+		{
+			return !IsValidSelectableActor(Actor);
+		}),
+		SelectedActors.end());
 
 	AActor* Primary = GetPrimarySelection();
 	if (Primary)

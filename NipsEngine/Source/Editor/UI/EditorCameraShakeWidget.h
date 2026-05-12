@@ -10,6 +10,8 @@ class FEditorCameraShakeWidget : public FEditorWidget
 public:
     void Initialize(UEditorEngine* InEditorEngine) override;
     void Render(float DeltaTime) override;
+    void SetOpen(bool bInOpen) { bIsOpen = bInOpen; }
+    bool IsOpen() const { return bIsOpen; }
 
 private:
     APlayerCameraManager* GetCameraManager() const;
@@ -26,4 +28,5 @@ private:
     ULuaCameraModifier* LuaModifier = nullptr;
     std::string LoadedScriptPath;
     std::string LastError;
+    bool bIsOpen = true;
 };

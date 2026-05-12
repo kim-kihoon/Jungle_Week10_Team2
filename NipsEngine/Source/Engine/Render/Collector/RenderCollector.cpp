@@ -183,9 +183,9 @@ void FRenderCollector::CollectDebugBounds(UWorld* World, const FShowFlags& ShowF
 	OverlayRenderCollector.CollectDebugBounds(World, ShowFlags, ViewMode, RenderBus, LineBatcher);
 }
 
-void FRenderCollector::CollectGrid(float GridSpacing, int32 GridHalfLineCount, FRenderBus& RenderBus, bool bOrthographic)
+void FRenderCollector::CollectGrid(float GridSpacing, int32 GridHalfLineCount, FRenderBus& RenderBus, bool bOrthographic, bool bFixedOrthographic)
 {
-	OverlayRenderCollector.CollectGrid(GridSpacing, GridHalfLineCount, RenderBus, bOrthographic);
+	OverlayRenderCollector.CollectGrid(GridSpacing, GridHalfLineCount, RenderBus, bOrthographic, bFixedOrthographic);
 }
 
 void FRenderCollector::CollectSkeleton(USkeletalMeshComponent* MeshComp, int32 SelectedBoneIndex, bool bShowFullSkeleton, FRenderBus& RenderBus, FLineBatcher* LineBatcher)

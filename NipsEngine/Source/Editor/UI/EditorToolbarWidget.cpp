@@ -10,6 +10,7 @@
 #include "Component/GizmoComponent.h"
 #include "Core/ResourceManager.h"
 #include "Engine/Viewport/ViewportCamera.h"
+#include "Render/Resource/Texture.h"
 #include "GameFramework/PrimitiveActors.h"
 #include "GameFramework/World.h"
 #include "Serialization/SceneSaveManager.h"
@@ -44,27 +45,87 @@ namespace
 
 	struct FAddActorEntry
 	{
+		const char* Category;
 		const char* Label;
 		AActor* (*Spawn)(UWorld*, const FVector&);
 	};
 
 	static const FAddActorEntry AddActorTypes[] = {
-		{ "Pawn", SpawnEditorActor<APawnActor> },
-		{ "Scene", SpawnEditorActor<ASceneActor> },
-		{ "StaticMesh", SpawnEditorActor<AStaticMeshActor> },
-		{ "SkeletalMesh", SpawnEditorActor<ASkeletalMeshActor> },
-		{ "TextRender", SpawnEditorActor<ATextRenderActor> },
-		{ "SubUV", SpawnEditorActor<ASubUVActor> },
-		{ "Billboard", SpawnEditorActor<ABillboardActor> },
-		{ "Decal", SpawnEditorActor<ADecalActor> },
-		{ "Directional Light", SpawnEditorActor<ADirectionalLightActor> },
-		{ "Ambient Light", SpawnEditorActor<AAmbientLightActor> },
-		{ "Point Light", SpawnEditorActor<APointLightActor> },
-		{ "Spot Light", SpawnEditorActor<ASpotLightActor> },
-		{ "Sky Atmosphere", SpawnEditorActor<ASkyAtmosphereActor> },
-		{ "Height Fog", SpawnEditorActor<AHeightFogActor> },
-		{ "Audio Zone", SpawnEditorActor<AAudioZoneActor> },
-		{ "Player Start", SpawnEditorActor<APlayerStartActor> },
+		{ "Basic", "Pawn", SpawnEditorActor<APawnActor> },
+		{ "Basic", "Scene", SpawnEditorActor<ASceneActor> },
+		{ "Rendering", "StaticMesh", SpawnEditorActor<AStaticMeshActor> },
+		{ "Rendering", "SkeletalMesh", SpawnEditorActor<ASkeletalMeshActor> },
+		{ "Rendering", "TextRender", SpawnEditorActor<ATextRenderActor> },
+		{ "Rendering", "SubUV", SpawnEditorActor<ASubUVActor> },
+		{ "Rendering", "Billboard", SpawnEditorActor<ABillboardActor> },
+		{ "Rendering", "Decal", SpawnEditorActor<ADecalActor> },
+		{ "Light", "Directional Light", SpawnEditorActor<ADirectionalLightActor> },
+		{ "Light", "Ambient Light", SpawnEditorActor<AAmbientLightActor> },
+		{ "Light", "Point Light", SpawnEditorActor<APointLightActor> },
+		{ "Light", "Spot Light", SpawnEditorActor<ASpotLightActor> },
+		{ "Environment", "Sky Atmosphere", SpawnEditorActor<ASkyAtmosphereActor> },
+		{ "Environment", "Height Fog", SpawnEditorActor<AHeightFogActor> },
+		{ "Audio", "Audio Zone", SpawnEditorActor<AAudioZoneActor> },
+		{ "Gameplay", "Player Start", SpawnEditorActor<APlayerStartActor> },
+	};
+
+	bool RenderToolbarIconButton(const char* Id, UTexture* Texture, const ImVec2& ButtonSize, const ImVec2& IconSize, const ImVec4& IconTint)
+	{
+		if (!Texture || !Texture->GetSRV())
+		{
+			return false;
+		}
+
+		ImGui::InvisibleButton(Id, ButtonSize);
+		const bool bClicked = ImGui::IsItemClicked();
+		const ImVec2 ButtonMin = ImGui::GetItemRectMin();
+		const ImVec2 ButtonMax = ImGui::GetItemRectMax();
+		const ImVec2 ButtonCenter(
+			(ButtonMin.x + ButtonMax.x) * 0.5f,
+			(ButtonMin.y + ButtonMax.y) * 0.5f
+		);
+		const ImVec2 IconMin(
+			ButtonCenter.x - IconSize.x * 0.5f,
+			ButtonCenter.y - IconSize.y * 0.5f
+		);
+		const ImVec2 IconMax(
+			ButtonCenter.x + IconSize.x * 0.5f,
+			ButtonCenter.y + IconSize.y * 0.5f
+		);
+
+		ImVec4 DrawTint = IconTint;
+		if (ImGui::IsItemHovered())
+		{
+			DrawTint.x = (DrawTint.x + 0.12f < 1.0f) ? DrawTint.x + 0.12f : 1.0f;
+			DrawTint.y = (DrawTint.y + 0.12f < 1.0f) ? DrawTint.y + 0.12f : 1.0f;
+			DrawTint.z = (DrawTint.z + 0.12f < 1.0f) ? DrawTint.z + 0.12f : 1.0f;
+		}
+		if (ImGui::IsItemActive())
+		{
+			DrawTint.x *= 0.85f;
+			DrawTint.y *= 0.85f;
+			DrawTint.z *= 0.85f;
+		}
+
+		ImGui::GetWindowDrawList()->AddImage(
+			reinterpret_cast<ImTextureID>(Texture->GetSRV()),
+			IconMin,
+			IconMax,
+			ImVec2(0.0f, 0.0f),
+			ImVec2(1.0f, 1.0f),
+			ImGui::ColorConvertFloat4ToU32(DrawTint)
+		);
+
+		return bClicked;
+	}
+
+	static const char* AddActorCategories[] = {
+		"Basic",
+		"Rendering",
+		"Light",
+		"Environment",
+		"Audio",
+		"Gameplay",
 	};
 
 	std::wstring GetSceneDialogInitialDir()
@@ -80,6 +141,18 @@ namespace
 		std::filesystem::create_directories(SceneDir, Ec);
 		return SceneDir.wstring();
 	}
+}
+
+void FEditorToolbarWidget::Initialize(UEditorEngine* InEditorEngine)
+{
+	FEditorWidget::Initialize(InEditorEngine);
+	TranslateIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Translate.png");
+	RotateIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Rotate.png");
+	ScaleIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Scale.png");
+	WorldSpaceIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/WorldSpace.png");
+	LocalSpaceIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/LocalSpace.png");
+	ShowFlagIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Show_Flag.png");
+	CameraIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Camera.png");
 }
 
 bool FEditorToolbarWidget::OpenSceneFileDialog(FString& OutFilePath) const
@@ -179,6 +252,7 @@ void FEditorToolbarWidget::SetPanelVisibilityRefs(
 	bool* InShowSceneManager,
 	bool* InShowMaterialEditor,
 	bool* InShowStatProfiler,
+	bool* InShowCameraShake,
 	bool* InShowSkeletalMeshViewer)
 {
 	bShowConsole = InShowConsole;
@@ -187,13 +261,14 @@ void FEditorToolbarWidget::SetPanelVisibilityRefs(
 	bShowSceneManager = InShowSceneManager;
 	bShowMaterialEditor = InShowMaterialEditor;
 	bShowStatProfiler = InShowStatProfiler;
+	bShowCameraShake = InShowCameraShake;
 	bShowSkeletalMeshViewer = InShowSkeletalMeshViewer;
 }
 
 void FEditorToolbarWidget::Render(float DeltaTime)
 {
 	(void)DeltaTime;
-	constexpr float EditorToolBarHeight = 34.0f;
+	constexpr float EditorToolBarHeight = 40.0f;
 
 	const ImGuiIO& IO = ImGui::GetIO();
 	if (bShowConsole && ImGui::IsKeyPressed(ImGuiKey_GraveAccent, false) && (*bShowConsole || !IO.WantTextInput))
@@ -254,11 +329,6 @@ void FEditorToolbarWidget::Render(float DeltaTime)
 	RenderEditMenu();
 	RenderHelpMenu();
 
-	if (PlayStreamWidget)
-	{
-		PlayStreamWidget->Render(DeltaTime);
-	}
-
 	ImGui::EndMainMenuBar();
 	RenderEditorToolBar(MenuBarHeight, EditorToolBarHeight);
 }
@@ -307,23 +377,59 @@ void FEditorToolbarWidget::RenderEditorToolBar(float MenuBarHeight, float ToolBa
 		ImGui::SameLine();
 		ImGui::TextDisabled("|");
 		ImGui::SameLine();
-		if (ImGui::Button("Settings", ImVec2(78.0f, 22.0f)))
+		constexpr ImVec2 SettingsButtonSize(28.0f, 22.0f);
+		constexpr ImVec2 SettingsIconSize(18.0f, 18.0f);
+		const ImVec4 SettingsIconTint(0.78f, 0.80f, 0.84f, 1.0f);
+
+		const bool bShowSettingsClicked = ShowFlagIconTexture && ShowFlagIconTexture->GetSRV()
+			? RenderToolbarIconButton("##ShowSettings", ShowFlagIconTexture, SettingsButtonSize, SettingsIconSize, SettingsIconTint)
+			: ImGui::Button("Show", ImVec2(58.0f, 22.0f));
+		if (bShowSettingsClicked)
 		{
-			ImGui::OpenPopup("ViewportSettingsPopup");
+			ImGui::OpenPopup("ShowSettingsPopup");
 		}
 
-		ImGui::SetNextWindowSize(ImVec2(360.0f, 520.0f), ImGuiCond_Appearing);
-		if (ImGui::BeginPopup("ViewportSettingsPopup"))
+		ImGui::SameLine();
+		const bool bCameraSettingsClicked = CameraIconTexture && CameraIconTexture->GetSRV()
+			? RenderToolbarIconButton("##CameraSettings", CameraIconTexture, SettingsButtonSize, SettingsIconSize, SettingsIconTint)
+			: ImGui::Button("Camera", ImVec2(68.0f, 22.0f));
+		if (bCameraSettingsClicked)
+		{
+			ImGui::OpenPopup("CameraSettingsPopup");
+		}
+
+		ImGui::SetNextWindowSize(ImVec2(360.0f, 430.0f), ImGuiCond_Appearing);
+		if (ImGui::BeginPopup("ShowSettingsPopup"))
 		{
 			if (ViewportOverlayWidget)
 			{
-				ViewportOverlayWidget->RenderViewportSettings(0.0f, false);
+				ViewportOverlayWidget->RenderViewportSettings(0.0f, false, EViewportSettingsSection::Show);
 			}
 			else
 			{
 				ImGui::TextDisabled("Viewport settings unavailable.");
 			}
 			ImGui::EndPopup();
+		}
+
+		ImGui::SetNextWindowSize(ImVec2(360.0f, 240.0f), ImGuiCond_Appearing);
+		if (ImGui::BeginPopup("CameraSettingsPopup"))
+		{
+			if (ViewportOverlayWidget)
+			{
+				ViewportOverlayWidget->RenderViewportSettings(0.0f, false, EViewportSettingsSection::Camera);
+			}
+			else
+			{
+				ImGui::TextDisabled("Camera settings unavailable.");
+			}
+			ImGui::EndPopup();
+		}
+
+		if (PlayStreamWidget)
+		{
+			ImGui::SameLine();
+			PlayStreamWidget->Render(0.0f);
 		}
 	}
 
@@ -376,7 +482,7 @@ void FEditorToolbarWidget::RenderAddActorMenu(int32 ViewportIndex)
 		return;
 	}
 
-	for (const FAddActorEntry& Entry : AddActorTypes)
+	auto SpawnEntry = [&](const FAddActorEntry& Entry)
 	{
 		if (ImGui::Selectable(Entry.Label))
 		{
@@ -395,6 +501,24 @@ void FEditorToolbarWidget::RenderAddActorMenu(int32 ViewportIndex)
 			}
 			SpawnCount = 1;
 		}
+	};
+
+	for (const char* Category : AddActorCategories)
+	{
+		if (!ImGui::BeginMenu(Category))
+		{
+			continue;
+		}
+
+		for (const FAddActorEntry& Entry : AddActorTypes)
+		{
+			if (strcmp(Entry.Category, Category) == 0)
+			{
+				SpawnEntry(Entry);
+			}
+		}
+
+		ImGui::EndMenu();
 	}
 
 	ImGui::EndPopup();
@@ -409,39 +533,58 @@ void FEditorToolbarWidget::RenderGizmoTools()
 		return;
 	}
 
-	constexpr ImVec2 GizmoModeButtonSize(58.0f, 22.0f);
+	constexpr ImVec2 GizmoModeButtonSize(28.0f, 22.0f);
+	constexpr ImVec2 GizmoModeIconSize(18.0f, 18.0f);
+	const ImVec4 ActiveTint(0.149f, 0.733f, 1.0f, 1.0f); // #26bbff
+	const ImVec4 InactiveTint(0.78f, 0.80f, 0.84f, 1.0f);
 
 	UGizmoComponent* Gizmo = EditorEngine->GetGizmo();
-	if (ImGui::Selectable("Move", Gizmo->IsTranslateMode(), 0, GizmoModeButtonSize))
+	const bool bHasTranslateIcon = TranslateIconTexture && TranslateIconTexture->GetSRV();
+	const bool bHasRotateIcon = RotateIconTexture && RotateIconTexture->GetSRV();
+	const bool bHasScaleIcon = ScaleIconTexture && ScaleIconTexture->GetSRV();
+
+	const ImVec4 TranslateTint = Gizmo->IsTranslateMode() ? ActiveTint : InactiveTint;
+	const ImVec4 RotateTint = Gizmo->IsRotateMode() ? ActiveTint : InactiveTint;
+	const ImVec4 ScaleTint = Gizmo->IsScaleMode() ? ActiveTint : InactiveTint;
+
+	const bool bTranslateClicked = bHasTranslateIcon
+		? RenderToolbarIconButton("##GizmoTranslate", TranslateIconTexture, GizmoModeButtonSize, GizmoModeIconSize, TranslateTint)
+		: ImGui::Selectable("Move", Gizmo->IsTranslateMode(), 0, ImVec2(58.0f, 22.0f));
+	if (bTranslateClicked)
 	{
 		Gizmo->SetTranslateMode();
 	}
 	ImGui::SameLine();
-	if (ImGui::Selectable("Rotate", Gizmo->IsRotateMode(), 0, GizmoModeButtonSize))
+	const bool bRotateClicked = bHasRotateIcon
+		? RenderToolbarIconButton("##GizmoRotate", RotateIconTexture, GizmoModeButtonSize, GizmoModeIconSize, RotateTint)
+		: ImGui::Selectable("Rotate", Gizmo->IsRotateMode(), 0, ImVec2(58.0f, 22.0f));
+	if (bRotateClicked)
 	{
 		Gizmo->SetRotateMode();
 	}
 	ImGui::SameLine();
-	if (ImGui::Selectable("Scale", Gizmo->IsScaleMode(), 0, GizmoModeButtonSize))
+	const bool bScaleClicked = bHasScaleIcon
+		? RenderToolbarIconButton("##GizmoScale", ScaleIconTexture, GizmoModeButtonSize, GizmoModeIconSize, ScaleTint)
+		: ImGui::Selectable("Scale", Gizmo->IsScaleMode(), 0, ImVec2(58.0f, 22.0f));
+	if (bScaleClicked)
 	{
 		Gizmo->SetScaleMode();
 	}
 	ImGui::SameLine();
 
-	const char* SpaceLabel = Gizmo->IsWorldSpace() ? "World" : "Local";
-	ImGui::SetNextItemWidth(76.0f);
-	if (ImGui::BeginCombo("##GizmoSpace", SpaceLabel))
+	const bool bWorldSpace = Gizmo->IsWorldSpace();
+	UTexture* CurrentSpaceIconTexture = bWorldSpace ? WorldSpaceIconTexture : LocalSpaceIconTexture;
+	const bool bHasSpaceIcon = CurrentSpaceIconTexture && CurrentSpaceIconTexture->GetSRV();
+	constexpr ImVec2 SpaceButtonSize(28.0f, 22.0f);
+	constexpr ImVec2 SpaceIconSize(18.0f, 18.0f);
+
+	const bool bSpaceClicked = bHasSpaceIcon
+		? RenderToolbarIconButton("##GizmoSpace", CurrentSpaceIconTexture, SpaceButtonSize, SpaceIconSize, InactiveTint)
+		: ImGui::Selectable(bWorldSpace ? "World" : "Local", false, 0, ImVec2(58.0f, 22.0f));
+
+	if (bSpaceClicked)
 	{
-		const bool bWorldSelected = Gizmo->IsWorldSpace();
-		if (ImGui::Selectable("World", bWorldSelected))
-		{
-			Gizmo->SetWorldSpace(true);
-		}
-		if (ImGui::Selectable("Local", !bWorldSelected))
-		{
-			Gizmo->SetWorldSpace(false);
-		}
-		ImGui::EndCombo();
+		Gizmo->SetWorldSpace(!bWorldSpace);
 	}
 }
 
@@ -553,6 +696,7 @@ void FEditorToolbarWidget::RenderViewMenu()
 	if (bShowSceneManager) ImGui::MenuItem("Scene Manager", nullptr, bShowSceneManager);
 	if (bShowMaterialEditor) ImGui::MenuItem("Material Editor", nullptr, bShowMaterialEditor);
 	if (bShowStatProfiler) ImGui::MenuItem("Stat Profiler", nullptr, bShowStatProfiler);
+	if (bShowCameraShake) ImGui::MenuItem("Camera Shake", nullptr, bShowCameraShake);
 	if (bShowSkeletalMeshViewer) ImGui::MenuItem("SkeletalMesh Viewer", nullptr, bShowSkeletalMeshViewer);
 
 	if (ContentDrawerWidget)
