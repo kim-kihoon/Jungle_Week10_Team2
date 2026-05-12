@@ -1,6 +1,7 @@
 #include "Editor/UI/EditorContentDrawerWidget.h"
 
 #include "Editor/EditorEngine.h"
+#include "Editor/UI/EditorConsoleWidget.h"
 #include "Editor/Selection/SelectionManager.h"
 #include "Editor/Viewport/ViewportLayout.h"
 #include "Engine/Viewport/ViewportCamera.h"
@@ -236,6 +237,14 @@ void FEditorContentDrawerWidget::Initialize(UEditorEngine* InEditorEngine)
 
 void FEditorContentDrawerWidget::SetOpen(bool bInOpen)
 {
+	if (bInOpen && !bOpen)
+	{
+		bOpenedThisFrame = true;
+		if (ConsoleWidget)
+		{
+			ConsoleWidget->SetOpen(false);
+		}
+	}
 	bOpen = bInOpen;
 	if (bOpen && bAssetTreeDirty)
 	{
@@ -246,6 +255,13 @@ void FEditorContentDrawerWidget::SetOpen(bool bInOpen)
 void FEditorContentDrawerWidget::ToggleOpen()
 {
 	SetOpen(!bOpen);
+}
+
+bool FEditorContentDrawerWidget::ConsumeOpenRequest()
+{
+	const bool bResult = bOpenedThisFrame;
+	bOpenedThisFrame = false;
+	return bResult;
 }
 
 void FEditorContentDrawerWidget::RefreshAssetTree()
@@ -541,6 +557,37 @@ void FEditorContentDrawerWidget::RenderBottomBar(const ImGuiViewport* Viewport, 
 		if (ImGui::IsItemHovered())
 		{
 			ImGui::SetTooltip("Ctrl+Space");
+		}
+
+		ImGui::SameLine();
+		const bool bConsoleOpen = ConsoleWidget && ConsoleWidget->IsOpen();
+		if (bConsoleOpen)
+		{
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.26f, 0.36f, 1.0f));
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.23f, 0.32f, 0.44f, 1.0f));
+			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.15f, 0.22f, 0.31f, 1.0f));
+		}
+		else
+		{
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.10f, 0.105f, 0.115f, 1.0f));
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.16f, 0.17f, 0.19f, 1.0f));
+			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.08f, 0.085f, 0.095f, 1.0f));
+		}
+
+		if (ImGui::Button(">_ Console", ImVec2(104.0f, 22.0f)) && ConsoleWidget)
+		{
+			const bool bNextOpen = !ConsoleWidget->IsOpen();
+			ConsoleWidget->SetOpen(bNextOpen);
+			if (bNextOpen)
+			{
+				SetOpen(false);
+			}
+		}
+		ImGui::PopStyleColor(3);
+
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::SetTooltip("`");
 		}
 	}
 	ImGui::End();
