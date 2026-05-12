@@ -33,7 +33,7 @@ void FEditorControlWidget::Render(float DeltaTime)
 	ImGui::SetNextWindowCollapsed(false, ImGuiCond_Once);
 	ImGui::SetNextWindowSize(ImVec2(500.0f, 480.0f), ImGuiCond_Once);
 
-	ImGui::Begin("Jungle Control Panel");
+	ImGui::Begin("Control Panel");
 
 	ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
 
