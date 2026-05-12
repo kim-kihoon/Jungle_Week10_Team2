@@ -215,11 +215,20 @@ void FEditorConsoleWidget::Render(float DeltaTime)
 		bRequestFocusInput = false;
 	}
 
+	UpdateCompletionCandidates();
+
 	if (ImGui::InputText("Input", InputBuf, sizeof(InputBuf), Flags, &TextEditCallback, this)) {
-		ExecCommand(InputBuf);
-		strcpy_s(InputBuf, "");
-		// 명령 실행 후 포커스를 반환하지 않음 — EnterReturnsTrue 가 자동으로 포커스 해제
+		if (!CompleteSelectedCandidateInBuffer())
+		{
+			ExecCommand(InputBuf);
+			strcpy_s(InputBuf, "");
+			CompletionCandidates.clear();
+			bCompletionSelectionActive = false;
+			CompletionInputSnapshot.clear();
+		}
 	}
+	UpdateCompletionCandidates();
+	RenderCompletionCandidates();
 
 	ImGui::SetItemDefaultFocus();
 
@@ -261,6 +270,149 @@ void FEditorConsoleWidget::RegisterCommand(const FString& Name, CommandFn Fn) {
 	Commands[Name] = Fn;
 }
 
+void FEditorConsoleWidget::UpdateCompletionCandidates()
+{
+	const FString Input(InputBuf);
+	if (Input == CompletionInputSnapshot)
+	{
+		return;
+	}
+
+	CompletionInputSnapshot = Input;
+	CompletionCandidates = GetCompletionCandidates(Input);
+	if (SelectedCompletionIndex >= static_cast<int32>(CompletionCandidates.size()))
+	{
+		SelectedCompletionIndex = 0;
+	}
+	if (SelectedCompletionIndex < 0)
+	{
+		SelectedCompletionIndex = 0;
+	}
+	bCompletionSelectionActive = !CompletionCandidates.empty();
+}
+
+TArray<FCompletionCandidate> FEditorConsoleWidget::GetCompletionCandidates(const FString& Input) const
+{
+	TArray<FCompletionCandidate> Result;
+	const char* InputStart = Input.c_str();
+	while (*InputStart == ' ')
+	{
+		++InputStart;
+	}
+
+	const FString Prefix(InputStart);
+	if (Prefix.empty() || Prefix.find(' ') != FString::npos)
+	{
+		return Result;
+	}
+
+	if (Commands.find(Prefix) != Commands.end())
+	{
+		return Result;
+	}
+
+	for (const auto& Pair : Commands)
+	{
+		const FString& Name = Pair.first;
+		if (Name.rfind(Prefix, 0) == 0)
+		{
+			Result.push_back({Name, Name});
+		}
+	}
+
+	std::sort(Result.begin(), Result.end(), [](const FCompletionCandidate& Left, const FCompletionCandidate& Right)
+	{
+		return Left.CommandName < Right.CommandName;
+	});
+
+	constexpr size_t MaxCompletionCandidates = 5;
+	if (Result.size() > MaxCompletionCandidates)
+	{
+		Result.resize(MaxCompletionCandidates);
+	}
+
+	return Result;
+}
+
+void FEditorConsoleWidget::RenderCompletionCandidates()
+{
+	if (!bCompletionSelectionActive || CompletionCandidates.empty())
+	{
+		return;
+	}
+
+	const ImVec2 InputMin = ImGui::GetItemRectMin();
+	const ImVec2 InputMax = ImGui::GetItemRectMax();
+	const float LineHeight = ImGui::GetTextLineHeightWithSpacing();
+	const float PanelHeight = static_cast<float>(CompletionCandidates.size()) * LineHeight + 8.0f;
+	const ImVec2 PanelMin(InputMin.x, InputMin.y - PanelHeight - 2.0f);
+	const ImVec2 PanelMax(InputMax.x, InputMin.y - 2.0f);
+
+	ImDrawList* DrawList = ImGui::GetForegroundDrawList();
+	DrawList->AddRectFilled(PanelMin, PanelMax, IM_COL32(30, 30, 30, 240), 4.0f);
+	DrawList->AddRect(PanelMin, PanelMax, IM_COL32(90, 95, 110, 220), 4.0f);
+
+	for (int32 Index = 0; Index < static_cast<int32>(CompletionCandidates.size()); ++Index)
+	{
+		const bool bSelected = Index == SelectedCompletionIndex;
+		const ImVec2 TextPos(PanelMin.x + 8.0f, PanelMin.y + 4.0f + static_cast<float>(Index) * LineHeight);
+		if (bSelected)
+		{
+			DrawList->AddRectFilled(
+				ImVec2(PanelMin.x + 2.0f, TextPos.y - 1.0f),
+				ImVec2(PanelMax.x - 2.0f, TextPos.y + LineHeight - 1.0f),
+				IM_COL32(70, 110, 180, 255),
+				3.0f);
+		}
+		DrawList->AddText(TextPos, IM_COL32(255, 255, 255, 255), CompletionCandidates[Index].DisplayText.c_str());
+	}
+}
+
+bool FEditorConsoleWidget::CompleteSelectedCandidateInBuffer()
+{
+	if (!bCompletionSelectionActive || CompletionCandidates.empty())
+	{
+		return false;
+	}
+
+	SelectedCompletionIndex = std::clamp(SelectedCompletionIndex, 0, static_cast<int32>(CompletionCandidates.size()) - 1);
+	strcpy_s(InputBuf, CompletionCandidates[SelectedCompletionIndex].CommandName.c_str());
+	strcat_s(InputBuf, " ");
+	CompletionCandidates.clear();
+	bCompletionSelectionActive = false;
+	CompletionInputSnapshot = InputBuf;
+	return true;
+}
+
+bool FEditorConsoleWidget::CompleteSelectedCandidateInBuffer(ImGuiInputTextCallbackData* Data)
+{
+	if (!bCompletionSelectionActive || CompletionCandidates.empty())
+	{
+		return false;
+	}
+
+	SelectedCompletionIndex = std::clamp(SelectedCompletionIndex, 0, static_cast<int32>(CompletionCandidates.size()) - 1);
+	const FString CompletedText = CompletionCandidates[SelectedCompletionIndex].CommandName + " ";
+	Data->DeleteChars(0, Data->BufTextLen);
+	Data->InsertChars(0, CompletedText.c_str());
+	strcpy_s(InputBuf, CompletedText.c_str());
+	CompletionCandidates.clear();
+	bCompletionSelectionActive = false;
+	CompletionInputSnapshot = InputBuf;
+	return true;
+}
+
+void FEditorConsoleWidget::MoveCompletionSelection(int32 Delta)
+{
+	if (!bCompletionSelectionActive || CompletionCandidates.empty())
+	{
+		return;
+	}
+
+	const int32 Count = static_cast<int32>(CompletionCandidates.size());
+	SelectedCompletionIndex = (SelectedCompletionIndex + Delta + Count) % Count;
+}
+
 void FEditorConsoleWidget::ExecCommand(const char* CommandLine) {
 	AddLog("# %s\n", CommandLine);
 	History.push_back(_strdup(CommandLine));
@@ -294,6 +446,21 @@ int32 FEditorConsoleWidget::TextEditCallback(ImGuiInputTextCallbackData* Data) {
 	}
 
 	if (Data->EventFlag == ImGuiInputTextFlags_CallbackHistory) {
+		Console->UpdateCompletionCandidates();
+		if (Console->bCompletionSelectionActive && !Console->CompletionCandidates.empty())
+		{
+			if (Data->EventKey == ImGuiKey_UpArrow)
+			{
+				Console->MoveCompletionSelection(-1);
+				return 0;
+			}
+			if (Data->EventKey == ImGuiKey_DownArrow)
+			{
+				Console->MoveCompletionSelection(1);
+				return 0;
+			}
+		}
+
 		const int32 PrevPos = Console->HistoryPos;
 		if (Data->EventKey == ImGuiKey_UpArrow) {
 			if (Console->HistoryPos == -1)
@@ -315,29 +482,8 @@ int32 FEditorConsoleWidget::TextEditCallback(ImGuiInputTextCallbackData* Data) {
 	}
 
 	if (Data->EventFlag == ImGuiInputTextFlags_CallbackCompletion) {
-		// Find last word typed
-		const char* WordEnd = Data->Buf + Data->CursorPos;
-		const char* WordStart = WordEnd;
-		while (WordStart > Data->Buf && WordStart[-1] != ' ')
-			WordStart--;
-
-		// Collect matches from registered commands
-		ImVector<const char*> Candidates;
-		for (auto& Pair : Console->Commands) {
-			const FString& Name = Pair.first;
-			if (strncmp(Name.c_str(), WordStart, WordEnd - WordStart) == 0)
-				Candidates.push_back(Name.c_str());
-		}
-
-		if (Candidates.Size == 1) {
-			Data->DeleteChars(static_cast<int32>(WordStart - Data->Buf), static_cast<int32>(WordEnd - WordStart));
-			Data->InsertChars(Data->CursorPos, Candidates[0]);
-			Data->InsertChars(Data->CursorPos, " ");
-		}
-		else if (Candidates.Size > 1) {
-			Console->AddLog("Possible completions:\n");
-			for (auto& C : Candidates) Console->AddLog("  %s\n", C);
-		}
+		Console->UpdateCompletionCandidates();
+		Console->CompleteSelectedCandidateInBuffer(Data);
 	}
 
 	return 0;
