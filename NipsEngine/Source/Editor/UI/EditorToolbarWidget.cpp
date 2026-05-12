@@ -140,6 +140,8 @@ void FEditorToolbarWidget::Initialize(UEditorEngine* InEditorEngine)
 	TranslateIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Translate.png");
 	RotateIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Rotate.png");
 	ScaleIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Scale.png");
+	WorldSpaceIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/WorldSpace.png");
+	LocalSpaceIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/LocalSpace.png");
 }
 
 bool FEditorToolbarWidget::OpenSceneFileDialog(FString& OutFilePath) const
@@ -518,20 +520,19 @@ void FEditorToolbarWidget::RenderGizmoTools()
 	}
 	ImGui::SameLine();
 
-	const char* SpaceLabel = Gizmo->IsWorldSpace() ? "World" : "Local";
-	ImGui::SetNextItemWidth(76.0f);
-	if (ImGui::BeginCombo("##GizmoSpace", SpaceLabel))
+	const bool bWorldSpace = Gizmo->IsWorldSpace();
+	UTexture* CurrentSpaceIconTexture = bWorldSpace ? WorldSpaceIconTexture : LocalSpaceIconTexture;
+	const bool bHasSpaceIcon = CurrentSpaceIconTexture && CurrentSpaceIconTexture->GetSRV();
+	constexpr ImVec2 SpaceButtonSize(28.0f, 22.0f);
+	constexpr ImVec2 SpaceIconSize(18.0f, 18.0f);
+
+	const bool bSpaceClicked = bHasSpaceIcon
+		? RenderToolbarIconButton("##GizmoSpace", CurrentSpaceIconTexture, SpaceButtonSize, SpaceIconSize, InactiveTint)
+		: ImGui::Selectable(bWorldSpace ? "World" : "Local", false, 0, ImVec2(58.0f, 22.0f));
+
+	if (bSpaceClicked)
 	{
-		const bool bWorldSelected = Gizmo->IsWorldSpace();
-		if (ImGui::Selectable("World", bWorldSelected))
-		{
-			Gizmo->SetWorldSpace(true);
-		}
-		if (ImGui::Selectable("Local", !bWorldSelected))
-		{
-			Gizmo->SetWorldSpace(false);
-		}
-		ImGui::EndCombo();
+		Gizmo->SetWorldSpace(!bWorldSpace);
 	}
 }
 

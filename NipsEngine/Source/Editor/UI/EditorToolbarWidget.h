@@ -50,6 +50,8 @@ private:
 	UTexture* TranslateIconTexture = nullptr;
 	UTexture* RotateIconTexture = nullptr;
 	UTexture* ScaleIconTexture = nullptr;
+	UTexture* WorldSpaceIconTexture = nullptr;
+	UTexture* LocalSpaceIconTexture = nullptr;
 
 	bool* bShowConsole = nullptr;
 	bool* bShowControl = nullptr;
