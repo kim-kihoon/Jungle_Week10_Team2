@@ -237,6 +237,22 @@ void FEditorSkeletalMeshViewerWidget::RenderToolbar()
 		ImGui::EndMenu();
 	}
 
+	if (ImGui::BeginMenu("Skeleton"))
+	{
+		bool bShow = PreviewScene.IsSkeletonVisible();
+		if (ImGui::MenuItem("Show Skeleton", nullptr, &bShow))
+		{
+			PreviewScene.SetSkeletonVisible(bShow);
+		}
+
+		bool bShowFull = PreviewScene.IsFullSkeletonVisible();
+		if (ImGui::MenuItem("Show Full Skeleton", nullptr, &bShowFull))
+		{
+			PreviewScene.SetFullSkeletonVisible(bShowFull);
+		}
+		ImGui::EndMenu();
+	}
+
 	if (ImGui::MenuItem("Reset Camera"))
 	{
 		Client.ResetCamera();

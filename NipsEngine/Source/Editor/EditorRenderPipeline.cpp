@@ -156,8 +156,17 @@ void FEditorRenderPipeline::RenderSkeletalMeshPreview(FRenderer& Renderer, FSkel
 	Collector.CollectWorld(PreviewScene.GetWorld(), Settings.ShowFlags, SceneView.ViewMode, Bus, &ViewFrustum);
 	Collector.CollectDebugBounds(PreviewScene.GetWorld(), Settings.ShowFlags, SceneView.ViewMode, Bus);
 	Collector.CollectGrid(Settings.GridSpacing, Settings.GridHalfLineCount, Bus, SceneView.bOrthographic);
-	Collector.CollectSkeleton(PreviewScene.GetPreviewMeshComponent(), PreviewScene.GetSelectedBoneIndex(), Bus, &Renderer.GetEditorLineBatcher());
 
+	if (PreviewScene.IsSkeletonVisible())
+	{
+		Collector.CollectSkeleton(
+			PreviewScene.GetPreviewMeshComponent(),
+			PreviewScene.GetSelectedBoneIndex(),
+			PreviewScene.IsFullSkeletonVisible(), // 새로 추가된 파라미터
+			Bus,
+			&Renderer.GetEditorLineBatcher()
+		);
+	}
 
 	if (UGizmoComponent* Gizmo = PreviewScene.GetPreviewGizmo())
 	{

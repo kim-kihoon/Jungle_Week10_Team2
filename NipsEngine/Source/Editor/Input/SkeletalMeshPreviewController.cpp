@@ -187,6 +187,7 @@ void FSkeletalMeshPreviewController::OnLeftMouseClick(float X, float Y)
 		else
 		{
 			Gizmo->SetPressedOnHandle(false);
+			PreviewScene->SelectBone(-1);
 		}
 	}
 }

@@ -50,6 +50,12 @@ public:
 	bool IsInputCaptured() const { return bPreviewInputCaptured; }
 	bool IsInputActive() const { return bPreviewHovered || bPreviewInputCaptured; }
 
+	bool IsSkeletonVisible() const { return bShowSkeleton; }
+	void SetSkeletonVisible(bool bVisible) { bShowSkeleton = bVisible; }
+
+	bool IsFullSkeletonVisible() const { return bShowFullSkeleton; }
+	void SetFullSkeletonVisible(bool bVisible) { bShowFullSkeleton = bVisible; }
+
 	UGizmoComponent* GetPreviewGizmo() const { return PreviewGizmo; }
 
 public:
@@ -73,4 +79,7 @@ private:
 	bool bPreviewInputCaptured = false;
 
 	int32 SelectedBoneIndex = -1;
+
+	bool bShowSkeleton = true;
+	bool bShowFullSkeleton = false;
 };

@@ -24,7 +24,7 @@ public:
 	void CollectGizmo(UGizmoComponent* Gizmo, const FShowFlags& ShowFlags, FRenderBus& RenderBus, bool bIsActiveOperation);
 	void CollectGrid(float GridSpacing, int32 GridHalfLineCount, FRenderBus& RenderBus, bool bOrthographic = false);
 	void CollectBVHInternalNodeAABBs(UPrimitiveComponent* PrimitiveComponent, const FShowFlags& ShowFlags, FRenderBus& RenderBus, FLineBatcher* LineBatcher, std::unordered_set<int32>& SeenNodeIndices);
-	void CollectSkeleton(USkeletalMeshComponent* MeshComp, int32 SelectedBoneIndex, FRenderBus& RenderBus, FLineBatcher* LineBatcher);
+	void CollectSkeleton(USkeletalMeshComponent* MeshComp, int32 SelectedBoneIndex, bool bShowFullSkeleton, FRenderBus& RenderBus, FLineBatcher* LineBatcher);
 
 private:
 	bool CollectFromSelectedActor(AActor* Actor, const FShowFlags& ShowFlags, EViewMode ViewMode, FRenderBus& RenderBus, FLineBatcher* LineBatcher);
