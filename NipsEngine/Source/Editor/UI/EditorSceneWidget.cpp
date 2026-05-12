@@ -172,6 +172,8 @@ void FEditorSceneWidget::Render(float DeltaTime)
 {
 	using namespace common::constants::ImGui;
 	(void)DeltaTime;
+	if (!bIsOpen)
+		return;
 
 	if (!EditorEngine) return;
 
@@ -187,7 +189,11 @@ void FEditorSceneWidget::Render(float DeltaTime)
 	}
 
 	ImGui::SetNextWindowSize(ImVec2(400.0f, 350.0f), ImGuiCond_Once);
-	ImGui::Begin("Scene Manager");
+	if (!ImGui::Begin("Scene Manager", &bIsOpen))
+	{
+		ImGui::End();
+		return;
+	}
 
 	ImGui::Text("Actors (%d)", static_cast<int32>(Actors.size()));
 	ImGui::Separator();

@@ -82,6 +82,7 @@ class FEditorWorldController : public IBaseEditorController
 
   private:
 	void UpdateCameraRotation();
+	void OrbitFreeOrthographicAroundWorldUp(float DeltaYawDegrees);
 	void UpdateGizmoScreenScaling();
 	void HandleBoxSelection();
 	bool TryProjectWorldToViewport(const FVector& WorldPos, float& OutViewportX, float& OutViewportY, float& OutDepth) const;

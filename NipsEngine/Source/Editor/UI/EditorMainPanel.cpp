@@ -253,7 +253,7 @@ void FEditorMainPanel::Create(FWindowsWindow* InWindow, FRenderer& InRenderer, U
 	ToolbarWidget.SetPlayStreamWidget(&PlayStreamWidget);
 	ToolbarWidget.SetContentDrawerWidget(&ContentDrawerWidget);
 	ToolbarWidget.SetPanelVisibilityRefs(&bShowConsole, &bShowControl, &bShowProperty, &bShowSceneManager,
-										 &bShowMaterialEditor, &bShowStatProfiler, &bShowSkeletalMeshViewer);
+										 &bShowMaterialEditor, &bShowStatProfiler, &bShowCameraShake, &bShowSkeletalMeshViewer);
 }
 
 void FEditorMainPanel::Release()
@@ -321,16 +321,26 @@ void FEditorMainPanel::Render(float DeltaTime)
 		ContentDrawerWidget.SetOpen(false);
 	}
 	bShowConsole = ConsoleWidget.IsOpen();
-	if (bShowMaterialEditor)
-		MaterialWidget.Render(DeltaTime);
-	if (bShowProperty)
-		PropertyWidget.Render(DeltaTime);
-	if (bShowSceneManager)
-		SceneWidget.Render(DeltaTime);
-	if (bShowStatProfiler)
-		StatWidget.Render(DeltaTime);
-	if (bShowCameraShake)
-		CameraShakeWidget.Render(DeltaTime);
+	MaterialWidget.SetOpen(bShowMaterialEditor);
+	MaterialWidget.Render(DeltaTime);
+	bShowMaterialEditor = MaterialWidget.IsOpen();
+
+	PropertyWidget.SetOpen(bShowProperty);
+	PropertyWidget.Render(DeltaTime);
+	bShowProperty = PropertyWidget.IsOpen();
+
+	SceneWidget.SetOpen(bShowSceneManager);
+	SceneWidget.Render(DeltaTime);
+	bShowSceneManager = SceneWidget.IsOpen();
+
+	StatWidget.SetOpen(bShowStatProfiler);
+	StatWidget.Render(DeltaTime);
+	bShowStatProfiler = StatWidget.IsOpen();
+
+	CameraShakeWidget.SetOpen(bShowCameraShake);
+	CameraShakeWidget.Render(DeltaTime);
+	bShowCameraShake = CameraShakeWidget.IsOpen();
+
 	SkeletalMeshViewerWidget.SetOpen(bShowSkeletalMeshViewer);
 	SkeletalMeshViewerWidget.Render(DeltaTime);
 	bShowSkeletalMeshViewer = SkeletalMeshViewerWidget.IsOpen();

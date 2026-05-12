@@ -15,6 +15,8 @@ public:
 	void LoadSceneFromFilePath(const FString& FilePath);
 	void RefreshSceneAndAssets();
 	const char* GetCurrentSceneName() const { return SceneName; }
+	void SetOpen(bool bInOpen) { bIsOpen = bInOpen; }
+	bool IsOpen() const { return bIsOpen; }
 
 private:
 	void RefreshSceneFileList();
@@ -28,4 +30,5 @@ private:
 	float NewSceneNotificationTimer = 0.f;
 	float SceneSaveNotificationTimer = 0.f;
 	float SceneLoadNotificationTimer = 0.f;
+	bool bIsOpen = true;
 };

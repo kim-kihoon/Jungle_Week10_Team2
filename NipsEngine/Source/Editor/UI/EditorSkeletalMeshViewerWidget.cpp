@@ -59,7 +59,7 @@ void FEditorSkeletalMeshViewerWidget::Render(float DeltaTime)
 
 	PreviewScene.SetVisible(true);
 
-	if (ImGui::Begin("SkeletalMesh Viewer", nullptr, ImGuiWindowFlags_MenuBar))
+	if (ImGui::Begin("SkeletalMesh Viewer", &bIsOpen, ImGuiWindowFlags_MenuBar))
 	{
 		SyncCurrentMeshFromPreview();
 		RenderToolbar();
