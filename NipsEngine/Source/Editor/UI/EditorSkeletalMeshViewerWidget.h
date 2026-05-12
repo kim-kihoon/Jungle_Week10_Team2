@@ -13,6 +13,7 @@ public:
 	void SetOpen(bool bInOpen) { bIsOpen = bInOpen; }
 	bool IsOpen() const { return bIsOpen; }
 	bool IsViewportInputActive() const { return bIsOpen && PreviewScene.IsInputActive(); }
+	bool IsViewportInputCaptured() const { return bIsOpen && PreviewScene.IsInputCaptured(); }
 
 	FSkeletalMeshPreviewScene* GetPreviewScene() { return &PreviewScene; }
 	const FSkeletalMeshPreviewScene* GetPreviewScene() const { return &PreviewScene; }
@@ -36,6 +37,8 @@ private:
 
 	USkeletalMesh* CurrentSkeletalMesh = nullptr;
 	int32 SelectedBoneIndex = -1;
+	FVector CachedEulerRotation;
+	int32 LastEditedBoneIndex = -1;
 
 	TArray<TArray<int32>> CachedBoneChildren;
 

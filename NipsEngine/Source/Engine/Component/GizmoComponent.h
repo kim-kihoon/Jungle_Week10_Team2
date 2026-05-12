@@ -3,9 +3,12 @@
 #include "PrimitiveComponent.h"
 #include "Core/CoreMinimal.h"
 #include "Render/Resource/Material.h"
+#include "GizmoTransformTarget.h"
+#include <memory>
 
 class AActor;
 class USceneComponent;
+class USkeletalMeshComponent;
 #include "Render/Resource/VertexTypes.h"
 
 class UGizmoComponent : public UPrimitiveComponent
@@ -19,9 +22,12 @@ private:
 		End
 	};
 
-	AActor* TargetActor = nullptr;
-	USceneComponent* TargetComponent = nullptr;
-	const TArray<AActor*>* AllSelectedActors = nullptr;
+	std::unique_ptr<IGizmoTransformTarget> TransformTarget;
+
+	AActor* TrackingActor = nullptr;
+	USceneComponent* TrackingComponent = nullptr;
+	const TArray<AActor*>* TrackingActors = nullptr;
+	int32 TrackingBoneIndex = -1;
 	EGizmoMode CurMode = EGizmoMode::Translate;
 	FVector LastIntersectionLocation;
 	const float AxisLength = 1.0f;
@@ -41,7 +47,9 @@ private:
 	void TranslateTarget(float DragAmount);
 	void RotateTarget(float DragAmount);
 	void ScaleTarget(float DragAmount);
+
 	USceneComponent* GetEffectiveTargetComponent() const;
+
 	FVector GetTargetLocation() const;
 	FVector GetTargetRotation() const;
 
@@ -60,15 +68,23 @@ public:
 
 	FVector GetVectorForAxis(int32 Axis);
 	void RenderGizmo() {}
+
+	void SetTransformTarget(std::unique_ptr<IGizmoTransformTarget> InTarget);
+	void ClearTransformTarget();
+
 	void SetTarget(AActor* NewTarget);
 	void SetTargetComponent(USceneComponent* NewTargetComponent);
-	void SetSelectedActors(const TArray<AActor*>* InSelectedActors) { AllSelectedActors = InSelectedActors; }
+	void SetSelectedActors(const TArray<AActor*>* InSelectedActors);
+	void SetTargetBone(USkeletalMeshComponent* MeshComponent, int32 BoneIndex);
+
+	inline bool HasTarget() const { return TransformTarget && TransformTarget->IsValid(); }
+
+	inline AActor* GetTarget() const { return TrackingActor; }
+	inline USceneComponent* GetTargetComponent() const { return TrackingComponent; }
+
 	inline void SetHolding(bool bHold) { bIsHolding = bHold; }
 	inline bool IsHolding() const { return bIsHolding; }
 	inline bool IsHovered() const { return SelectedAxis != -1; }
-	inline bool HasTarget() const { return TargetActor != nullptr; }
-	inline AActor* GetTarget() const { return TargetActor; }
-	inline USceneComponent* GetTargetComponent() const { return TargetComponent; }
 	inline int32 GetSelectedAxis() const { return SelectedAxis; }
 
 	inline void SetPressedOnHandle(bool bPressed) { bPressedOnHandle = bPressed; }

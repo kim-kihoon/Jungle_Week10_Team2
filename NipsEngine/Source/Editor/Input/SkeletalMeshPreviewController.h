@@ -3,6 +3,7 @@
 #include "Input/IInputController.h"
 
 class FSkeletalMeshPreviewViewportClient;
+class FSkeletalMeshPreviewScene;
 
 class FSkeletalMeshPreviewController : public IInputController
 {
@@ -29,8 +30,11 @@ public:
 
 	void OnRightMouseButtonUp();
 
+	void SetPreviewScene(FSkeletalMeshPreviewScene* InPreviewScene) { PreviewScene = InPreviewScene; }
+
 private:
 	FSkeletalMeshPreviewViewportClient* ViewportClient = nullptr;
+	FSkeletalMeshPreviewScene* PreviewScene = nullptr;
 
 	bool bIsRMBDown = false;
 	bool bMoveForward = false;

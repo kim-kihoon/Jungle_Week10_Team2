@@ -958,6 +958,7 @@
     </ClCompile>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="HighPerformanceGpuHint.cpp" />
+    <ClCompile Include="Source\Engine\Component\GizmoTransformTarget.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Editor\EditorEngine.h">
@@ -1815,6 +1816,10 @@
     <ClInclude Include="ThirdParty\ImGui\imstb_truetype.h">
       <Filter>ThirdParty\ImGui</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Component\SkeletalMeshComponent.h">
+      <Filter>Source\Engine\Component</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Component\GizmoTransformTarget.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Source\Game\UI\Documents\GameUI.rcss">
