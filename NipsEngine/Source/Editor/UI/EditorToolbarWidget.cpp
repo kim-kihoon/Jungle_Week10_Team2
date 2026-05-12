@@ -17,10 +17,12 @@
 #include "ImGui/imgui.h"
 
 #include <algorithm>
+#include <cmath>
 #include <Windows.h>
 #include <commdlg.h>
 #include <filesystem>
 #include <shellapi.h>
+#include <cstdio>
 
 namespace
 {
@@ -119,6 +121,56 @@ namespace
 		return bClicked;
 	}
 
+	bool DrawSnapPopup(const char* PopupId, const float* Values, int32 ValueCount, float CurrentValue, bool bEnabled, bool bDegrees, bool& bOutEnabled, float& OutValue)
+	{
+		bool bChanged = false;
+		if (!ImGui::BeginPopup(PopupId))
+		{
+			return false;
+		}
+
+		if (ImGui::Selectable("Off", !bEnabled))
+		{
+			bOutEnabled = false;
+			OutValue = CurrentValue;
+			bChanged = true;
+		}
+
+		for (int32 Index = 0; Index < ValueCount; ++Index)
+		{
+			const float Value = Values[Index];
+			char Label[32] = {};
+			if (bDegrees)
+			{
+				std::snprintf(Label, sizeof(Label), "%.0f deg", Value);
+			}
+			else
+			{
+				std::snprintf(Label, sizeof(Label), "%.2g", Value);
+			}
+
+			const bool bSelected = bEnabled && std::abs(CurrentValue - Value) < 0.0001f;
+			if (ImGui::Selectable(Label, bSelected))
+			{
+				bOutEnabled = true;
+				OutValue = Value;
+				bChanged = true;
+			}
+		}
+
+		ImGui::EndPopup();
+		return bChanged;
+	}
+
+	static const char* AddActorCategories[] = {
+		"Basic",
+		"Rendering",
+		"Light",
+		"Environment",
+		"Audio",
+		"Gameplay",
+	};
+
 	std::wstring GetSceneDialogInitialDir()
 	{
 		std::filesystem::path SceneDir(FSceneSaveManager::GetSceneDirectory());
@@ -142,6 +194,9 @@ void FEditorToolbarWidget::Initialize(UEditorEngine* InEditorEngine)
 	ScaleIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Scale.png");
 	WorldSpaceIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/WorldSpace.png");
 	LocalSpaceIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/LocalSpace.png");
+	TranslateSnapIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Translate_Snap.png");
+	RotateSnapIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Rotate_Snap.png");
+	ScaleSnapIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Scale_Snap.png");
 	ShowFlagIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Show_Flag.png");
 	CameraIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Camera.png");
 }
@@ -565,6 +620,63 @@ void FEditorToolbarWidget::RenderGizmoTools()
 	if (bSpaceClicked)
 	{
 		Gizmo->SetWorldSpace(!bWorldSpace);
+	}
+	ImGui::SameLine();
+
+	constexpr ImVec2 SnapButtonSize(28.0f, 22.0f);
+	constexpr ImVec2 SnapIconSize(18.0f, 18.0f);
+	constexpr float DegToRad = 0.017453292519943295f;
+	constexpr float RadToDeg = 57.29577951308232f;
+	static constexpr float TranslateSnapValues[] = { 0.1f, 0.5f, 1.0f, 5.0f, 10.0f };
+	static constexpr float RotateSnapValuesDeg[] = { 5.0f, 10.0f, 15.0f, 45.0f, 90.0f };
+	static constexpr float ScaleSnapValues[] = { 0.1f, 0.25f, 0.5f, 1.0f };
+
+	const bool bHasTranslateSnapIcon = TranslateSnapIconTexture && TranslateSnapIconTexture->GetSRV();
+	const bool bHasRotateSnapIcon = RotateSnapIconTexture && RotateSnapIconTexture->GetSRV();
+	const bool bHasScaleSnapIcon = ScaleSnapIconTexture && ScaleSnapIconTexture->GetSRV();
+
+	const bool bTranslateSnapClicked = bHasTranslateSnapIcon
+		? RenderToolbarIconButton("##TranslateSnap", TranslateSnapIconTexture, SnapButtonSize, SnapIconSize, Gizmo->IsTranslateSnapEnabled() ? ActiveTint : InactiveTint)
+		: ImGui::Button("T Snap", ImVec2(62.0f, 22.0f));
+	if (bTranslateSnapClicked)
+	{
+		ImGui::OpenPopup("TranslateSnapPopup");
+	}
+	bool bSnapEnabled = Gizmo->IsTranslateSnapEnabled();
+	float SnapValue = Gizmo->GetTranslateSnapValue();
+	if (DrawSnapPopup("TranslateSnapPopup", TranslateSnapValues, IM_ARRAYSIZE(TranslateSnapValues), SnapValue, bSnapEnabled, false, bSnapEnabled, SnapValue))
+	{
+		Gizmo->SetTranslateSnap(bSnapEnabled, SnapValue);
+	}
+
+	ImGui::SameLine();
+	const bool bRotateSnapClicked = bHasRotateSnapIcon
+		? RenderToolbarIconButton("##RotateSnap", RotateSnapIconTexture, SnapButtonSize, SnapIconSize, Gizmo->IsRotateSnapEnabled() ? ActiveTint : InactiveTint)
+		: ImGui::Button("R Snap", ImVec2(62.0f, 22.0f));
+	if (bRotateSnapClicked)
+	{
+		ImGui::OpenPopup("RotateSnapPopup");
+	}
+	bSnapEnabled = Gizmo->IsRotateSnapEnabled();
+	SnapValue = Gizmo->GetRotateSnapValue() * RadToDeg;
+	if (DrawSnapPopup("RotateSnapPopup", RotateSnapValuesDeg, IM_ARRAYSIZE(RotateSnapValuesDeg), SnapValue, bSnapEnabled, true, bSnapEnabled, SnapValue))
+	{
+		Gizmo->SetRotateSnap(bSnapEnabled, SnapValue * DegToRad);
+	}
+
+	ImGui::SameLine();
+	const bool bScaleSnapClicked = bHasScaleSnapIcon
+		? RenderToolbarIconButton("##ScaleSnap", ScaleSnapIconTexture, SnapButtonSize, SnapIconSize, Gizmo->IsScaleSnapEnabled() ? ActiveTint : InactiveTint)
+		: ImGui::Button("S Snap", ImVec2(62.0f, 22.0f));
+	if (bScaleSnapClicked)
+	{
+		ImGui::OpenPopup("ScaleSnapPopup");
+	}
+	bSnapEnabled = Gizmo->IsScaleSnapEnabled();
+	SnapValue = Gizmo->GetScaleSnapValue();
+	if (DrawSnapPopup("ScaleSnapPopup", ScaleSnapValues, IM_ARRAYSIZE(ScaleSnapValues), SnapValue, bSnapEnabled, false, bSnapEnabled, SnapValue))
+	{
+		Gizmo->SetScaleSnap(bSnapEnabled, SnapValue);
 	}
 }
 

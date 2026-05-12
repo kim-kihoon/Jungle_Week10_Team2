@@ -52,6 +52,9 @@ private:
 	UTexture* ScaleIconTexture = nullptr;
 	UTexture* WorldSpaceIconTexture = nullptr;
 	UTexture* LocalSpaceIconTexture = nullptr;
+	UTexture* TranslateSnapIconTexture = nullptr;
+	UTexture* RotateSnapIconTexture = nullptr;
+	UTexture* ScaleSnapIconTexture = nullptr;
 	UTexture* ShowFlagIconTexture = nullptr;
 	UTexture* CameraIconTexture = nullptr;
 
