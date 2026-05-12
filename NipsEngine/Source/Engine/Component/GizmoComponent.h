@@ -34,13 +34,21 @@ private:
 	float Radius = 0.1f;
 	const float ScaleSensitivity = 1.0f;
 	int32 SelectedAxis = -1;
+	float SnapAccumulatedDrag = 0.0f;
 	bool bIsFirstFrameOfDrag = true;
 	bool bIsHolding = false;
 	bool bIsWorldSpace = true;
 	bool bPressedOnHandle = false;
+	bool bTranslateSnapEnabled = false;
+	bool bRotateSnapEnabled = false;
+	bool bScaleSnapEnabled = false;
+	float TranslateSnapValue = 1.0f;
+	float RotateSnapValue = 0.261799f;
+	float ScaleSnapValue = 0.1f;
 
 	bool IntersectRayAxis(const FRay& Ray, FVector AxisEnd, float& OutRayT);
 	const FMeshData* GetActiveMeshData() const;
+	float ApplySnapToDrag(float DragAmount);
 
 	//Control Target Method
 	void HandleDrag(float DragAmount);
@@ -106,6 +114,15 @@ public:
 	inline bool IsTranslateMode() const { return CurMode == EGizmoMode::Translate; }
 	inline bool IsRotateMode() const { return CurMode == EGizmoMode::Rotate; }
 	inline bool IsScaleMode() const { return CurMode == EGizmoMode::Scale; }
+	inline bool IsTranslateSnapEnabled() const { return bTranslateSnapEnabled; }
+	inline bool IsRotateSnapEnabled() const { return bRotateSnapEnabled; }
+	inline bool IsScaleSnapEnabled() const { return bScaleSnapEnabled; }
+	inline float GetTranslateSnapValue() const { return TranslateSnapValue; }
+	inline float GetRotateSnapValue() const { return RotateSnapValue; }
+	inline float GetScaleSnapValue() const { return ScaleSnapValue; }
+	inline void SetTranslateSnap(bool bEnabled, float Value) { bTranslateSnapEnabled = bEnabled; TranslateSnapValue = Value; SnapAccumulatedDrag = 0.0f; }
+	inline void SetRotateSnap(bool bEnabled, float Value) { bRotateSnapEnabled = bEnabled; RotateSnapValue = Value; SnapAccumulatedDrag = 0.0f; }
+	inline void SetScaleSnap(bool bEnabled, float Value) { bScaleSnapEnabled = bEnabled; ScaleSnapValue = Value; SnapAccumulatedDrag = 0.0f; }
 	void UpdateGizmoTransform();
 	void ApplyScreenSpaceScaling(const FVector& CameraLocation);
 

@@ -159,9 +159,15 @@ namespace
 void FEditorPropertyWidget::Render(float DeltaTime)
 {
 	(void)DeltaTime;
+	if (!bIsOpen)
+		return;
 
 	ImGui::SetNextWindowSize(ImVec2(350.0f, 500.0f), ImGuiCond_Once);
-	ImGui::Begin("Property Window");
+	if (!ImGui::Begin("Property Window", &bIsOpen))
+	{
+		ImGui::End();
+		return;
+	}
 
 	AActor* PrimaryActor = SelectionManager->GetPrimarySelection();
 	if (!PrimaryActor)

@@ -22,6 +22,8 @@ class FEditorMaterialWidget : public FEditorWidget
 public:
 	void Render(float DeltaTime) override;
 	void ResetSelection();
+	void SetOpen(bool bInOpen) { bIsOpen = bInOpen; }
+	bool IsOpen() const { return bIsOpen; }
 
 private:
 	void RenderMaterialEditor(UPrimitiveComponent* PrimitiveComp);
@@ -35,4 +37,5 @@ private:
 	UMaterialInterface* SelectedMaterialPtr = nullptr;  // 원본 포인터 (Apply 대상)
 
 	USceneComponent* SelectedComponent = nullptr;
+	bool bIsOpen = true;
 };

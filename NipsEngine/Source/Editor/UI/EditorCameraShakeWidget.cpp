@@ -76,9 +76,11 @@ void FEditorCameraShakeWidget::Initialize(UEditorEngine* InEditorEngine)
 void FEditorCameraShakeWidget::Render(float DeltaTime)
 {
     (void)DeltaTime;
+    if (!bIsOpen)
+        return;
 
     ImGui::SetNextWindowSize(ImVec2(440.0f, 900.0f), ImGuiCond_Once);
-    if (!ImGui::Begin("Camera Shake"))
+    if (!ImGui::Begin("Camera Shake", &bIsOpen))
     {
         ImGui::End();
         return;

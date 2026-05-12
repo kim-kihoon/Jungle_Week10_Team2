@@ -251,8 +251,8 @@ void FEditorMainPanel::Create(FWindowsWindow* InWindow, FRenderer& InRenderer, U
 	ToolbarWidget.SetSceneWidget(&SceneWidget);
 	ToolbarWidget.SetPlayStreamWidget(&PlayStreamWidget);
 	ToolbarWidget.SetContentDrawerWidget(&ContentDrawerWidget);
-	ToolbarWidget.SetPanelVisibilityRefs(&bShowConsole, &bShowControl, &bShowProperty, &bShowSceneManager,
-										 &bShowMaterialEditor, &bShowStatProfiler, nullptr);
+	ToolbarWidget.SetPanelVisibilityRefs(&bShowConsole, &bShowControl, &bShowProperty, &bShowSceneManager, 
+		&bShowMaterialEditor, &bShowStatProfiler, &bShowCameraShake, nullptr);
 }
 
 void FEditorMainPanel::Release()

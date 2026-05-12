@@ -1,7 +1,68 @@
-#include "EditorPlayStreamWidget.h"
+﻿#include "EditorPlayStreamWidget.h"
+#include "Core/ResourceManager.h"
 #include "Editor/EditorEngine.h"
 #include "ImGui/imgui.h"
-#include <algorithm> // std::max 사용을 위해 추가
+#include "Render/Resource/Texture.h"
+
+namespace
+{
+	bool RenderIconButton(const char* Id, UTexture* Texture, const ImVec2& ButtonSize, const ImVec2& IconSize, const ImVec4& IconTint)
+	{
+		if (!Texture || !Texture->GetSRV())
+		{
+			return false;
+		}
+
+		ImGui::InvisibleButton(Id, ButtonSize);
+		const bool bClicked = ImGui::IsItemClicked();
+		const ImVec2 ButtonMin = ImGui::GetItemRectMin();
+		const ImVec2 ButtonMax = ImGui::GetItemRectMax();
+		const ImVec2 ButtonCenter(
+			(ButtonMin.x + ButtonMax.x) * 0.5f,
+			(ButtonMin.y + ButtonMax.y) * 0.5f
+		);
+		const ImVec2 IconMin(
+			ButtonCenter.x - IconSize.x * 0.5f,
+			ButtonCenter.y - IconSize.y * 0.5f
+		);
+		const ImVec2 IconMax(
+			ButtonCenter.x + IconSize.x * 0.5f,
+			ButtonCenter.y + IconSize.y * 0.5f
+		);
+
+		ImVec4 DrawTint = IconTint;
+		if (ImGui::IsItemHovered())
+		{
+			DrawTint.x = (DrawTint.x + 0.12f < 1.0f) ? DrawTint.x + 0.12f : 1.0f;
+			DrawTint.y = (DrawTint.y + 0.12f < 1.0f) ? DrawTint.y + 0.12f : 1.0f;
+			DrawTint.z = (DrawTint.z + 0.12f < 1.0f) ? DrawTint.z + 0.12f : 1.0f;
+		}
+		if (ImGui::IsItemActive())
+		{
+			DrawTint.x *= 0.85f;
+			DrawTint.y *= 0.85f;
+			DrawTint.z *= 0.85f;
+		}
+
+		ImGui::GetWindowDrawList()->AddImage(
+			reinterpret_cast<ImTextureID>(Texture->GetSRV()),
+			IconMin,
+			IconMax,
+			ImVec2(0.0f, 0.0f),
+			ImVec2(1.0f, 1.0f),
+			ImGui::ColorConvertFloat4ToU32(DrawTint)
+		);
+
+		return bClicked;
+	}
+}
+
+void FEditorPlayStreamWidget::Initialize(UEditorEngine* InEditorEngine)
+{
+	FEditorWidget::Initialize(InEditorEngine);
+	PlayIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Play.png");
+	StopIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Stop.png");
+}
 
 void FEditorPlayStreamWidget::Render(float DeltaTime)
 {
@@ -12,7 +73,6 @@ void FEditorPlayStreamWidget::Render(float DeltaTime)
 	ImGui::SetWindowFontScale(1.1f);
 
 	// 포커스된 뷰포트의 PIE 상태를 기준으로 버튼을 표시합니다.
-	const int32 FocusedIdx = EditorEngine->GetViewportLayout().GetLastFocusedViewportIndex();
 	EViewportPlayState CurrentState = EditorEngine->GetEditorState();
 	bool bIsEditing = (CurrentState == EViewportPlayState::Editing);
 	bool bIsPlaying = (CurrentState == EViewportPlayState::Playing);
@@ -20,18 +80,13 @@ void FEditorPlayStreamWidget::Render(float DeltaTime)
 
 	const char* CurrentPlayPauseLabel = bIsPlaying ? PauseLabel : (bIsPaused ? ResumeLabel : PlayLabel);
 
-	// 💡 [수정됨] 2. 버튼 크기 고정 및 위아래(Height) 키우기
-	// Play, Resume, Pause 중 가장 긴 텍스트의 길이를 기준으로 고정 너비를 계산합니다.
-	float MaxLabelWidth = std::max({
-		ImGui::CalcTextSize(PlayLabel).x,
-		ImGui::CalcTextSize(ResumeLabel).x,
-		ImGui::CalcTextSize(PauseLabel).x
-	});
-	
-	// 버튼 텍스트 좌우 여백(+30.0f)과 세로 높이(32.0f)를 넉넉하게 지정합니다.
-	float ButtonHeight = 27.0f; 
-	ImVec2 PlayBtnSize = ImVec2(MaxLabelWidth + 16.0f, ButtonHeight);
-	ImVec2 StopBtnSize = ImVec2(ImGui::CalcTextSize(StopLabel).x + 30.0f, ButtonHeight);
+	ImVec2 IconSize(24.0f, 24.0f);
+	const bool bHasPlayIcon = PlayIconTexture && PlayIconTexture->GetSRV();
+	const bool bHasStopIcon = StopIconTexture && StopIconTexture->GetSRV();
+	const ImVec2 IconButtonSize = ImVec2(34.0f, 27.0f);
+	const ImVec2 TextButtonSize = ImVec2(86.0f, 27.0f);
+	ImVec2 PlayBtnSize = bHasPlayIcon ? IconButtonSize : TextButtonSize;
+	ImVec2 StopBtnSize = bHasStopIcon ? IconButtonSize : TextButtonSize;
 
 	float Spacing = ImGui::GetStyle().ItemSpacing.x;
 	float TotalWidth = PlayBtnSize.x + StopBtnSize.x + Spacing;
@@ -45,12 +100,16 @@ void FEditorPlayStreamWidget::Render(float DeltaTime)
 	// --- 1번 버튼 (Play / Pause / Resume) ---
 	if (bIsPlaying)
 	{
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.753f, 0.753f, 0.753f, 1.0f));       // #c0c0c0
+		const ImVec4 IconTint(0.753f, 0.753f, 0.753f, 1.0f);       // #c0c0c0
+		ImGui::PushStyleColor(ImGuiCol_Button, IconTint);
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.830f, 0.830f, 0.830f, 1.0f));
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.620f, 0.620f, 0.620f, 1.0f));
 		
-		// 버튼 렌더링 시 계산한 고정 크기(PlayBtnSize)를 넘겨줍니다.
-		if (ImGui::Button(CurrentPlayPauseLabel, PlayBtnSize))
+		bool bPlayPauseClicked = bHasPlayIcon
+			? RenderIconButton("PlayPauseBtn", PlayIconTexture, PlayBtnSize, IconSize, IconTint)
+			: ImGui::Button(CurrentPlayPauseLabel, PlayBtnSize);
+
+		if (bPlayPauseClicked)
 		{
 			EditorEngine->PausePlaySession();
 			ImGui::SetWindowFocus(nullptr);
@@ -59,11 +118,16 @@ void FEditorPlayStreamWidget::Render(float DeltaTime)
 	}
 	else
 	{
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.545f, 0.761f, 0.290f, 1.0f));       // #8bc24a
+		const ImVec4 IconTint(0.545f, 0.761f, 0.290f, 1.0f);       // #8bc24a
+		ImGui::PushStyleColor(ImGuiCol_Button, IconTint);
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.620f, 0.820f, 0.365f, 1.0f));
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.420f, 0.620f, 0.220f, 1.0f));
 		
-		if (ImGui::Button(CurrentPlayPauseLabel, PlayBtnSize))
+		bool bPlayPauseClicked = bHasPlayIcon
+			? RenderIconButton("PlayPauseBtn", PlayIconTexture, PlayBtnSize, IconSize, IconTint)
+			: ImGui::Button(CurrentPlayPauseLabel, PlayBtnSize);
+
+		if (bPlayPauseClicked)
 		{
 			EditorEngine->StartPlaySession();
 		}
@@ -75,12 +139,16 @@ void FEditorPlayStreamWidget::Render(float DeltaTime)
 	// --- 2번 버튼 (Stop) ---
 	if (bIsEditing) ImGui::BeginDisabled();
 	
-	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 0.251f, 0.251f, 1.0f));       // #ff4040
+	const ImVec4 StopIconTint(1.0f, 0.251f, 0.251f, 1.0f);       // #ff4040
+	ImGui::PushStyleColor(ImGuiCol_Button, StopIconTint);
 	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.333f, 0.333f, 1.0f));
 	ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.82f, 0.18f, 0.18f, 1.0f));
 	
-	// Stop 버튼도 고정 크기(StopBtnSize)를 적용합니다.
-	if (ImGui::Button(StopLabel, StopBtnSize))
+	bool bStopClicked = bHasStopIcon
+		? RenderIconButton("StopBtn", StopIconTexture, StopBtnSize, IconSize, StopIconTint)
+		: ImGui::Button(StopLabel, StopBtnSize);
+
+	if (bStopClicked)
 	{
 		EditorEngine->StopPlaySession();
 	}
@@ -88,5 +156,6 @@ void FEditorPlayStreamWidget::Render(float DeltaTime)
 
 	if (bIsEditing) ImGui::EndDisabled();
 
+	ImGui::SetWindowFontScale(1.0f);
 	ImGui::PopStyleVar();
 }

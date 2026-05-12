@@ -27,6 +27,46 @@ const FMeshData* UGizmoComponent::GetActiveMeshData() const
     return GizmoMeshData;
 }
 
+float UGizmoComponent::ApplySnapToDrag(float DragAmount)
+{
+    bool bSnapEnabled = false;
+    float SnapValue = 0.0f;
+    switch (CurMode)
+    {
+    case EGizmoMode::Translate:
+        bSnapEnabled = bTranslateSnapEnabled;
+        SnapValue = TranslateSnapValue;
+        break;
+    case EGizmoMode::Rotate:
+        bSnapEnabled = bRotateSnapEnabled;
+        SnapValue = RotateSnapValue;
+        break;
+    case EGizmoMode::Scale:
+        bSnapEnabled = bScaleSnapEnabled;
+        SnapValue = ScaleSnapValue;
+        break;
+    default:
+        break;
+    }
+
+    if (!bSnapEnabled || SnapValue <= 0.0f)
+    {
+        SnapAccumulatedDrag = 0.0f;
+        return DragAmount;
+    }
+
+    SnapAccumulatedDrag += DragAmount;
+    const float StepCount = std::trunc(SnapAccumulatedDrag / SnapValue);
+    if (StepCount == 0.0f)
+    {
+        return 0.0f;
+    }
+
+    const float SnappedDrag = StepCount * SnapValue;
+    SnapAccumulatedDrag -= SnappedDrag;
+    return SnappedDrag;
+}
+
 void UGizmoComponent::UpdateWorldAABB() const
 {
     WorldAABB.Reset();
@@ -107,6 +147,12 @@ bool UGizmoComponent::IntersectRayAxis(const FRay& Ray, FVector AxisEnd, float& 
 
 void UGizmoComponent::HandleDrag(float DragAmount)
 {
+    DragAmount = ApplySnapToDrag(DragAmount);
+    if (DragAmount == 0.0f)
+    {
+        return;
+    }
+
     switch (CurMode)
     {
     case EGizmoMode::Translate: TranslateTarget(DragAmount); break;
@@ -512,6 +558,7 @@ void UGizmoComponent::UpdateDrag(const FRay& Ray)
 void UGizmoComponent::DragEnd()
 {
     bIsFirstFrameOfDrag = true;
+    SnapAccumulatedDrag = 0.0f;
     SetHolding(false);
     SetPressedOnHandle(false);
     SelectedAxis = -1;
@@ -526,6 +573,7 @@ void UGizmoComponent::SetNextMode()
 void UGizmoComponent::UpdateGizmoMode(EGizmoMode NewMode)
 {
     CurMode = NewMode;
+    SnapAccumulatedDrag = 0.0f;
     UpdateGizmoTransform();
 }
 
