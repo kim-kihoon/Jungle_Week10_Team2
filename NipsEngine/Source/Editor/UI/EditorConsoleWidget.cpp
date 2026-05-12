@@ -1,4 +1,4 @@
-#include "Editor/UI/EditorConsoleWidget.h"
+﻿#include "Editor/UI/EditorConsoleWidget.h"
 
 #include <algorithm>
 
@@ -25,6 +25,7 @@ FEditorConsoleWidget::FEditorConsoleWidget()
 	FLogger::SetMessage(&FEditorConsoleWidget::AddMessage);
 
 	// 임의의 명령어 문자열이 들어왔을 때 뒤의 함수를 실행하도록 분기한다.
+	RegisterCommand("clear", [this](const TArray<FString>& Args) { (void)Args; Clear(); });
 	RegisterCommand("stat", [this](const TArray<FString>& Args) { CmdStat(Args); });
 	RegisterCommand("shadow_filter", [this](const TArray<FString>& Args) { CmdShadowFilter(Args); });
 	RegisterCommand("shader_filter", [this](const TArray<FString>& Args) { CmdShadowFilter(Args); });
@@ -145,10 +146,6 @@ void FEditorConsoleWidget::Render(float DeltaTime)
 		bOpen = bWindowOpen;
 		return;
 	}
-
-	RenderResizeHandle(AvailableHeight);
-
-	if (ImGui::SmallButton("Clear")) { Clear(); }
 
 	ImGui::Separator();
 

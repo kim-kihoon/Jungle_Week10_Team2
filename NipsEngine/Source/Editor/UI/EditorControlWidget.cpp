@@ -80,37 +80,7 @@ void FEditorControlWidget::Render(float DeltaTime)
 		NewRotation.Normalize();
 		Camera->SetRotation(NewRotation);
 	}
-
 	ImGui::PopItemWidth();
-
-	SEPARATOR();
-
-	// Gizmo Space / Mode
-	int32 SelectedSpace = EditorEngine->GetGizmo()->IsWorldSpace() ? 0 : 1;
-	if (ImGui::RadioButton("World", &SelectedSpace, 0))
-	{
-		EditorEngine->GetGizmo()->SetWorldSpace(true);
-	}
-	ImGui::SameLine();
-	if (ImGui::RadioButton("Local", &SelectedSpace, 1))
-	{
-		EditorEngine->GetGizmo()->SetWorldSpace(false);
-	}
-
-	SEPARATOR();
-
-	if (ImGui::Button("Translate"))
-		EditorEngine->GetGizmo()->SetTranslateMode();
-
-	ImGui::SameLine();
-
-	if (ImGui::Button("Rotate"))
-		EditorEngine->GetGizmo()->SetRotateMode();
-
-	ImGui::SameLine();
-
-	if (ImGui::Button("Scale"))
-		EditorEngine->GetGizmo()->SetScaleMode();
 
 	ImGui::End();
 }
