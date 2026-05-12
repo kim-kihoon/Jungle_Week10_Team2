@@ -390,6 +390,8 @@ void FEditorMainPanel::Update()
 	const bool bPropertyModalBlockingInput = PropertyWidget.IsModalInputBlocking();
 	const bool bSkeletalMeshViewerBlockingInput = SkeletalMeshViewerWidget.IsViewportInputActive();
 	const bool bSkeletalMeshViewerCapturedInput = SkeletalMeshViewerWidget.IsViewportInputCaptured();
+	const bool bOverlayBlockingMouseInput =
+		ContentDrawerWidget.IsViewportInputBlocking() || ConsoleWidget.IsViewportInputBlocking();
 
 	if (bViewportOperationActive || bSkeletalMeshViewerCapturedInput)
 	{
@@ -401,9 +403,13 @@ void FEditorMainPanel::Update()
 	}
 
 	FGuiInputState& GuiState = FInputRouter::GetGuiInputState();
-	GuiState.bBlockViewportInput = bPropertyModalBlockingInput || bSkeletalMeshViewerBlockingInput;
+	GuiState.bBlockViewportInput =
+		bPropertyModalBlockingInput || bSkeletalMeshViewerBlockingInput || bOverlayBlockingMouseInput;
 	GuiState.bUsingMouse =
-		bPropertyModalBlockingInput || bSkeletalMeshViewerBlockingInput || (bViewportOperationActive ? false : IO.WantCaptureMouse);
+		bPropertyModalBlockingInput ||
+		bSkeletalMeshViewerBlockingInput ||
+		bOverlayBlockingMouseInput ||
+		(bViewportOperationActive ? false : IO.WantCaptureMouse);
 	GuiState.bUsingKeyboard = bPropertyModalBlockingInput || bSkeletalMeshViewerBlockingInput || IO.WantCaptureKeyboard;
 
 	// IME는 ImGui가 텍스트 입력을 원할 때만 활성화.

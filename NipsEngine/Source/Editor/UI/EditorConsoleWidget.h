@@ -35,6 +35,7 @@ public:
 	bool ShouldRender() const;
 	void CloseImmediately();
 	void OpenFromDrawerTakeover(float InDrawerHeight);
+	bool IsViewportInputBlocking() const { return bViewportInputBlocking; }
 
 	void Clear()
 	{
@@ -50,6 +51,7 @@ public:
 private:
 	bool bOpen = false;
 	bool bOpenedThisFrame = false;
+	bool bViewportInputBlocking = false;
 	float DrawerHeight = 0.0f;
 	float DrawerAnimationAlpha = 0.0f;
 	char InputBuf[256]{};

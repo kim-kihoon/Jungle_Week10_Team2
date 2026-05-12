@@ -33,12 +33,21 @@ const FTypeInfo UObject::s_TypeInfo = { "UObject", nullptr, sizeof(UObject) };
 
 bool UObject::IsValid(const UObject* Obj)
 {
-    if (!Obj) return false;
-    uint32 Index = Obj->InternalIndex;
-    if (Index < GUObjectArray.size() && GUObjectArray[Index] == Obj)
+    return IsLiveObjectPointer(Obj);
+}
+
+bool UObject::IsLiveObjectPointer(const void* Ptr)
+{
+    if (!Ptr) return false;
+
+    for (const UObject* Obj : GUObjectArray)
     {
-        return true;
+        if (Obj == Ptr)
+        {
+            return true;
+        }
     }
+
     return false;
 }
 

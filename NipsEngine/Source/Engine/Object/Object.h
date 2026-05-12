@@ -101,6 +101,7 @@ public:
 	static const FTypeInfo s_TypeInfo;
 
 	static bool IsValid(const UObject* Obj);
+	static bool IsLiveObjectPointer(const void* Ptr);
 
 	bool IsUObjectAlive(const void* Ptr);
 

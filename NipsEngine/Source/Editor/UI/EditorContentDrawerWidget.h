@@ -41,6 +41,7 @@ public:
 	void StartConsoleTakeover();
 	bool ConsumeConsoleTakeover(float& OutDrawerHeight);
 	void RefreshAssetTree();
+	bool IsViewportInputBlocking() const { return bViewportInputBlocking; }
 
 private:
 	void RenderResizeHandle(float WorkAreaHeight);
@@ -64,6 +65,7 @@ private:
 	bool bOpenedThisFrame = false;
 	bool bAssetTreeDirty = true;
 	bool bPendingConsoleTakeover = false;
+	bool bViewportInputBlocking = false;
 	float DrawerHeight = 0.0f;
 	float DrawerAnimationAlpha = 0.0f;
 	float PendingConsoleTakeoverHeight = 0.0f;
