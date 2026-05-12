@@ -11,6 +11,12 @@
 
 #include "Editor/UI/EditorWidget.h"
 
+struct FCompletionCandidate
+{
+	FString CommandName;
+	FString DisplayText;
+};
+
 class FEditorConsoleWidget : public FEditorWidget
 {
 public:
@@ -26,6 +32,9 @@ public:
 	bool IsOpen() const { return bOpen; }
 	void ToggleOpen();
 	bool ConsumeOpenRequest();
+	bool ShouldRender() const;
+	void CloseImmediately();
+	void OpenFromDrawerTakeover(float InDrawerHeight);
 
 	void Clear()
 	{
@@ -39,6 +48,10 @@ public:
 	}
 
 private:
+	bool bOpen = false;
+	bool bOpenedThisFrame = false;
+	float DrawerHeight = 0.0f;
+	float DrawerAnimationAlpha = 0.0f;
 	char InputBuf[256]{};
 	static ImVector<char*> Messages;
 	static ImVector<char*> History;
@@ -46,10 +59,10 @@ private:
 	ImGuiTextFilter Filter;
 	static bool AutoScroll;
 	static bool ScrollToBottom;
-	bool bOpen = false;
-	bool bOpenedThisFrame = false;
-	float DrawerHeight = 0.0f;
-	float DrawerAnimationAlpha = 0.0f;
+	TArray<FCompletionCandidate> CompletionCandidates;
+	int32 SelectedCompletionIndex = 0;
+	bool bCompletionSelectionActive = false;
+	FString CompletionInputSnapshot;
 
 	// 백틱(`) 키로 포커스 요청 시 true — 다음 InputText 렌더링 직전에 SetKeyboardFocusHere 호출
 	bool bRequestFocusInput = false;
@@ -62,6 +75,12 @@ private:
 	void ExecCommand(const char* CommandLine);
 	static int32 TextEditCallback(ImGuiInputTextCallbackData* Data);
 	void RenderResizeHandle(float WorkAreaHeight);
+	void UpdateCompletionCandidates();
+	TArray<FCompletionCandidate> GetCompletionCandidates(const FString& Input) const;
+	void RenderCompletionCandidates();
+	bool CompleteSelectedCandidateInBuffer();
+	bool CompleteSelectedCandidateInBuffer(ImGuiInputTextCallbackData* Data);
+	void MoveCompletionSelection(int32 Delta);
 
 private:
 	void CmdStat(const TArray<FString>& Args);

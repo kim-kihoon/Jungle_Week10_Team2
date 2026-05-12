@@ -227,7 +227,7 @@ void ABillboardActor::InitDefaultComponents()
 {
 	UBillboardComponent* Billboard = AddComponent<UBillboardComponent>();
 	SetRootComponent(Billboard);
-	Billboard->SetTexturePath(("Asset/Texture/S_Pawn.png"));
+	//Billboard->SetTexturePath(("Asset/Texture/S_Pawn.png"));
 	Billboard->SetEditorOnly(true);
 }
 

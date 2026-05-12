@@ -218,6 +218,14 @@ void FEditorWorldController::OnRightMouseClick(float DeltaX, float DeltaY)
 	Yaw   = MathUtil::RadiansToDegrees(std::atan2(Forward.Y, Forward.X));
 }
 
+void FEditorWorldController::OnRightMouseButtonUp(float X, float Y)
+{
+	if (OnRequestActorPlacement)
+	{
+		OnRequestActorPlacement(X, Y, ViewportX + X, ViewportY + Y);
+	}
+}
+
 void FEditorWorldController::OnRightMouseDrag(float DeltaX, float DeltaY)
 {
 	if (!Camera)

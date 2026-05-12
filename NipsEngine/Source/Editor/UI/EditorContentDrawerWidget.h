@@ -37,6 +37,9 @@ public:
 	void ToggleOpen();
 	bool ConsumeOpenRequest();
 	void SetConsoleWidget(FEditorConsoleWidget* InConsoleWidget) { ConsoleWidget = InConsoleWidget; }
+	void CloseImmediately();
+	void StartConsoleTakeover();
+	bool ConsumeConsoleTakeover(float& OutDrawerHeight);
 	void RefreshAssetTree();
 
 private:
@@ -60,8 +63,10 @@ private:
 	bool bOpen = false;
 	bool bOpenedThisFrame = false;
 	bool bAssetTreeDirty = true;
+	bool bPendingConsoleTakeover = false;
 	float DrawerHeight = 0.0f;
 	float DrawerAnimationAlpha = 0.0f;
+	float PendingConsoleTakeoverHeight = 0.0f;
 	int32 SelectedKindFilter = 0;
 	int32 LastVisibleFolderCount = 0;
 	int32 LastVisibleAssetCount = 0;

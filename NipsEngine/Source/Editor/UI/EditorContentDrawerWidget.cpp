@@ -264,6 +264,37 @@ bool FEditorContentDrawerWidget::ConsumeOpenRequest()
 	return bResult;
 }
 
+void FEditorContentDrawerWidget::CloseImmediately()
+{
+	bOpen = false;
+	DrawerAnimationAlpha = 0.0f;
+	bOpenedThisFrame = false;
+}
+
+void FEditorContentDrawerWidget::StartConsoleTakeover()
+{
+	if (bOpen || DrawerAnimationAlpha > 0.0f)
+	{
+		bPendingConsoleTakeover = true;
+		PendingConsoleTakeoverHeight = DrawerHeight;
+	}
+
+	CloseImmediately();
+}
+
+bool FEditorContentDrawerWidget::ConsumeConsoleTakeover(float& OutDrawerHeight)
+{
+	if (!bPendingConsoleTakeover)
+	{
+		return false;
+	}
+
+	bPendingConsoleTakeover = false;
+	OutDrawerHeight = PendingConsoleTakeoverHeight;
+	PendingConsoleTakeoverHeight = 0.0f;
+	return true;
+}
+
 void FEditorContentDrawerWidget::RefreshAssetTree()
 {
 	FolderPaths.clear();
@@ -480,7 +511,7 @@ void FEditorContentDrawerWidget::RenderResizeHandle(float WorkAreaHeight)
 	DrawList->AddRectFilled(
 		Min,
 		Max,
-		(bHovered || bActive) ? IM_COL32(120, 150, 190, 160) : IM_COL32(85, 90, 100, 110));
+		(bHovered || bActive) ? IM_COL32(36, 36, 36, 220) : IM_COL32(26, 26, 26, 180));
 }
 
 void FEditorContentDrawerWidget::RenderBottomBar(const ImGuiViewport* Viewport, float BottomBarHeight)
@@ -501,8 +532,8 @@ void FEditorContentDrawerWidget::RenderBottomBar(const ImGuiViewport* Viewport, 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6.0f, 3.0f));
 	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(7.0f, 3.0f));
-	ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.045f, 0.047f, 0.052f, 1.0f));
-	ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.18f, 0.18f, 0.19f, 1.0f));
+	ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.082f, 0.082f, 0.082f, 1.0f));
+	ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.141f, 0.141f, 0.141f, 1.0f));
 
 	constexpr ImGuiWindowFlags WindowFlags =
 		ImGuiWindowFlags_NoTitleBar |
@@ -518,29 +549,33 @@ void FEditorContentDrawerWidget::RenderBottomBar(const ImGuiViewport* Viewport, 
 		ImDrawList* DrawList = ImGui::GetWindowDrawList();
 		const ImVec2 BarMin = ImGui::GetWindowPos();
 		const ImVec2 BarMax = ImVec2(BarMin.x + ImGui::GetWindowWidth(), BarMin.y + ImGui::GetWindowHeight());
-		DrawList->AddLine(BarMin, ImVec2(BarMax.x, BarMin.y), IM_COL32(70, 72, 78, 255));
+		DrawList->AddLine(BarMin, ImVec2(BarMax.x, BarMin.y), IM_COL32(36, 36, 36, 255));
 
 		const bool bWasOpen = bOpen;
-		if (bWasOpen)
+		auto PushButtonStyle = [](bool bActive)
 		{
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.26f, 0.36f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.23f, 0.32f, 0.44f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.15f, 0.22f, 0.31f, 1.0f));
-		}
-		else
-		{
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.10f, 0.105f, 0.115f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.16f, 0.17f, 0.19f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.08f, 0.085f, 0.095f, 1.0f));
-		}
+			if (bActive)
+			{
+				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.141f, 0.141f, 0.141f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.188f, 0.188f, 0.188f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.102f, 0.102f, 0.102f, 1.0f));
+			}
+			else
+			{
+				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.102f, 0.102f, 0.102f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.141f, 0.141f, 0.141f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.082f, 0.082f, 0.082f, 1.0f));
+			}
+		};
 
+		PushButtonStyle(bWasOpen);
 		if (ImGui::Button("    Content Drawer", ImVec2(142.0f, 22.0f)))
 		{
 			ToggleOpen();
 		}
 
 		const ImVec2 ButtonMin = ImGui::GetItemRectMin();
-		const ImU32 FolderColor = bWasOpen ? IM_COL32(170, 200, 235, 255) : IM_COL32(190, 194, 202, 255);
+		const ImU32 FolderColor = bWasOpen ? IM_COL32(214, 214, 214, 255) : IM_COL32(128, 128, 128, 255);
 		DrawList->AddRectFilled(
 			ImVec2(ButtonMin.x + 10.0f, ButtonMin.y + 8.0f),
 			ImVec2(ButtonMin.x + 24.0f, ButtonMin.y + 17.0f),
@@ -559,30 +594,47 @@ void FEditorContentDrawerWidget::RenderBottomBar(const ImGuiViewport* Viewport, 
 			ImGui::SetTooltip("Ctrl+Space");
 		}
 
-		ImGui::SameLine();
-		const bool bConsoleOpen = ConsoleWidget && ConsoleWidget->IsOpen();
-		if (bConsoleOpen)
-		{
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.26f, 0.36f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.23f, 0.32f, 0.44f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.15f, 0.22f, 0.31f, 1.0f));
-		}
-		else
-		{
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.10f, 0.105f, 0.115f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.16f, 0.17f, 0.19f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.08f, 0.085f, 0.095f, 1.0f));
-		}
+		ImGui::SameLine(0.0f, 6.0f);
 
-		if (ImGui::Button(">_ Console", ImVec2(104.0f, 22.0f)) && ConsoleWidget)
+		const bool bConsoleOpen = ConsoleWidget && ConsoleWidget->IsOpen();
+		PushButtonStyle(bConsoleOpen);
+		if (ImGui::Button("    Console", ImVec2(96.0f, 22.0f)) && ConsoleWidget)
 		{
 			const bool bNextOpen = !ConsoleWidget->IsOpen();
-			ConsoleWidget->SetOpen(bNextOpen);
 			if (bNextOpen)
 			{
-				SetOpen(false);
+				StartConsoleTakeover();
+				float TakeoverHeight = 0.0f;
+				if (ConsumeConsoleTakeover(TakeoverHeight))
+				{
+					ConsoleWidget->OpenFromDrawerTakeover(TakeoverHeight);
+				}
+				else
+				{
+					ConsoleWidget->SetOpen(true);
+				}
+			}
+			else
+			{
+				ConsoleWidget->SetOpen(false);
 			}
 		}
+
+		const ImVec2 ConsoleButtonMin = ImGui::GetItemRectMin();
+		const ImVec2 ConsoleButtonMax = ImGui::GetItemRectMax();
+		const ImU32 ConsoleColor = bConsoleOpen ? IM_COL32(214, 214, 214, 255) : IM_COL32(128, 128, 128, 255);
+		DrawList->AddRect(
+			ImVec2(ConsoleButtonMin.x + 10.0f, ConsoleButtonMin.y + 6.0f),
+			ImVec2(ConsoleButtonMin.x + 25.0f, ConsoleButtonMax.y - 5.0f),
+			ConsoleColor,
+			2.0f,
+			0,
+			1.5f);
+		DrawList->AddText(
+			ImVec2(ConsoleButtonMin.x + 14.0f, ConsoleButtonMin.y + 4.0f),
+			ConsoleColor,
+			">");
+
 		ImGui::PopStyleColor(3);
 
 		if (ImGui::IsItemHovered())
@@ -767,8 +819,8 @@ void FEditorContentDrawerWidget::RenderFolderTile(const FString& FolderPath, con
 	ImDrawList* DrawList = ImGui::GetWindowDrawList();
 
 	const ImU32 AccentColor = IM_COL32(214, 172, 68, 255);
-	const ImU32 BgColor = bHovered ? IM_COL32(50, 47, 38, 255) : IM_COL32(36, 35, 32, 255);
-	const ImU32 BorderColor = bHovered ? IM_COL32(170, 140, 70, 255) : IM_COL32(84, 78, 62, 255);
+	const ImU32 BgColor = bHovered ? IM_COL32(36, 36, 36, 255) : IM_COL32(26, 26, 26, 255);
+	const ImU32 BorderColor = bHovered ? IM_COL32(63, 63, 63, 255) : IM_COL32(36, 36, 36, 255);
 
 	DrawList->AddRectFilled(Min, Max, BgColor, 5.0f);
 	DrawList->AddRect(Min, Max, BorderColor, 5.0f);
@@ -785,7 +837,7 @@ void FEditorContentDrawerWidget::RenderFolderTile(const FString& FolderPath, con
 	DrawList->PushClipRect(Min, Max, true);
 	DrawList->AddText(ImVec2(Min.x + 8.0f, Min.y + 67.0f), IM_COL32(238, 238, 238, 255),
 					  TrimToLength(DisplayName, 22).c_str());
-	DrawList->AddText(ImVec2(Min.x + 8.0f, Min.y + 86.0f), IM_COL32(170, 166, 150, 255), "Folder");
+	DrawList->AddText(ImVec2(Min.x + 8.0f, Min.y + 86.0f), IM_COL32(128, 128, 128, 255), "Folder");
 	DrawList->PopClipRect();
 
 	if (bHovered)
@@ -823,10 +875,10 @@ void FEditorContentDrawerWidget::RenderAssetTile(const FEditorAssetItem& Item, c
 
 	const ImU32 AccentColor = GetAssetKindColor(Item.Kind);
 	const ImU32 BgColor =
-		bSelected ? IM_COL32(58, 72, 92, 255) :
-		bHovered ? IM_COL32(48, 52, 60, 255) :
-		IM_COL32(34, 36, 42, 255);
-	const ImU32 BorderColor = bSelected ? IM_COL32(145, 175, 220, 255) : IM_COL32(75, 78, 86, 255);
+		bSelected ? IM_COL32(36, 36, 36, 255) :
+		bHovered ? IM_COL32(30, 30, 30, 255) :
+		IM_COL32(26, 26, 26, 255);
+	const ImU32 BorderColor = bSelected ? IM_COL32(80, 80, 80, 255) : IM_COL32(36, 36, 36, 255);
 
 	DrawList->AddRectFilled(Min, Max, BgColor, 5.0f);
 	DrawList->AddRect(Min, Max, BorderColor, 5.0f);
@@ -836,8 +888,8 @@ void FEditorContentDrawerWidget::RenderAssetTile(const FEditorAssetItem& Item, c
 	DrawList->AddText(ImVec2(Min.x + 8.0f, Min.y + 14.0f), AccentColor, ToAssetKindLabel(Item.Kind));
 	DrawList->AddText(ImVec2(Min.x + 8.0f, Min.y + 37.0f), IM_COL32(238, 238, 238, 255),
 					  TrimToLength(Item.DisplayName, 22).c_str());
-	DrawList->AddText(ImVec2(Min.x + 8.0f, Min.y + 59.0f), IM_COL32(180, 185, 196, 255), Item.Extension.c_str());
-	DrawList->AddText(ImVec2(Min.x + 8.0f, Min.y + 79.0f), IM_COL32(145, 150, 162, 255),
+	DrawList->AddText(ImVec2(Min.x + 8.0f, Min.y + 59.0f), IM_COL32(160, 160, 160, 255), Item.Extension.c_str());
+	DrawList->AddText(ImVec2(Min.x + 8.0f, Min.y + 79.0f), IM_COL32(128, 128, 128, 255),
 					  TrimToLength(Item.RelativePath, 28).c_str());
 	DrawList->PopClipRect();
 

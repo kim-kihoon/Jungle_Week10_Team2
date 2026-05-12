@@ -45,10 +45,10 @@ void FEditorPlayStreamWidget::Render(float DeltaTime)
 	// --- 1번 버튼 (Play / Pause / Resume) ---
 	if (bIsPlaying || bIsPaused)
 	{
-		// 💡 [수정됨] 실행 중(Pause)이거나 일시정지(Resume)일 때는 푸른색 계열 적용
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.4f, 0.8f, 1.0f));        // 기본 파란색
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.5f, 0.9f, 1.0f)); // 마우스 올렸을 때 (조금 더 밝게)
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.6f, 1.0f, 1.0f));  // 클릭할 때 (가장 밝게)
+		// 실행 중(Pause)이거나 일시정지(Resume)일 때도 편집기 공통 톤을 유지합니다.
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.141f, 0.141f, 0.141f, 1.0f));        // #242424
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.188f, 0.188f, 0.188f, 1.0f));
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.102f, 0.102f, 0.102f, 1.0f));  // #1a1a1a
 		
 		// 버튼 렌더링 시 계산한 고정 크기(PlayBtnSize)를 넘겨줍니다.
 		if (ImGui::Button(CurrentPlayPauseLabel, PlayBtnSize))
@@ -61,10 +61,10 @@ void FEditorPlayStreamWidget::Render(float DeltaTime)
 	}
 	else
 	{
-		// 완전히 꺼져있음(Edit): 처음 재생(Play) 버튼 (초록 계열 유지)
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.7f, 0.2f, 1.0f));
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.8f, 0.3f, 1.0f));
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.9f, 0.4f, 1.0f));
+		// 완전히 꺼져있음(Edit): 처음 재생(Play) 버튼
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.141f, 0.141f, 0.141f, 1.0f));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.188f, 0.188f, 0.188f, 1.0f));
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.102f, 0.102f, 0.102f, 1.0f));
 		
 		if (ImGui::Button(CurrentPlayPauseLabel, PlayBtnSize))
 		{
@@ -78,9 +78,9 @@ void FEditorPlayStreamWidget::Render(float DeltaTime)
 	// --- 2번 버튼 (Stop) ---
 	if (bIsEditing) ImGui::BeginDisabled();
 	
-	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.7f, 0.2f, 0.2f, 1.0f));
-	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.3f, 0.3f, 1.0f));
-	ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.9f, 0.4f, 0.4f, 1.0f));
+	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.141f, 0.141f, 0.141f, 1.0f));
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.188f, 0.188f, 0.188f, 1.0f));
+	ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.102f, 0.102f, 0.102f, 1.0f));
 	
 	// Stop 버튼도 고정 크기(StopBtnSize)를 적용합니다.
 	if (ImGui::Button(StopLabel, StopBtnSize))

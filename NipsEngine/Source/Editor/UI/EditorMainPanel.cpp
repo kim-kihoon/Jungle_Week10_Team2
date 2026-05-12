@@ -27,6 +27,103 @@ void SetOpaqueBlendStateCallback(const ImDrawList*, const ImDrawCmd* Cmd)
 	DeviceContext->OMSetBlendState(nullptr, BlendFactor, 0xffffffff);
 }
 
+ImVec4 ColorFromHex(uint32 Rgb, float Alpha = 1.0f)
+{
+	return ImVec4(
+		static_cast<float>((Rgb >> 16) & 0xff) / 255.0f,
+		static_cast<float>((Rgb >> 8) & 0xff) / 255.0f,
+		static_cast<float>(Rgb & 0xff) / 255.0f,
+		Alpha);
+}
+
+void ApplyUnrealImGuiStyle()
+{
+	ImGuiStyle& Style = ImGui::GetStyle();
+	Style.WindowRounding = 2.0f;
+	Style.ChildRounding = 2.0f;
+	Style.FrameRounding = 2.0f;
+	Style.PopupRounding = 2.0f;
+	Style.ScrollbarRounding = 2.0f;
+	Style.GrabRounding = 2.0f;
+	Style.TabRounding = 2.0f;
+	Style.WindowBorderSize = 1.0f;
+	Style.FrameBorderSize = 1.0f;
+	Style.PopupBorderSize = 1.0f;
+	Style.WindowPadding = ImVec2(8.0f, 8.0f);
+	Style.FramePadding = ImVec2(6.0f, 4.0f);
+	Style.ItemSpacing = ImVec2(8.0f, 5.0f);
+	Style.ItemInnerSpacing = ImVec2(6.0f, 4.0f);
+
+	ImVec4* Colors = Style.Colors;
+	const ImVec4 WindowBg = ColorFromHex(0x151515);
+	const ImVec4 ChildBg = ColorFromHex(0x1a1a1a);
+	const ImVec4 PanelBg = ColorFromHex(0x242424);
+	const ImVec4 PanelHover = ColorFromHex(0x303030);
+	const ImVec4 PanelActive = ColorFromHex(0x3a3a3a);
+	const ImVec4 Border = ColorFromHex(0x3f3f3f);
+	const ImVec4 Text = ColorFromHex(0xd6d6d6);
+	const ImVec4 TextDisabled = ColorFromHex(0x808080);
+	const ImVec4 Accent = ColorFromHex(0x4f86c6);
+	const ImVec4 AccentHover = ColorFromHex(0x5f9ade);
+	const ImVec4 AccentActive = ColorFromHex(0x3f6fa8);
+
+	Colors[ImGuiCol_Text] = Text;
+	Colors[ImGuiCol_TextDisabled] = TextDisabled;
+	Colors[ImGuiCol_WindowBg] = WindowBg;
+	Colors[ImGuiCol_ChildBg] = ChildBg;
+	Colors[ImGuiCol_PopupBg] = ColorFromHex(0x1a1a1a, 0.98f);
+	Colors[ImGuiCol_Border] = Border;
+	Colors[ImGuiCol_BorderShadow] = ColorFromHex(0x000000, 0.0f);
+	Colors[ImGuiCol_FrameBg] = PanelBg;
+	Colors[ImGuiCol_FrameBgHovered] = PanelHover;
+	Colors[ImGuiCol_FrameBgActive] = PanelActive;
+	Colors[ImGuiCol_TitleBg] = ColorFromHex(0x151515);
+	Colors[ImGuiCol_TitleBgActive] = ColorFromHex(0x1a1a1a);
+	Colors[ImGuiCol_TitleBgCollapsed] = ColorFromHex(0x151515, 0.9f);
+	Colors[ImGuiCol_MenuBarBg] = ColorFromHex(0x1a1a1a);
+	Colors[ImGuiCol_ScrollbarBg] = ColorFromHex(0x151515);
+	Colors[ImGuiCol_ScrollbarGrab] = ColorFromHex(0x3a3a3a);
+	Colors[ImGuiCol_ScrollbarGrabHovered] = ColorFromHex(0x4a4a4a);
+	Colors[ImGuiCol_ScrollbarGrabActive] = ColorFromHex(0x5a5a5a);
+	Colors[ImGuiCol_CheckMark] = AccentHover;
+	Colors[ImGuiCol_SliderGrab] = Accent;
+	Colors[ImGuiCol_SliderGrabActive] = AccentHover;
+	Colors[ImGuiCol_Button] = PanelBg;
+	Colors[ImGuiCol_ButtonHovered] = PanelHover;
+	Colors[ImGuiCol_ButtonActive] = PanelActive;
+	Colors[ImGuiCol_Header] = ColorFromHex(0x242424);
+	Colors[ImGuiCol_HeaderHovered] = ColorFromHex(0x303030);
+	Colors[ImGuiCol_HeaderActive] = AccentActive;
+	Colors[ImGuiCol_Separator] = Border;
+	Colors[ImGuiCol_SeparatorHovered] = Accent;
+	Colors[ImGuiCol_SeparatorActive] = AccentHover;
+	Colors[ImGuiCol_ResizeGrip] = ColorFromHex(0x4f86c6, 0.35f);
+	Colors[ImGuiCol_ResizeGripHovered] = ColorFromHex(0x5f9ade, 0.65f);
+	Colors[ImGuiCol_ResizeGripActive] = ColorFromHex(0x5f9ade, 0.9f);
+	Colors[ImGuiCol_Tab] = ColorFromHex(0x1a1a1a);
+	Colors[ImGuiCol_TabHovered] = ColorFromHex(0x303030);
+	Colors[ImGuiCol_TabActive] = ColorFromHex(0x242424);
+	Colors[ImGuiCol_TabUnfocused] = ColorFromHex(0x151515);
+	Colors[ImGuiCol_TabUnfocusedActive] = ColorFromHex(0x1a1a1a);
+	Colors[ImGuiCol_DockingPreview] = ColorFromHex(0x4f86c6, 0.45f);
+	Colors[ImGuiCol_DockingEmptyBg] = WindowBg;
+	Colors[ImGuiCol_PlotLines] = Accent;
+	Colors[ImGuiCol_PlotLinesHovered] = AccentHover;
+	Colors[ImGuiCol_PlotHistogram] = ColorFromHex(0xbfa45a);
+	Colors[ImGuiCol_PlotHistogramHovered] = ColorFromHex(0xd6bb70);
+	Colors[ImGuiCol_TableHeaderBg] = PanelBg;
+	Colors[ImGuiCol_TableBorderStrong] = Border;
+	Colors[ImGuiCol_TableBorderLight] = ColorFromHex(0x303030);
+	Colors[ImGuiCol_TableRowBg] = ColorFromHex(0x000000, 0.0f);
+	Colors[ImGuiCol_TableRowBgAlt] = ColorFromHex(0xffffff, 0.035f);
+	Colors[ImGuiCol_TextSelectedBg] = ColorFromHex(0x4f86c6, 0.35f);
+	Colors[ImGuiCol_DragDropTarget] = ColorFromHex(0x5f9ade, 0.9f);
+	Colors[ImGuiCol_NavHighlight] = AccentHover;
+	Colors[ImGuiCol_NavWindowingHighlight] = ColorFromHex(0xffffff, 0.45f);
+	Colors[ImGuiCol_NavWindowingDimBg] = ColorFromHex(0x000000, 0.35f);
+	Colors[ImGuiCol_ModalWindowDimBg] = ColorFromHex(0x000000, 0.55f);
+}
+
 const char* GetViewportTypeName(EEditorViewportType Type)
 {
 	switch (Type)
@@ -98,6 +195,7 @@ void FEditorMainPanel::Create(FWindowsWindow* InWindow, FRenderer& InRenderer, U
 	ImGuiIO& IO = ImGui::GetIO();
 	IO.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 	IO.IniFilename = "imgui_editor.ini";
+	ApplyUnrealImGuiStyle();
 
 	Window = InWindow;
 	EditorEngine = InEditorEngine;
@@ -201,6 +299,19 @@ void FEditorMainPanel::Render(float DeltaTime)
 
 	RenderViewportHostWindow();
 
+	float ConsoleTakeoverHeight = 0.0f;
+	if (ContentDrawerWidget.ConsumeOpenRequest())
+	{
+		ConsoleWidget.SetOpen(false);
+		bShowConsole = false;
+	}
+
+	if (ContentDrawerWidget.ConsumeConsoleTakeover(ConsoleTakeoverHeight))
+	{
+		bShowConsole = true;
+		ConsoleWidget.OpenFromDrawerTakeover(ConsoleTakeoverHeight);
+	}
+
 	ConsoleWidget.SetOpen(bShowConsole);
 	ConsoleWidget.Render(DeltaTime);
 	if (ConsoleWidget.ConsumeOpenRequest())
@@ -223,6 +334,11 @@ void FEditorMainPanel::Render(float DeltaTime)
 	bShowSkeletalMeshViewer = SkeletalMeshViewerWidget.IsOpen();
 	ViewportOverlayWidget.Render(DeltaTime);
 	ContentDrawerWidget.Render(DeltaTime);
+	if (ContentDrawerWidget.ConsumeConsoleTakeover(ConsoleTakeoverHeight))
+	{
+		bShowConsole = true;
+		ConsoleWidget.OpenFromDrawerTakeover(ConsoleTakeoverHeight);
+	}
 	if (ContentDrawerWidget.ConsumeOpenRequest())
 	{
 		ConsoleWidget.SetOpen(false);
@@ -302,7 +418,16 @@ bool FEditorMainPanel::ShouldResetDefaultDockLayout(ImGuiID DockspaceId) const
 
 	// A leaf dockspace means ImGui could not restore a useful editor split layout.
 	// This happens with a fresh or corrupted imgui_editor.ini.
-	return RootNode->IsLeafNode();
+	if (RootNode->IsLeafNode())
+		return true;
+
+	const ImGuiID LegacyConsoleId = ImHashStr("Console");
+	if (const ImGuiWindowSettings* ConsoleSettings = ImGui::FindWindowSettingsByID(LegacyConsoleId))
+	{
+		return ConsoleSettings->DockId != 0;
+	}
+
+	return false;
 }
 
 void FEditorMainPanel::EnsureDefaultDockLayout(ImGuiID DockspaceId)
@@ -317,6 +442,10 @@ void FEditorMainPanel::EnsureDefaultDockLayout(ImGuiID DockspaceId)
 	const ImGuiViewport* Viewport = ImGui::GetMainViewport();
 	const float ReservedTopHeight = ToolbarWidget.GetReservedTopHeight();
 	ImGui::DockBuilderRemoveNode(DockspaceId);
+	if (ImGuiWindowSettings* ConsoleSettings = ImGui::FindWindowSettingsByID(ImHashStr("Console")))
+	{
+		ConsoleSettings->DockId = 0;
+	}
 	ImGui::DockBuilderAddNode(DockspaceId, ImGuiDockNodeFlags_DockSpace);
 	ImGui::DockBuilderSetNodePos(DockspaceId, ImVec2(Viewport->Pos.x, Viewport->Pos.y + ReservedTopHeight));
 	ImGui::DockBuilderSetNodeSize(
@@ -425,7 +554,7 @@ void FEditorMainPanel::RenderViewportHostWindow()
 				char ChildID[32];
 				snprintf(ChildID, sizeof(ChildID), "##VPMenu%d", i);
 
-				ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.05f, 0.05f, 0.05f, 0.75f));
+				ImGui::PushStyleColor(ImGuiCol_ChildBg, ColorFromHex(0x151515, 0.75f));
 				constexpr ImGuiWindowFlags OverlayFlags =
 					ImGuiWindowFlags_MenuBar |
 					ImGuiWindowFlags_NoScrollbar |
