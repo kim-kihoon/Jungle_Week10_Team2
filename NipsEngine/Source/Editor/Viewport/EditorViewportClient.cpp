@@ -80,6 +80,7 @@ void FEditorViewportClient::Initialize(FWindowsWindow* InWindow, UEditorEngine* 
 	EditorWorldController.SetStartPIECallback([this]() { if (Editor) Editor->StartPlaySession(); });
 	EditorWorldController.SetFocusSelectionCallback([this]() { FocusPrimarySelection(); });
 	EditorWorldController.SetBeforeDeleteSelectionCallback([this]() { if (Editor) Editor->GetMainPanel().ResetWidgetSelections(); });
+	EditorWorldController.SetActorPlacementCallback([this](float X, float Y, float PopupX, float PopupY) { return RequestActorPlacement(X, Y, PopupX, PopupY); });
 	PIEController.SetToggleInputCaptureCallback([this]() { TogglePIEInputCapture(); });
 	GamePlayerController.SetTogglePauseCallback(&GameUISystem::TogglePauseMenuIfInGame);
 	GamePlayerController.SetPlayerCameraManager(&PlayerCameraManager);
@@ -333,7 +334,8 @@ bool FEditorViewportClient::RequestActorPlacement(float X, float Y, float PopupX
 	if (!World || !bHasCamera)
 		return false;
 
-	FRay Ray = Camera.DeprojectScreenToWorld(X, Y, WindowWidth, WindowHeight);
+	const FViewportRect ViewRect = Viewport ? Viewport->GetRect() : FViewportRect(0, 0, static_cast<int32>(WindowWidth), static_cast<int32>(WindowHeight));
+	FRay Ray = Camera.DeprojectScreenToWorld(X, Y, static_cast<float>(ViewRect.Width), static_cast<float>(ViewRect.Height));
 
 	FHitResult BestHit{};
 	bool bHasHit = false;
@@ -362,10 +364,7 @@ bool FEditorViewportClient::RequestActorPlacement(float X, float Y, float PopupX
 		}
 	}
 
-	if (!bHasHit)
-		return false;
-
-	PendingActorPlacementLocation = BestHit.Location + BestHit.Normal;
+	PendingActorPlacementLocation = bHasHit ? BestHit.Location + BestHit.Normal : Ray.Origin + Ray.Direction.GetSafeNormal() * 10.0f;
 	PendingActorPlacementPopupPos = { static_cast<LONG>(PopupX), static_cast<LONG>(PopupY) };
 	bPendingActorPlacement = true;
 	return true;

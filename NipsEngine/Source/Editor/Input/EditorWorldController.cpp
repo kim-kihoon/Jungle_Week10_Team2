@@ -218,6 +218,14 @@ void FEditorWorldController::OnRightMouseClick(float DeltaX, float DeltaY)
 	Yaw   = MathUtil::RadiansToDegrees(std::atan2(Forward.Y, Forward.X));
 }
 
+void FEditorWorldController::OnRightMouseButtonUp(float X, float Y)
+{
+	if (OnRequestActorPlacement)
+	{
+		OnRequestActorPlacement(X, Y, ViewportX + X, ViewportY + Y);
+	}
+}
+
 void FEditorWorldController::OnRightMouseDrag(float DeltaX, float DeltaY)
 {
 	if (!Camera)
@@ -450,9 +458,7 @@ void FEditorWorldController::OnWheelScrolled(float Notch)
 	else
 	{
 		FVector Forward = Camera->GetForwardVector();
-		FVector NewLocation = Camera->GetLocation() + Forward * Notch * ZoomSpeed;
-		Camera->SetLocation(NewLocation);
-		ResetTargetLocation();
+		TargetLocation += Forward * Notch * ZoomSpeed;
 	}
 }
 

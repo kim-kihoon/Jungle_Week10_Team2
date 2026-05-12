@@ -1,5 +1,4 @@
 ﻿#pragma once
-#pragma once
 
 #include "StaticMeshTypes.h"
 #include "Object/Object.h"

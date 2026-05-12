@@ -76,7 +76,7 @@ template <>
 UActorComponent* FEditorComponentFactory::RegisterComp<UBillboardComponent>(AActor* Actor)
 {
     auto* Comp = Actor->AddComponent<UBillboardComponent>();
-    Comp->SetTexturePath("Asset/Texture/Pawn_64x.png");
+    //Comp->SetTexturePath("Asset/Texture/S_Pawn.png");
     return Comp;
 }
 

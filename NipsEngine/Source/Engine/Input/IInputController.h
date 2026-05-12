@@ -12,6 +12,7 @@ public:
 	virtual void OnLeftMouseDragEnd(float X, float Y) = 0;
 	virtual void OnLeftMouseButtonUp(float X, float Y) = 0;
 	virtual void OnRightMouseClick(float DeltaX, float DeltaY) = 0;
+	virtual void OnRightMouseButtonUp(float X, float Y) {}
 	virtual void OnLeftMouseDrag(float X, float Y) = 0;
 	virtual void OnRightMouseDrag(float DeltaX, float DeltaY) = 0;
 	virtual void OnMiddleMouseDrag(float DeltaX, float DeltaY) = 0;
