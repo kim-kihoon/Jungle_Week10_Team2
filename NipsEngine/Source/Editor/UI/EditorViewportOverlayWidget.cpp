@@ -197,12 +197,6 @@ void FEditorViewportOverlayWidget::RenderViewportSettings(float DeltaTime, bool 
 	FViewportCamera* Camera = EditorEngine ? EditorEngine->GetCamera() : nullptr;
 	if (Camera)
 	{
-		bool bIsOrtho = (Camera->GetProjectionType() == EViewportProjectionType::Orthographic);
-		if (ImGui::Checkbox("Orthographic", &bIsOrtho))
-		{
-			Camera->SetProjectionType(bIsOrtho ? EViewportProjectionType::Orthographic : EViewportProjectionType::Perspective);
-		}
-
 		float CameraFOV_Deg = MathUtil::RadiansToDegrees(Camera->GetFOV());
 		ImGui::SetNextItemWidth(ItemWidth);
 		if (ImGui::DragFloat("FOV", &CameraFOV_Deg, 0.5f, 1.0f, 90.0f))
@@ -1088,6 +1082,7 @@ namespace
 		switch (Type)
 		{
 		case EVT_Perspective: return "Perspective";
+		case EVT_Orthographic: return "Orthographic";
 		case EVT_OrthoTop:    return "Top";
 		case EVT_OrthoBottom: return "Bottom";
 		case EVT_OrthoFront:  return "Front";

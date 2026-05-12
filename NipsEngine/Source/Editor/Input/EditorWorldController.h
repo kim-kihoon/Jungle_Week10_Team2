@@ -85,6 +85,7 @@ class FEditorWorldController : public IBaseEditorController
 	void UpdateGizmoScreenScaling();
 	void HandleBoxSelection();
 	bool TryProjectWorldToViewport(const FVector& WorldPos, float& OutViewportX, float& OutViewportY, float& OutDepth) const;
+	bool IsFreeOrthographicCamera() const;
 
   private:
 	FSelectionManager* SelectionManager = nullptr;
@@ -100,6 +101,8 @@ class FEditorWorldController : public IBaseEditorController
 	float   ZoomSpeed = 15.0f;
 	bool    bWASDAlwaysMove = true;
 	FVector TargetLocation;
+	FVector OrthoOrbitTarget = FVector::ZeroVector;
+	float   OrthoOrbitDistance = 1.0f;
 	bool    bTargetLocationInitialized = false;
 	std::function<void()> OnRequestStartPIE;
 	std::function<void()> OnRequestFocusSelection;

@@ -130,6 +130,8 @@ const char* GetViewportTypeName(EEditorViewportType Type)
 	{
 	case EVT_Perspective:
 		return "Perspective";
+	case EVT_Orthographic:
+		return "Orthographic";
 	case EVT_OrthoTop:
 		return "Top";
 	case EVT_OrthoBottom:
@@ -641,27 +643,34 @@ void FEditorMainPanel::RenderViewportMenuBarForIndex(int32 Index)
 
 	if (ImGui::BeginMenu("Type"))
 	{
-		if (Index == 0)
+		const bool bPerspectiveSelected = (Client->GetViewportType() == EVT_Perspective);
+		if (ImGui::MenuItem("Perspective", nullptr, bPerspectiveSelected))
 		{
-			ImGui::TextDisabled("Viewport 0 is fixed to Perspective.");
-			ImGui::Separator();
-			ImGui::MenuItem("Perspective", nullptr, true, false);
+			Client->SetViewportType(EVT_Perspective);
+			Client->ApplyCameraMode();
 		}
-		else
+
+		const bool bOrthographicSelected = (Client->GetViewportType() == EVT_Orthographic);
+		if (ImGui::MenuItem("Orthographic", nullptr, bOrthographicSelected))
 		{
-			static constexpr EEditorViewportType kOrthoTypes[] = {
-				EVT_OrthoTop, EVT_OrthoBottom,
-				EVT_OrthoFront, EVT_OrthoBack,
-				EVT_OrthoLeft, EVT_OrthoRight
-			};
-			for (EEditorViewportType Type : kOrthoTypes)
+			Client->SetViewportType(EVT_Orthographic);
+			Client->ApplyCameraMode();
+		}
+
+		ImGui::Separator();
+
+		static constexpr EEditorViewportType kOrthoTypes[] = {
+			EVT_OrthoTop, EVT_OrthoBottom,
+			EVT_OrthoFront, EVT_OrthoBack,
+			EVT_OrthoLeft, EVT_OrthoRight
+		};
+		for (EEditorViewportType Type : kOrthoTypes)
+		{
+			const bool bSel = (Client->GetViewportType() == Type);
+			if (ImGui::MenuItem(GetViewportTypeName(Type), nullptr, bSel))
 			{
-				const bool bSel = (Client->GetViewportType() == Type);
-				if (ImGui::MenuItem(GetViewportTypeName(Type), nullptr, bSel))
-				{
-					Client->SetViewportType(Type);
-					Client->ApplyCameraMode();
-				}
+				Client->SetViewportType(Type);
+				Client->ApplyCameraMode();
 			}
 		}
 		ImGui::EndMenu();
