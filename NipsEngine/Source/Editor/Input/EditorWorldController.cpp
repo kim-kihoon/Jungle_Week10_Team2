@@ -49,7 +49,7 @@ void FEditorWorldController::Tick(float InDeltaTime)
 {
 	DeltaTime = InDeltaTime;
 	if (!Camera)
-		return;
+		return;  
 	UpdateGizmoScreenScaling();
 	if (!bTargetLocationInitialized)
 	{
@@ -254,7 +254,10 @@ void FEditorWorldController::OnRightMouseDrag(float DeltaX, float DeltaY)
 		// Accumulate yaw/pitch and rebuild rotation quaternion
 		const float RotationSpeed = 0.15f * RotateSensitivity;
 		Yaw   += DeltaX * RotationSpeed;
-		Pitch -= DeltaY * RotationSpeed;
+		if (!IsFreeOrthographicCamera())
+		{
+			Pitch -= DeltaY * RotationSpeed;
+		}
 		Pitch  = MathUtil::Clamp(Pitch, -89.f, 89.f);
 		UpdateCameraRotation();
 
