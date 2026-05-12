@@ -3,6 +3,8 @@
 #include "Editor/UI/EditorWidget.h"
 #include "ImGui/imgui.h"
 
+class FEditorConsoleWidget;
+
 enum class EEditorAssetKind
 {
 	All = 0,
@@ -33,6 +35,8 @@ public:
 	void SetOpen(bool bInOpen);
 	bool IsOpen() const { return bOpen; }
 	void ToggleOpen();
+	bool ConsumeOpenRequest();
+	void SetConsoleWidget(FEditorConsoleWidget* InConsoleWidget) { ConsoleWidget = InConsoleWidget; }
 	void RefreshAssetTree();
 
 private:
@@ -54,6 +58,7 @@ private:
 
 private:
 	bool bOpen = false;
+	bool bOpenedThisFrame = false;
 	bool bAssetTreeDirty = true;
 	float DrawerHeight = 0.0f;
 	float DrawerAnimationAlpha = 0.0f;
@@ -67,4 +72,5 @@ private:
 
 	TArray<FString> FolderPaths;
 	TArray<FEditorAssetItem> AssetItems;
+	FEditorConsoleWidget* ConsoleWidget = nullptr;
 };
