@@ -958,9 +958,6 @@
     </ClCompile>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="HighPerformanceGpuHint.cpp" />
-    <ClCompile Include="Source\Engine\Component\SkeletalMeshComponent.cpp">
-      <Filter>Source\Engine\Component</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Engine\Component\GizmoTransformTarget.cpp" />
   </ItemGroup>
   <ItemGroup>
