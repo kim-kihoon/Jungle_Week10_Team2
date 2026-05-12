@@ -43,9 +43,15 @@ void FEditorRenderPipeline::Execute(float DeltaTime, FRenderer& Renderer)
 		RenderViewport(Renderer, i);
 	}
 
-	if (FSkeletalMeshPreviewScene* PreviewScene = Editor->GetMainPanel().GetSkeletalMeshPreviewScene())
+	const int32 PreviewIndexOffset = FEditorViewportLayout::MaxViewports - 1;
+
+	for (const auto& Viewer : Editor->GetMainPanel().GetSkeletalMeshViewers())
 	{
-		RenderSkeletalMeshPreview(Renderer, *PreviewScene);
+		if (Viewer->IsOpen())
+		{
+			// 각 뷰어의 인스턴스 ID를 기반으로 고유한 ViewportIndex를 부여하여 렌더링
+			RenderSkeletalMeshPreview(Renderer, *Viewer->GetPreviewScene(), Viewer->GetInstanceId() + PreviewIndexOffset);
+		}
 	}
 
 	Renderer.UseBackBufferRenderTargets();
@@ -124,7 +130,7 @@ void FEditorRenderPipeline::RenderViewport(FRenderer& Renderer, int32 ViewportIn
 	}
 }
 
-void FEditorRenderPipeline::RenderSkeletalMeshPreview(FRenderer& Renderer, FSkeletalMeshPreviewScene& PreviewScene)
+void FEditorRenderPipeline::RenderSkeletalMeshPreview(FRenderer& Renderer, FSkeletalMeshPreviewScene& PreviewScene, int32 ViewportIndex)
 {
 	FSceneView SceneView;
 	PreviewScene.GetViewportClient().BuildSceneView(SceneView);
@@ -136,8 +142,8 @@ void FEditorRenderPipeline::RenderSkeletalMeshPreview(FRenderer& Renderer, FSkel
 	}
 
 	FSceneViewport& SceneViewport = PreviewScene.GetSceneViewport();
-	FViewportRenderResource& ViewportResource =
-		Renderer.AcquireViewportResource(Rect.Width, Rect.Height, PreviewScene.GetViewportIndex());
+	FViewportRenderResource& ViewportResource = Renderer.AcquireViewportResource(Rect.Width, Rect.Height, ViewportIndex);
+
 	SceneViewport.SetRenderTargetSet(&ViewportResource.GetView());
 
 	Renderer.BeginViewportFrame(SceneViewport.GetViewportRenderTargets());

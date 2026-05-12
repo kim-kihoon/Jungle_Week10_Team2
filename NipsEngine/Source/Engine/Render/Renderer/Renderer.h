@@ -16,6 +16,7 @@
 #include "Render/SubUVBatcher.h"
 
 #include <cstddef>
+#include <deque>
 #include <functional>
 
 #include "Render/Renderer/RenderFlow/RenderPipeline.h"
@@ -140,8 +141,7 @@ public:
 	const ID3D11RenderTargetView*   GetCurrentSceneRTV() const { return SceneFinalRTV.Get(); }
 	const ID3D11ShaderResourceView* GetCurrentSceneSRV() const { return SceneFinalSRV.Get(); }
 
-	// 현재는 Resource 를 Handle 이 아니라, 고정된 4개의 Viewport 에 대한 Index 를 통해 관리
-	// 추가로 VP 를 받아서 원래 해당하는 Resource 를 찾아야하는데 현재는 Index 로 찾는 중
+	// Viewport 리소스는 에디터 기본 뷰포트와 동적으로 열리는 preview viewport가 함께 사용한다.
 	FViewportRenderResource& AcquireViewportResource(uint32 W, uint32 H, int32 Index);
 	void InitializeViewportResource(uint32 Width, uint32 Height, int32 Index);
 	void ReleaseViewportResource(int32 Index);
@@ -203,7 +203,6 @@ private:
 	// Directional, Ambient 같은 전역 Light 개수 제한
 	constexpr static uint32 MaxSceneGlobalLightCount = 64;
 
-	constexpr static int32 MaxViewportResourceCount = 5;
-	FViewportRenderResource ViewportResources[MaxViewportResourceCount];
+	std::deque<FViewportRenderResource> ViewportResources;
 };
 

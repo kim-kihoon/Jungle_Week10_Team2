@@ -345,7 +345,11 @@ void FRenderer::RenderToCurrentTarget(const std::function<void(int32 Width, int3
 
 FViewportRenderResource& FRenderer::AcquireViewportResource(uint32 Width, uint32 Height, int32 Index)
 {
-	assert(Index >= 0 && Index < MaxViewportResourceCount && "Index Out of Bound");
+	assert(Index >= 0 && "Index Out of Bound");
+	if (Index >= static_cast<int32>(ViewportResources.size()))
+	{
+		ViewportResources.resize(static_cast<size_t>(Index) + 1);
+	}
 
 	FViewportRenderResource& Res = ViewportResources[Index];
 
@@ -380,6 +384,12 @@ FViewportRenderResource& FRenderer::AcquireViewportResource(uint32 Width, uint32
 
 void FRenderer::InitializeViewportResource(uint32 Width, uint32 Height, int32 Index)
 {
+	assert(Index >= 0 && "Index Out of Bound");
+	if (Index >= static_cast<int32>(ViewportResources.size()))
+	{
+		ViewportResources.resize(static_cast<size_t>(Index) + 1);
+	}
+
 	FViewportRenderResource& Res = ViewportResources[Index];
 
 	FRenderTarget RT;
@@ -438,7 +448,11 @@ void FRenderer::InitializeViewportResource(uint32 Width, uint32 Height, int32 In
 
 void FRenderer::ReleaseViewportResource(int32 Index)
 {
-	assert(Index >= 0 && Index < MaxViewportResourceCount && "Index Out of Bound");
+	assert(Index >= 0 && "Index Out of Bound");
+	if (Index < 0 || Index >= static_cast<int32>(ViewportResources.size()))
+	{
+		return;
+	}
 
 	FViewportRenderResource& Res = ViewportResources[Index];
 

@@ -246,14 +246,13 @@ void FEditorMainPanel::Create(FWindowsWindow* InWindow, FRenderer& InRenderer, U
 	StatWidget.Initialize(InEditorEngine);
 	PlayStreamWidget.Initialize(InEditorEngine);
 	CameraShakeWidget.Initialize(InEditorEngine);
-	SkeletalMeshViewerWidget.Initialize(InEditorEngine);
 	ToolbarWidget.Initialize(InEditorEngine);
 	ToolbarWidget.SetViewportOverlayWidget(&ViewportOverlayWidget);
 	ToolbarWidget.SetSceneWidget(&SceneWidget);
 	ToolbarWidget.SetPlayStreamWidget(&PlayStreamWidget);
 	ToolbarWidget.SetContentDrawerWidget(&ContentDrawerWidget);
 	ToolbarWidget.SetPanelVisibilityRefs(&bShowConsole, &bShowControl, &bShowProperty, &bShowSceneManager,
-										 &bShowMaterialEditor, &bShowStatProfiler, &bShowSkeletalMeshViewer);
+										 &bShowMaterialEditor, &bShowStatProfiler, nullptr);
 }
 
 void FEditorMainPanel::Release()
@@ -331,9 +330,41 @@ void FEditorMainPanel::Render(float DeltaTime)
 		StatWidget.Render(DeltaTime);
 	if (bShowCameraShake)
 		CameraShakeWidget.Render(DeltaTime);
-	SkeletalMeshViewerWidget.SetOpen(bShowSkeletalMeshViewer);
-	SkeletalMeshViewerWidget.Render(DeltaTime);
-	bShowSkeletalMeshViewer = SkeletalMeshViewerWidget.IsOpen();
+	FEditorSkeletalMeshViewerWidget* FocusedViewerThisFrame = nullptr;
+	bool bFocusedViewerStillOpen = false;
+	for (auto It = SkeletalMeshViewers.begin(); It != SkeletalMeshViewers.end(); )
+	{
+		(*It)->Render(DeltaTime);
+
+		if (!(*It)->IsOpen())
+		{
+			if (FocusedSkeletalMeshViewer == It->get())
+			{
+				FocusedSkeletalMeshViewer = nullptr;
+			}
+			It = SkeletalMeshViewers.erase(It);
+		}
+		else
+		{
+			if ((*It)->IsWindowFocused())
+			{
+				FocusedViewerThisFrame = It->get();
+			}
+			if (FocusedSkeletalMeshViewer == It->get())
+			{
+				bFocusedViewerStillOpen = true;
+			}
+			++It;
+		}
+	}
+	if (FocusedViewerThisFrame)
+	{
+		FocusedSkeletalMeshViewer = FocusedViewerThisFrame;
+	}
+	else if (!bFocusedViewerStillOpen)
+	{
+		FocusedSkeletalMeshViewer = SkeletalMeshViewers.empty() ? nullptr : SkeletalMeshViewers.back().get();
+	}
 	ViewportOverlayWidget.Render(DeltaTime);
 	ContentDrawerWidget.Render(DeltaTime);
 	if (ContentDrawerWidget.ConsumeConsoleTakeover(ConsoleTakeoverHeight))
@@ -378,8 +409,15 @@ void FEditorMainPanel::Update()
 	}
 
 	const bool bPropertyModalBlockingInput = PropertyWidget.IsModalInputBlocking();
-	const bool bSkeletalMeshViewerBlockingInput = SkeletalMeshViewerWidget.IsViewportInputActive();
-	const bool bSkeletalMeshViewerCapturedInput = SkeletalMeshViewerWidget.IsViewportInputCaptured();
+
+	bool bSkeletalMeshViewerBlockingInput = false;
+	bool bSkeletalMeshViewerCapturedInput = false;
+
+	for (const auto& Viewer : SkeletalMeshViewers)
+	{
+		if (Viewer->IsViewportInputActive()) bSkeletalMeshViewerBlockingInput = true;
+		if (Viewer->IsViewportInputCaptured()) bSkeletalMeshViewerCapturedInput = true;
+	}
 
 	if (bViewportOperationActive || bSkeletalMeshViewerCapturedInput)
 	{
@@ -474,6 +512,16 @@ void FEditorMainPanel::EnsureDefaultDockLayout(ImGuiID DockspaceId)
 	ImGui::DockBuilderDockWindow("SkeletalMesh Viewer", RightBottomNode);
 
 	ImGui::DockBuilderFinish(DockspaceId);
+}
+
+void FEditorMainPanel::OpenSkeletalMeshViewer(const FString& MeshPath)
+{
+	auto NewViewer = std::make_shared<FEditorSkeletalMeshViewerWidget>();
+	NewViewer->SetInstanceId(NextViewerInstanceId++);
+	NewViewer->Initialize(EditorEngine);
+	NewViewer->OpenMesh(MeshPath);
+
+	SkeletalMeshViewers.push_back(NewViewer);
 }
 
 // ImGui로 Viewport 가 차지할 영역을 계산하고 만든다.

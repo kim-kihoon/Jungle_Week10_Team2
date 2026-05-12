@@ -865,7 +865,18 @@ void FEditorContentDrawerWidget::RenderAssetTile(const FEditorAssetItem& Item, c
 	if (bDoubleClicked)
 	{
 		SelectedAssetPath = Item.RelativePath;
-		PlaceAssetInWorld(Item);
+
+		if (Item.Kind == EEditorAssetKind::SkeletalMesh)
+		{
+			if (EditorEngine)
+			{
+				EditorEngine->GetMainPanel().OpenSkeletalMeshViewer(Item.RelativePath);
+			}
+		}
+		else
+		{
+			PlaceAssetInWorld(Item);
+		}
 	}
 
 	const bool bSelected = SelectedAssetPath == Item.RelativePath;
