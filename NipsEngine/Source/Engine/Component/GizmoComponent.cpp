@@ -388,6 +388,7 @@ void UGizmoComponent::SetTargetBone(USkeletalMeshComponent* MeshComponent, int32
     ClearTransformTarget();
     TrackingComponent = MeshComponent;
     TrackingActor = MeshComponent->GetOwner();
+    TrackingBoneIndex = BoneIndex;
 
     SetTransformTarget(std::make_unique<FBoneGizmoTarget>(MeshComponent, BoneIndex));
 }

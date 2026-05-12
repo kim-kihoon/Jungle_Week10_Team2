@@ -10,6 +10,8 @@
 #include <string>
 #include <windows.h>
 
+#include "Component/GizmoComponent.h"
+
 namespace
 {
 int32 GPreviewWorldCounter = 0;
@@ -42,6 +44,15 @@ void FSkeletalMeshPreviewScene::Initialize(UEditorEngine* InEditor)
 	std::string ContextName = "SkeletalMeshViewer_Preview_" + std::to_string(GPreviewWorldCounter++);
 	WorldHandle = FName(ContextName.c_str());
 
+	PreviewInputController.SetPreviewScene(this);
+
+	// Gizmo
+	PreviewGizmo = UObjectManager::Get().CreateObject<UGizmoComponent>();
+	if (PreviewGizmo)
+	{
+		PreviewGizmo->Deactivate();
+	}
+
 	FWorldContext& Context = Editor->CreateWorldContext(EWorldType::ViewerPreview, WorldHandle, ContextName);
 	PreviewWorld = Context.World;
 	PreviewWorld->SetWorldType(EWorldType::ViewerPreview);
@@ -66,6 +77,12 @@ void FSkeletalMeshPreviewScene::Shutdown()
 	{
 		Editor->DestroyWorldContext(WorldHandle);
 
+		if (PreviewGizmo)
+		{
+			UObjectManager::Get().DestroyObject(PreviewGizmo);
+			PreviewGizmo = nullptr;
+		}
+
 		PreviewWorld = nullptr;
 		PreviewActor = nullptr;
 		ViewportClient.SetState(nullptr);
@@ -81,31 +98,40 @@ void FSkeletalMeshPreviewScene::Tick(float DeltaTime)
 		return;
 	}
 
-	const bool bMouseControlDown = FInputRouter::GetKey(VK_RBUTTON) || FInputRouter::GetKey(VK_MBUTTON);
+	bool bGizmoActive = PreviewGizmo && (PreviewGizmo->IsPressedOnHandle() || PreviewGizmo->IsHolding());
+
+	const bool bMouseControlDown = FInputRouter::GetKey(VK_LBUTTON) || FInputRouter::GetKey(VK_RBUTTON) || FInputRouter::GetKey(VK_MBUTTON) || bGizmoActive;
+	const bool bWasPreviewInputCaptured = bPreviewInputCaptured;
+
 	const bool bPreviewCaptureBegin =
 		bPreviewHovered &&
-		(FInputRouter::GetKeyDown(VK_RBUTTON) || FInputRouter::GetKeyDown(VK_MBUTTON));
+		(FInputRouter::GetKeyDown(VK_LBUTTON) || FInputRouter::GetKeyDown(VK_RBUTTON) || FInputRouter::GetKeyDown(VK_MBUTTON));
 
 	if (bPreviewCaptureBegin)
 	{
 		bPreviewInputCaptured = true;
 	}
-	else if (!bMouseControlDown)
-	{
-		bPreviewInputCaptured = false;
-		PreviewInputController.OnRightMouseButtonUp();
-	}
 
 	FInputRouteContext Context;
 	Context.Window = Editor->GetWindow();
 	Context.ViewportRect = PreviewInputRect;
-	Context.bHovered = bPreviewHovered || bPreviewInputCaptured;
+	Context.bHovered = bPreviewHovered || bPreviewInputCaptured || bWasPreviewInputCaptured;
 	Context.bInputActive = true;
 	Context.bControlLocked = false;
 	Context.bHasActiveCamera = true;
 	Context.bIgnoreGuiBlock = true;
 
 	PreviewInputRouter.Tick(DeltaTime, Context);
+
+	if (!bMouseControlDown)
+	{
+		bPreviewInputCaptured = false;
+		if (!FInputRouter::GetKey(VK_RBUTTON))
+		{
+			PreviewInputController.OnRightMouseButtonUp();
+		}
+	}
+
 	ViewportClient.Tick(DeltaTime);
 }
 
@@ -166,6 +192,18 @@ USkeletalMesh* FSkeletalMeshPreviewScene::GetCurrentSkeletalMesh() const
 void FSkeletalMeshPreviewScene::SelectBone(int32 BoneIndex)
 {
 	SelectedBoneIndex = BoneIndex;
+
+	if (PreviewGizmo)
+	{
+		if (BoneIndex >= 0 && GetPreviewMeshComponent())
+		{
+			PreviewGizmo->SetTargetBone(GetPreviewMeshComponent(), BoneIndex);
+		}
+		else
+		{
+			PreviewGizmo->ClearTransformTarget();
+		}
+	}
 }
 
 int32 FSkeletalMeshPreviewScene::GetSelectedBoneIndex() const

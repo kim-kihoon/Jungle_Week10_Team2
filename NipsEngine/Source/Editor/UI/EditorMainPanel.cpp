@@ -206,6 +206,7 @@ void FEditorMainPanel::Render(float DeltaTime)
 void FEditorMainPanel::Update()
 {
 	ImGuiIO& IO = ImGui::GetIO();
+	IO.ConfigWindowsMoveFromTitleBarOnly = true;
 
 	bool bViewportOperationActive = false;
 	if (EditorEngine)
@@ -221,7 +222,11 @@ void FEditorMainPanel::Update()
 		}
 	}
 
-	if (bViewportOperationActive)
+	const bool bPropertyModalBlockingInput = PropertyWidget.IsModalInputBlocking();
+	const bool bSkeletalMeshViewerBlockingInput = SkeletalMeshViewerWidget.IsViewportInputActive();
+	const bool bSkeletalMeshViewerCapturedInput = SkeletalMeshViewerWidget.IsViewportInputCaptured();
+
+	if (bViewportOperationActive || bSkeletalMeshViewerCapturedInput)
 	{
 		IO.ConfigFlags |= ImGuiConfigFlags_NoMouse;
 	}
@@ -230,8 +235,6 @@ void FEditorMainPanel::Update()
 		IO.ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
 	}
 
-	const bool bPropertyModalBlockingInput = PropertyWidget.IsModalInputBlocking();
-	const bool bSkeletalMeshViewerBlockingInput = SkeletalMeshViewerWidget.IsViewportInputActive();
 	FGuiInputState& GuiState = FInputRouter::GetGuiInputState();
 	GuiState.bBlockViewportInput = bPropertyModalBlockingInput || bSkeletalMeshViewerBlockingInput;
 	GuiState.bUsingMouse =

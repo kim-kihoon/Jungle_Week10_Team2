@@ -157,6 +157,19 @@ void FEditorRenderPipeline::RenderSkeletalMeshPreview(FRenderer& Renderer, FSkel
 	Collector.CollectDebugBounds(PreviewScene.GetWorld(), Settings.ShowFlags, SceneView.ViewMode, Bus);
 	Collector.CollectSkeleton(PreviewScene.GetPreviewMeshComponent(), PreviewScene.GetSelectedBoneIndex(), Bus, &Renderer.GetEditorLineBatcher());
 
+	if (UGizmoComponent* Gizmo = PreviewScene.GetPreviewGizmo())
+	{
+		if (Gizmo->HasTarget())
+		{
+			if (SceneView.bOrthographic)
+				Gizmo->ApplyScreenSpaceScalingOrtho(SceneView.CameraOrthoHeight);
+			else
+				Gizmo->ApplyScreenSpaceScaling(SceneView.CameraPosition);
+
+			Collector.CollectGizmo(Gizmo, Settings.ShowFlags, Bus, PreviewScene.IsInputActive());
+		}
+	}
+
 	Renderer.PrepareBatchers(Bus);
 	Renderer.Render(Bus);
 }

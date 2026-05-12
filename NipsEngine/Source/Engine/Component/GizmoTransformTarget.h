@@ -65,7 +65,7 @@ public:
     FTransform GetWorldTransform() const override;
     void SetWorldTransform(const FTransform& NewWorldTransform) override;
 
-    bool SupportsScale() const override { return false; } // Bone 스케일 조작 방지
+    bool SupportsScale() const override { return true; } // Bone 스케일 조작 방지
 
 private:
     USkeletalMeshComponent* MeshComp = nullptr;

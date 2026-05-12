@@ -1,7 +1,9 @@
 ﻿#include "Editor/Input/SkeletalMeshPreviewController.h"
 
+#include "Component/GizmoComponent.h"
 #include "Editor/Viewport/SkeletalMeshPreviewViewportClient.h"
 #include "Engine/Input/InputRouter.h"
+#include "SkeletalMesh/SkeletalMeshPreviewScene.h"
 
 namespace
 {
@@ -110,6 +112,14 @@ void FSkeletalMeshPreviewController::OnKeyDown(int VK)
 		return;
 	}
 
+	if (!bIsRMBDown && PreviewScene && PreviewScene->GetPreviewGizmo())
+	{
+		UGizmoComponent* Gizmo = PreviewScene->GetPreviewGizmo();
+		if (VK == 'W') { Gizmo->SetTranslateMode(); return; }
+		if (VK == 'E') { Gizmo->SetRotateMode(); return; }
+		if (VK == 'R') { Gizmo->SetScaleMode(); return; }
+	}
+
 	switch (VK)
 	{
 	case VK_W: bMoveForward = true; break;
@@ -137,9 +147,95 @@ void FSkeletalMeshPreviewController::OnKeyReleased(int VK)
 }
 
 void FSkeletalMeshPreviewController::OnMouseMove(float DeltaX, float DeltaY) { (void)DeltaX; (void)DeltaY; }
-void FSkeletalMeshPreviewController::OnMouseMoveAbsolute(float X, float Y) { (void)X; (void)Y; }
-void FSkeletalMeshPreviewController::OnLeftMouseClick(float X, float Y) { (void)X; (void)Y; }
-void FSkeletalMeshPreviewController::OnLeftMouseDragEnd(float X, float Y) { (void)X; (void)Y; }
-void FSkeletalMeshPreviewController::OnLeftMouseButtonUp(float X, float Y) { (void)X; (void)Y; }
-void FSkeletalMeshPreviewController::OnLeftMouseDrag(float X, float Y) { (void)X; (void)Y; }
-void FSkeletalMeshPreviewController::OnKeyPressed(int VK) { (void)VK; }
+
+void FSkeletalMeshPreviewController::OnMouseMoveAbsolute(float X, float Y) 
+{ 
+	if (!ViewportClient || !PreviewScene) return;
+
+	UGizmoComponent* GizmoComponent = PreviewScene->GetPreviewGizmo();
+	if (!GizmoComponent || !GizmoComponent->HasTarget()) return;
+
+	if (!bIsRMBDown)
+	{
+	    if (FViewportCamera* Camera = ViewportClient->GetCamera())
+	    {
+			FRay Ray = Camera->DeprojectScreenToWorld(X, Y, ViewportWidth, ViewportHeight);
+			FHitResult HitResult;
+			GizmoComponent->RaycastMesh(Ray, HitResult);
+	    }
+	}
+}
+
+void FSkeletalMeshPreviewController::OnLeftMouseClick(float X, float Y) 
+{ 
+	if (!ViewportClient || !PreviewScene) return;
+
+	UGizmoComponent* Gizmo = PreviewScene->GetPreviewGizmo();
+	if (!Gizmo || !Gizmo->HasTarget()) return;
+
+	if (FViewportCamera* Camera = ViewportClient->GetCamera())
+	{
+		FRay Ray = Camera->DeprojectScreenToWorld(X, Y, ViewportWidth, ViewportHeight);
+		FHitResult HitResult;
+
+		// 기즈모를 맞췄다면 조작 시작
+		if (Gizmo->RaycastMesh(Ray, HitResult))
+		{
+			Gizmo->SetPressedOnHandle(true);
+			return; 
+		}
+		else
+		{
+			Gizmo->SetPressedOnHandle(false);
+		}
+	}
+}
+
+void FSkeletalMeshPreviewController::OnLeftMouseDragEnd(float X, float Y) 
+{ 
+	if (PreviewScene && PreviewScene->GetPreviewGizmo())
+	{
+		PreviewScene->GetPreviewGizmo()->DragEnd();
+	}
+}
+
+void FSkeletalMeshPreviewController::OnLeftMouseButtonUp(float X, float Y) 
+{ 
+	if (PreviewScene && PreviewScene->GetPreviewGizmo())
+	{
+		PreviewScene->GetPreviewGizmo()->SetPressedOnHandle(false);
+	}
+}
+
+void FSkeletalMeshPreviewController::OnLeftMouseDrag(float X, float Y) 
+{ 
+	if (!ViewportClient || !PreviewScene) return;
+
+	UGizmoComponent* Gizmo = PreviewScene->GetPreviewGizmo();
+	if (!Gizmo || !Gizmo->HasTarget()) return;
+
+	if (Gizmo->IsPressedOnHandle() && !Gizmo->IsHolding())
+	{
+		Gizmo->SetHolding(true);
+	}
+
+	if (Gizmo->IsHolding())
+	{
+		if (FViewportCamera* Camera = ViewportClient->GetCamera())
+		{
+			FRay Ray = Camera->DeprojectScreenToWorld(X, Y, ViewportWidth, ViewportHeight);
+			Gizmo->UpdateDrag(Ray);
+		}
+	}
+}
+
+void FSkeletalMeshPreviewController::OnKeyPressed(int VK)
+{
+	if (VK == 0x20 
+		&& !bIsRMBDown
+		&& PreviewScene && PreviewScene->GetPreviewGizmo())
+	{
+		PreviewScene->GetPreviewGizmo()->SetNextMode();
+		return;
+	}
+}
