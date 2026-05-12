@@ -10,6 +10,7 @@
 #include "Component/GizmoComponent.h"
 #include "Core/ResourceManager.h"
 #include "Engine/Viewport/ViewportCamera.h"
+#include "Render/Resource/Texture.h"
 #include "GameFramework/PrimitiveActors.h"
 #include "GameFramework/World.h"
 #include "Serialization/SceneSaveManager.h"
@@ -68,6 +69,56 @@ namespace
 		{ "Gameplay", "Player Start", SpawnEditorActor<APlayerStartActor> },
 	};
 
+	bool RenderToolbarIconButton(const char* Id, UTexture* Texture, const ImVec2& ButtonSize, const ImVec2& IconSize, const ImVec4& IconTint)
+	{
+		if (!Texture || !Texture->GetSRV())
+		{
+			return false;
+		}
+
+		ImGui::InvisibleButton(Id, ButtonSize);
+		const bool bClicked = ImGui::IsItemClicked();
+		const ImVec2 ButtonMin = ImGui::GetItemRectMin();
+		const ImVec2 ButtonMax = ImGui::GetItemRectMax();
+		const ImVec2 ButtonCenter(
+			(ButtonMin.x + ButtonMax.x) * 0.5f,
+			(ButtonMin.y + ButtonMax.y) * 0.5f
+		);
+		const ImVec2 IconMin(
+			ButtonCenter.x - IconSize.x * 0.5f,
+			ButtonCenter.y - IconSize.y * 0.5f
+		);
+		const ImVec2 IconMax(
+			ButtonCenter.x + IconSize.x * 0.5f,
+			ButtonCenter.y + IconSize.y * 0.5f
+		);
+
+		ImVec4 DrawTint = IconTint;
+		if (ImGui::IsItemHovered())
+		{
+			DrawTint.x = (DrawTint.x + 0.12f < 1.0f) ? DrawTint.x + 0.12f : 1.0f;
+			DrawTint.y = (DrawTint.y + 0.12f < 1.0f) ? DrawTint.y + 0.12f : 1.0f;
+			DrawTint.z = (DrawTint.z + 0.12f < 1.0f) ? DrawTint.z + 0.12f : 1.0f;
+		}
+		if (ImGui::IsItemActive())
+		{
+			DrawTint.x *= 0.85f;
+			DrawTint.y *= 0.85f;
+			DrawTint.z *= 0.85f;
+		}
+
+		ImGui::GetWindowDrawList()->AddImage(
+			reinterpret_cast<ImTextureID>(Texture->GetSRV()),
+			IconMin,
+			IconMax,
+			ImVec2(0.0f, 0.0f),
+			ImVec2(1.0f, 1.0f),
+			ImGui::ColorConvertFloat4ToU32(DrawTint)
+		);
+
+		return bClicked;
+	}
+
 	static const char* AddActorCategories[] = {
 		"Basic",
 		"Rendering",
@@ -90,6 +141,16 @@ namespace
 		std::filesystem::create_directories(SceneDir, Ec);
 		return SceneDir.wstring();
 	}
+}
+
+void FEditorToolbarWidget::Initialize(UEditorEngine* InEditorEngine)
+{
+	FEditorWidget::Initialize(InEditorEngine);
+	TranslateIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Translate.png");
+	RotateIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Rotate.png");
+	ScaleIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Scale.png");
+	WorldSpaceIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/WorldSpace.png");
+	LocalSpaceIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/LocalSpace.png");
 }
 
 bool FEditorToolbarWidget::OpenSceneFileDialog(FString& OutFilePath) const
@@ -440,39 +501,58 @@ void FEditorToolbarWidget::RenderGizmoTools()
 		return;
 	}
 
-	constexpr ImVec2 GizmoModeButtonSize(58.0f, 22.0f);
+	constexpr ImVec2 GizmoModeButtonSize(28.0f, 22.0f);
+	constexpr ImVec2 GizmoModeIconSize(18.0f, 18.0f);
+	const ImVec4 ActiveTint(0.149f, 0.733f, 1.0f, 1.0f); // #26bbff
+	const ImVec4 InactiveTint(0.78f, 0.80f, 0.84f, 1.0f);
 
 	UGizmoComponent* Gizmo = EditorEngine->GetGizmo();
-	if (ImGui::Selectable("Move", Gizmo->IsTranslateMode(), 0, GizmoModeButtonSize))
+	const bool bHasTranslateIcon = TranslateIconTexture && TranslateIconTexture->GetSRV();
+	const bool bHasRotateIcon = RotateIconTexture && RotateIconTexture->GetSRV();
+	const bool bHasScaleIcon = ScaleIconTexture && ScaleIconTexture->GetSRV();
+
+	const ImVec4 TranslateTint = Gizmo->IsTranslateMode() ? ActiveTint : InactiveTint;
+	const ImVec4 RotateTint = Gizmo->IsRotateMode() ? ActiveTint : InactiveTint;
+	const ImVec4 ScaleTint = Gizmo->IsScaleMode() ? ActiveTint : InactiveTint;
+
+	const bool bTranslateClicked = bHasTranslateIcon
+		? RenderToolbarIconButton("##GizmoTranslate", TranslateIconTexture, GizmoModeButtonSize, GizmoModeIconSize, TranslateTint)
+		: ImGui::Selectable("Move", Gizmo->IsTranslateMode(), 0, ImVec2(58.0f, 22.0f));
+	if (bTranslateClicked)
 	{
 		Gizmo->SetTranslateMode();
 	}
 	ImGui::SameLine();
-	if (ImGui::Selectable("Rotate", Gizmo->IsRotateMode(), 0, GizmoModeButtonSize))
+	const bool bRotateClicked = bHasRotateIcon
+		? RenderToolbarIconButton("##GizmoRotate", RotateIconTexture, GizmoModeButtonSize, GizmoModeIconSize, RotateTint)
+		: ImGui::Selectable("Rotate", Gizmo->IsRotateMode(), 0, ImVec2(58.0f, 22.0f));
+	if (bRotateClicked)
 	{
 		Gizmo->SetRotateMode();
 	}
 	ImGui::SameLine();
-	if (ImGui::Selectable("Scale", Gizmo->IsScaleMode(), 0, GizmoModeButtonSize))
+	const bool bScaleClicked = bHasScaleIcon
+		? RenderToolbarIconButton("##GizmoScale", ScaleIconTexture, GizmoModeButtonSize, GizmoModeIconSize, ScaleTint)
+		: ImGui::Selectable("Scale", Gizmo->IsScaleMode(), 0, ImVec2(58.0f, 22.0f));
+	if (bScaleClicked)
 	{
 		Gizmo->SetScaleMode();
 	}
 	ImGui::SameLine();
 
-	const char* SpaceLabel = Gizmo->IsWorldSpace() ? "World" : "Local";
-	ImGui::SetNextItemWidth(76.0f);
-	if (ImGui::BeginCombo("##GizmoSpace", SpaceLabel))
+	const bool bWorldSpace = Gizmo->IsWorldSpace();
+	UTexture* CurrentSpaceIconTexture = bWorldSpace ? WorldSpaceIconTexture : LocalSpaceIconTexture;
+	const bool bHasSpaceIcon = CurrentSpaceIconTexture && CurrentSpaceIconTexture->GetSRV();
+	constexpr ImVec2 SpaceButtonSize(28.0f, 22.0f);
+	constexpr ImVec2 SpaceIconSize(18.0f, 18.0f);
+
+	const bool bSpaceClicked = bHasSpaceIcon
+		? RenderToolbarIconButton("##GizmoSpace", CurrentSpaceIconTexture, SpaceButtonSize, SpaceIconSize, InactiveTint)
+		: ImGui::Selectable(bWorldSpace ? "World" : "Local", false, 0, ImVec2(58.0f, 22.0f));
+
+	if (bSpaceClicked)
 	{
-		const bool bWorldSelected = Gizmo->IsWorldSpace();
-		if (ImGui::Selectable("World", bWorldSelected))
-		{
-			Gizmo->SetWorldSpace(true);
-		}
-		if (ImGui::Selectable("Local", !bWorldSelected))
-		{
-			Gizmo->SetWorldSpace(false);
-		}
-		ImGui::EndCombo();
+		Gizmo->SetWorldSpace(!bWorldSpace);
 	}
 }
 

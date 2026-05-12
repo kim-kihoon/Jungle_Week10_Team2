@@ -6,6 +6,7 @@ class FEditorViewportOverlayWidget;
 class FEditorSceneWidget;
 class FEditorPlayStreamWidget;
 class FEditorContentDrawerWidget;
+class UTexture;
 
 class FEditorToolbarWidget : public FEditorWidget
 {
@@ -23,6 +24,7 @@ public:
 		bool* InShowStatProfiler,
 		bool* InShowCameraShake,
 		bool* InShowSkeletalMeshViewer);
+	virtual void Initialize(UEditorEngine* InEditorEngine) override;
 	virtual void Render(float DeltaTime) override;
 	float GetReservedTopHeight() const { return ReservedTopHeight; }
 
@@ -44,6 +46,12 @@ private:
 	FEditorContentDrawerWidget* ContentDrawerWidget = nullptr;
 	int32 SpawnCount = 1;
 	float ReservedTopHeight = 0.0f;
+
+	UTexture* TranslateIconTexture = nullptr;
+	UTexture* RotateIconTexture = nullptr;
+	UTexture* ScaleIconTexture = nullptr;
+	UTexture* WorldSpaceIconTexture = nullptr;
+	UTexture* LocalSpaceIconTexture = nullptr;
 
 	bool* bShowConsole = nullptr;
 	bool* bShowControl = nullptr;
