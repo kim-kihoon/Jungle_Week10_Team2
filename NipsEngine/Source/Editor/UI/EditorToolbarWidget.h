@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Editor/UI/EditorWidget.h"
 
@@ -33,7 +33,7 @@ private:
 	bool SaveSceneFileDialog(FString& OutFilePath) const;
 	void RenderEditorToolBar(float MenuBarHeight, float ToolBarHeight);
 	void RenderFilesMenu();
-	void RenderViewMenu();
+    void RenderWindowMenu();
 	void RenderEditMenu();
 	void RenderHelpMenu();
 	void RenderAddActorMenu(int32 ViewportIndex);

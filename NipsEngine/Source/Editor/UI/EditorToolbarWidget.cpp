@@ -379,7 +379,7 @@ void FEditorToolbarWidget::Render(float DeltaTime)
 	}
 
 	RenderFilesMenu();
-	RenderViewMenu();
+    RenderWindowMenu();
 	RenderEditMenu();
 	RenderHelpMenu();
 
@@ -785,9 +785,9 @@ void FEditorToolbarWidget::RenderFilesMenu()
 	ImGui::EndMenu();
 }
 
-void FEditorToolbarWidget::RenderViewMenu()
+void FEditorToolbarWidget::RenderWindowMenu()
 {
-	if (!ImGui::BeginMenu("View"))
+	if (!ImGui::BeginMenu("Window"))
 	{
 		return;
 	}
