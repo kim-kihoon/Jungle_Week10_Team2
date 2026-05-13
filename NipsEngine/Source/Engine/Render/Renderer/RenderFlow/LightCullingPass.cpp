@@ -294,8 +294,9 @@ bool FLightCullingPass::EnsureComputeShader(ID3D11Device* Device)
 
     TComPtr<ID3DBlob> CSBlob;
     TComPtr<ID3DBlob> ErrorBlob;
+    const std::wstring ShaderPath = FPaths::ToAbsolute(FPaths::ToWide("Shaders/Multipass/LightCullingCS.hlsl"));
     const HRESULT CompileResult = D3DCompileFromFile(
-        FPaths::ToWide("Shaders/Multipass/LightCullingCS.hlsl").c_str(),
+        ShaderPath.c_str(),
         nullptr,
         D3D_COMPILE_STANDARD_FILE_INCLUDE,
         "mainCS",
