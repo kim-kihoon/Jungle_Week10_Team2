@@ -32,10 +32,12 @@ public:
 	bool IsOpen() const { return bOpen; }
 	void ToggleOpen();
 	bool ConsumeOpenRequest();
+	bool ConsumeCompactOpenRequest();
 	bool ShouldRender() const;
 	void CloseImmediately();
 	void OpenFromDrawerTakeover(float InDrawerHeight);
 	float GetReservedBottomHeight() const;
+	void RenderCompactInput(float Width);
 
 	void Clear()
 	{
@@ -67,6 +69,9 @@ private:
 
 	// 백틱(`) 키로 포커스 요청 시 true — 다음 InputText 렌더링 직전에 SetKeyboardFocusHere 호출
 	bool bRequestFocusInput = false;
+	bool bRequestFocusCompactInput = false;
+	bool bCompactInputActive = false;
+	bool bCompactOpenRequested = false;
 
 	//Command Dispatch System
 	using CommandFn = std::function<void(const TArray<FString>& args)>;
@@ -74,6 +79,8 @@ private:
 
 	void RegisterCommand(const FString& Name, CommandFn Fn);
 	void ExecCommand(const char* CommandLine);
+	void SubmitInputBuffer();
+	bool RenderCommandInput(const char* Label, const char* Hint, bool bUseHint);
 	static int32 TextEditCallback(ImGuiInputTextCallbackData* Data);
 	void UpdateCompletionCandidates();
 	TArray<FCompletionCandidate> GetCompletionCandidates(const FString& Input) const;

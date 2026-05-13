@@ -346,15 +346,6 @@ void FEditorToolbarWidget::Render(float DeltaTime)
 	constexpr float EditorToolBarHeight = 40.0f;
 
 	const ImGuiIO& IO = ImGui::GetIO();
-	if (bShowConsole && ImGui::IsKeyPressed(ImGuiKey_GraveAccent, false) && (*bShowConsole || !IO.WantTextInput))
-	{
-		const bool bNextOpen = !*bShowConsole;
-		*bShowConsole = bNextOpen;
-		if (bNextOpen && ContentDrawerWidget)
-		{
-			ContentDrawerWidget->StartConsoleTakeover();
-		}
-	}
 
 	if (!IO.WantTextInput && IO.KeyCtrl)
 	{
