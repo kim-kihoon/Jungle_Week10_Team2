@@ -11,6 +11,8 @@
 
 namespace
 {
+constexpr float BoneTreeIndentSpacing = 12.0f;
+
 const char* GetPreviewViewportTypeName(EEditorViewportType Type)
 {
 	switch (Type)
@@ -315,10 +317,12 @@ void FEditorSkeletalMeshViewerWidget::RenderBoneHierarchyPanel()
 	ImGui::TextDisabled("%d bones", static_cast<int32>(Bones.size()));
 	ImGui::Spacing();
 
+	ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, BoneTreeIndentSpacing);
 	for (int32 RootIndex : RootBones)
 	{
 		RenderBoneTree(RootIndex, Bones);
 	}
+	ImGui::PopStyleVar();
 }
 
 void FEditorSkeletalMeshViewerWidget::RenderBoneTree(int32 BoneIndex, const TArray<FSkeletalBone>& Bones)
