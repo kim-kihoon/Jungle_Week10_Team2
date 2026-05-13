@@ -163,7 +163,7 @@ void FEditorPropertyWidget::Render(float DeltaTime)
 		return;
 
 	ImGui::SetNextWindowSize(ImVec2(350.0f, 500.0f), ImGuiCond_Once);
-	if (!ImGui::Begin("Property Window", &bIsOpen))
+	if (!ImGui::Begin("Details", &bIsOpen))
 	{
 		ImGui::End();
 		return;
@@ -203,14 +203,13 @@ void FEditorPropertyWidget::Render(float DeltaTime)
 	}
 
 	// 컴포넌트 트리 영역
-	SEPARATOR();
 	RenderComponentTree(PrimaryActor);
 	SyncGizmoToSelection(PrimaryActor);
 
 	// 디테일 프로퍼티 영역
-	SEPARATOR();
-	ImGui::Text("Details");
-	ImGui::Separator();
+	//SEPARATOR();
+	//ImGui::Text("Details");
+	//ImGui::Separator();
 
 	float ScrollHeight = std::max(UIConstants::MinScrollHeight, ImGui::GetContentRegionAvail().y);
 	ImGui::BeginChild("##Details", ImVec2(0, ScrollHeight), true, ImGuiWindowFlags_AlwaysVerticalScrollbar);
@@ -367,10 +366,9 @@ void FEditorPropertyWidget::RenderAddComponentPopup(AActor* PrimaryActor)
 // 액터가 가진 모든 컴포넌트의 계층 구조와 목록을 렌더링합니다.
 void FEditorPropertyWidget::RenderComponentTree(AActor* Actor)
 {
-	ImGui::Text("Components");
-	ImGui::Separator();
+	ImGui::Text("Components Tree");
 
-	float TreeHeight = std::max(100.0f, ImGui::GetContentRegionAvail().y * 0.4f);
+	float TreeHeight = std::max(50.0f, ImGui::GetContentRegionAvail().y * 0.2f);
 
 	// BeginChild를 호출하여 내부 스크롤이 가능한 Child Window를 생성합니다.
 	ImGui::BeginChild("##ComponentTreeChild", ImVec2(0, TreeHeight), true, ImGuiWindowFlags_AlwaysVerticalScrollbar);
@@ -682,8 +680,9 @@ void FEditorPropertyWidget::RenderComponentProperties()
 	const bool bIsLuaCameraModifierComponent = SelectedComponent->IsA<ULuaCameraModifierComponent>();
 	const bool bIsAudioComponent = SelectedComponent->IsA<UAudioComponent>();
 	const bool bIsAudioZoneComponent = SelectedComponent->IsA<UAudioZoneComponent>();
-	for (auto& Prop : Props)
+	for (size_t PropIndex = 0; PropIndex < Props.size(); ++PropIndex)
 	{
+		FPropertyDescriptor& Prop = Props[PropIndex];
 		if (bIsLuaScriptComponent && strcmp(Prop.Name, "Script Path") == 0)
 		{
 			continue;
@@ -704,6 +703,17 @@ void FEditorPropertyWidget::RenderComponentProperties()
 		else if (bIsAudioZoneComponent && strcmp(Prop.Name, "Interior LowPass Cutoff") == 0)
 		{
 			ImGui::SeparatorText("Effects");
+		}
+
+		if (strcmp(Prop.Name, "Enable Tick") == 0 &&
+			PropIndex + 1 < Props.size() &&
+			strcmp(Props[PropIndex + 1].Name, "Editor Only") == 0)
+		{
+			bAnyChanged |= RenderPropertyWidget(Prop);
+			ImGui::SameLine();
+			bAnyChanged |= RenderPropertyWidget(Props[PropIndex + 1]);
+			++PropIndex;
+			continue;
 		}
 
 		if (Prop.Type == EPropertyType::SceneComponentRef)

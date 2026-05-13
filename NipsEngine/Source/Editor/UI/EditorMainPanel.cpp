@@ -4,7 +4,11 @@
 
 #include "Editor/EditorEngine.h"
 #include "Editor/Viewport/ViewportLayout.h"
+#include "Engine/Viewport/ViewportCamera.h"
 #include "Engine/Runtime/WindowsWindow.h"
+#include "GameFramework/AActor.h"
+#include "GameFramework/PrimitiveActors.h"
+#include "GameFramework/World.h"
 
 #include "ImGui/imgui.h"
 #include "ImGui/imgui_internal.h"
@@ -14,6 +18,9 @@
 #include "Render/Renderer/Renderer.h"
 #include "Engine/Input/InputRouter.h"
 #include "Game/UI/GameUISystem.h"
+
+#include <algorithm>
+#include <random>
 
 namespace
 {
@@ -188,6 +195,98 @@ const char* GetViewportSlotName(int32 Index)
 		return "Viewport";
 	}
 }
+
+enum class EDebugPlaceActorType : uint8
+{
+	Scene,
+	StaticMesh,
+	SkeletalMesh,
+	Decal,
+	HeightFog,
+	AmbientLight,
+	DirectionalLight,
+	PointLight,
+	SpotLight,
+	Pawn,
+	PlayerStart
+};
+
+struct FDebugPlaceActorOption
+{
+	const char* Label = "";
+	EDebugPlaceActorType Type = EDebugPlaceActorType::StaticMesh;
+};
+
+const FDebugPlaceActorOption GDebugPlaceActorOptions[] = {
+	{ "Scene", EDebugPlaceActorType::Scene },
+	{ "StaticMesh", EDebugPlaceActorType::StaticMesh },
+	{ "SkeletalMesh", EDebugPlaceActorType::SkeletalMesh },
+	{ "Decal", EDebugPlaceActorType::Decal },
+	{ "Height Fog", EDebugPlaceActorType::HeightFog },
+	{ "Ambient Light", EDebugPlaceActorType::AmbientLight },
+	{ "Directional Light", EDebugPlaceActorType::DirectionalLight },
+	{ "Point Light", EDebugPlaceActorType::PointLight },
+	{ "Spot Light", EDebugPlaceActorType::SpotLight },
+	{ "Pawn", EDebugPlaceActorType::Pawn },
+	{ "Player Start", EDebugPlaceActorType::PlayerStart },
+};
+
+template <typename T>
+AActor* SpawnDebugActor(UWorld* World, const FVector& Location)
+{
+	if (!World)
+	{
+		return nullptr;
+	}
+
+	T* Actor = World->SpawnActor<T>();
+	if (!Actor)
+	{
+		return nullptr;
+	}
+
+	Actor->InitDefaultComponents();
+	Actor->SetActorLocation(Location);
+	return Actor;
+}
+
+AActor* SpawnDebugPlaceActor(UWorld* World, EDebugPlaceActorType Type, const FVector& Location)
+{
+	switch (Type)
+	{
+	case EDebugPlaceActorType::Scene:
+		return SpawnDebugActor<ASceneActor>(World, Location);
+	case EDebugPlaceActorType::StaticMesh:
+		return SpawnDebugActor<AStaticMeshActor>(World, Location);
+	case EDebugPlaceActorType::SkeletalMesh:
+		return SpawnDebugActor<ASkeletalMeshActor>(World, Location);
+	case EDebugPlaceActorType::Decal:
+		return SpawnDebugActor<ADecalActor>(World, Location + FVector(0.0f, 0.0f, 1.0f));
+	case EDebugPlaceActorType::HeightFog:
+		return SpawnDebugActor<AHeightFogActor>(World, Location + FVector(0.0f, 0.0f, 1.0f));
+	case EDebugPlaceActorType::AmbientLight:
+		return SpawnDebugActor<AAmbientLightActor>(World, Location + FVector(0.0f, 0.0f, 1.0f));
+	case EDebugPlaceActorType::DirectionalLight:
+	{
+		AActor* Actor = SpawnDebugActor<ADirectionalLightActor>(World, Location + FVector(0.0f, 0.0f, 1.0f));
+		if (Actor)
+		{
+			Actor->SetActorRotation(FVector(0.0f, 45.0f, -45.0f));
+		}
+		return Actor;
+	}
+	case EDebugPlaceActorType::PointLight:
+		return SpawnDebugActor<APointLightActor>(World, Location + FVector(0.0f, 0.0f, 1.0f));
+	case EDebugPlaceActorType::SpotLight:
+		return SpawnDebugActor<ASpotLightActor>(World, Location + FVector(0.0f, 0.0f, 1.0f));
+	case EDebugPlaceActorType::Pawn:
+		return SpawnDebugActor<APawnActor>(World, Location);
+	case EDebugPlaceActorType::PlayerStart:
+		return SpawnDebugActor<APlayerStartActor>(World, Location);
+	default:
+		return nullptr;
+	}
+}
 } // namespace
 void FEditorMainPanel::Create(FWindowsWindow* InWindow, FRenderer& InRenderer, UEditorEngine* InEditorEngine)
 {
@@ -252,7 +351,7 @@ void FEditorMainPanel::Create(FWindowsWindow* InWindow, FRenderer& InRenderer, U
 	ToolbarWidget.SetPlayStreamWidget(&PlayStreamWidget);
 	ToolbarWidget.SetContentDrawerWidget(&ContentDrawerWidget);
 	ToolbarWidget.SetPanelVisibilityRefs(&bShowConsole, &bShowControl, &bShowProperty, &bShowSceneManager, 
-		&bShowMaterialEditor, &bShowStatProfiler, &bShowCameraShake, nullptr);
+		&bShowMaterialEditor, &bShowStatProfiler, &bShowCameraShake, nullptr, &bShowEditorDebug);
 }
 
 void FEditorMainPanel::Release()
@@ -268,6 +367,7 @@ void FEditorMainPanel::Render(float DeltaTime)
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
 
+	ProcessPendingDebugActions();
 	ToolbarWidget.Render(DeltaTime);
 
 	const ImGuiID DockspaceId = ImGui::GetID("EditorDockSpaceV3");
@@ -340,6 +440,7 @@ void FEditorMainPanel::Render(float DeltaTime)
 		CameraShakeWidget.Render(DeltaTime);
 		bShowCameraShake = CameraShakeWidget.IsOpen();
 	}
+	RenderEditorDebugPanel();
 	FEditorSkeletalMeshViewerWidget* FocusedViewerThisFrame = nullptr;
 	bool bFocusedViewerStillOpen = false;
 	for (auto It = SkeletalMeshViewers.begin(); It != SkeletalMeshViewers.end(); )
@@ -397,6 +498,236 @@ void FEditorMainPanel::Render(float DeltaTime)
 
 	ImGui::Render();
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+}
+
+void FEditorMainPanel::RenderEditorDebugPanel()
+{
+	if (!bShowEditorDebug || !EditorEngine)
+	{
+		return;
+	}
+
+	ImGui::SetNextWindowSize(ImVec2(520.0f, 320.0f), ImGuiCond_FirstUseEver);
+	if (!ImGui::Begin("Editor Debug", &bShowEditorDebug))
+	{
+		ImGui::End();
+		return;
+	}
+
+	if (ImGui::CollapsingHeader("Place Actors (Grid)", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		const int32 OptionCount = static_cast<int32>(sizeof(GDebugPlaceActorOptions) / sizeof(GDebugPlaceActorOptions[0]));
+		if (DebugPlaceActorTypeIndex < 0)
+		{
+			DebugPlaceActorTypeIndex = 0;
+		}
+		if (DebugPlaceActorTypeIndex >= OptionCount)
+		{
+			DebugPlaceActorTypeIndex = OptionCount - 1;
+		}
+
+		const char* CurrentActorLabel = GDebugPlaceActorOptions[DebugPlaceActorTypeIndex].Label;
+		if (ImGui::BeginCombo("Actor Type", CurrentActorLabel))
+		{
+			for (int32 Index = 0; Index < OptionCount; ++Index)
+			{
+				const bool bSelected = (DebugPlaceActorTypeIndex == Index);
+				if (ImGui::Selectable(GDebugPlaceActorOptions[Index].Label, bSelected))
+				{
+					DebugPlaceActorTypeIndex = Index;
+				}
+				if (bSelected)
+				{
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		}
+
+		ImGui::DragInt("Rows", &DebugGridRows, 1.0f, 1, 1024, "%d");
+		ImGui::DragInt("Cols", &DebugGridCols, 1.0f, 1, 1024, "%d");
+		ImGui::DragInt("Layers", &DebugGridLayers, 1.0f, 1, 256, "%d");
+		ImGui::DragFloat("Grid Spacing", &DebugGridSpacing, 0.1f, 0.1f, 1000.0f, "%.2f");
+		ImGui::Checkbox("Center Grid Around Origin", &bDebugGridCenter);
+
+		ImGui::Separator();
+		ImGui::Checkbox("Use Camera Forward Origin", &bDebugUseCameraOrigin);
+		if (bDebugUseCameraOrigin)
+		{
+			ImGui::DragFloat("Camera Forward Distance", &DebugCameraForwardDistance, 0.5f, 0.0f, 100000.0f, "%.1f");
+		}
+		else
+		{
+			ImGui::DragFloat3("Manual Origin", &DebugManualGridOrigin.X, 0.1f, -100000.0f, 100000.0f, "%.2f");
+		}
+
+		ImGui::Separator();
+		ImGui::Checkbox("Random Yaw", &bDebugRandomYaw);
+		ImGui::BeginDisabled(!bDebugRandomYaw);
+		ImGui::DragFloat("Yaw Range (+/-)", &DebugRandomYawRange, 1.0f, 0.0f, 180.0f, "%.1f");
+		ImGui::EndDisabled();
+
+		ImGui::Checkbox("Apply Position Jitter", &bDebugApplyJitter);
+		ImGui::BeginDisabled(!bDebugApplyJitter);
+		ImGui::DragFloat("Jitter XY", &DebugJitterXY, 0.05f, 0.0f, 1000.0f, "%.2f");
+		ImGui::DragFloat("Jitter Z", &DebugJitterZ, 0.05f, 0.0f, 1000.0f, "%.2f");
+		ImGui::EndDisabled();
+
+		if (DebugGridRows < 1) DebugGridRows = 1;
+		if (DebugGridCols < 1) DebugGridCols = 1;
+		if (DebugGridLayers < 1) DebugGridLayers = 1;
+		if (DebugGridSpacing < 0.1f) DebugGridSpacing = 0.1f;
+		if (DebugRandomYawRange < 0.0f) DebugRandomYawRange = 0.0f;
+		if (DebugRandomYawRange > 180.0f) DebugRandomYawRange = 180.0f;
+		if (DebugJitterXY < 0.0f) DebugJitterXY = 0.0f;
+		if (DebugJitterZ < 0.0f) DebugJitterZ = 0.0f;
+
+		const long long TotalSpawnCount =
+			static_cast<long long>(DebugGridRows) *
+			static_cast<long long>(DebugGridCols) *
+			static_cast<long long>(DebugGridLayers);
+		ImGui::Text("Total Actors: %lld", TotalSpawnCount);
+		ImGui::Text("Last Batch: %u", static_cast<uint32>(DebugLastSpawnedActors.size()));
+
+		if (ImGui::Button("Spawn Grid Actors"))
+		{
+			UWorld* World = EditorEngine->GetFocusedWorld();
+			if (!World)
+			{
+				FEditorConsoleWidget::AddLog("Grid spawn failed: invalid world\n");
+			}
+			else
+			{
+				FVector GridOrigin = DebugManualGridOrigin;
+				FVector GridRight(1.0f, 0.0f, 0.0f);
+				FVector GridForward(0.0f, 1.0f, 0.0f);
+				if (bDebugUseCameraOrigin)
+				{
+					FEditorViewportLayout& Layout = EditorEngine->GetViewportLayout();
+					FEditorViewportClient* ActiveViewport = Layout.GetViewportClient(Layout.GetLastFocusedViewportIndex());
+					if (ActiveViewport)
+					{
+						if (FViewportCamera* ActiveCamera = ActiveViewport->GetCamera())
+						{
+							FVector CameraForward = ActiveCamera->GetEffectiveForward();
+							CameraForward.Z = 0.0f;
+							if (!CameraForward.IsNearlyZero())
+							{
+								CameraForward.Normalize();
+								GridForward = CameraForward;
+								GridRight = FVector(-CameraForward.Y, CameraForward.X, 0.0f);
+							}
+
+							FVector SpawnForward = ActiveCamera->GetEffectiveForward();
+							if (SpawnForward.IsNearlyZero())
+							{
+								SpawnForward = ActiveCamera->GetForwardVector();
+							}
+							SpawnForward.NormalizeSafe();
+							GridOrigin = ActiveCamera->GetLocation() + SpawnForward * DebugCameraForwardDistance;
+						}
+					}
+				}
+
+				const float RowOffset = bDebugGridCenter ? (static_cast<float>(DebugGridRows - 1) * 0.5f) : 0.0f;
+				const float ColOffset = bDebugGridCenter ? (static_cast<float>(DebugGridCols - 1) * 0.5f) : 0.0f;
+				const float LayerOffset = bDebugGridCenter ? (static_cast<float>(DebugGridLayers - 1) * 0.5f) : 0.0f;
+
+				std::mt19937 RNG{ std::random_device{}() };
+				std::uniform_real_distribution<float> YawDist(-DebugRandomYawRange, DebugRandomYawRange);
+				std::uniform_real_distribution<float> JitterXYDist(-DebugJitterXY, DebugJitterXY);
+				std::uniform_real_distribution<float> JitterZDist(-DebugJitterZ, DebugJitterZ);
+
+				std::vector<AActor*> SpawnedActors;
+				SpawnedActors.reserve(static_cast<size_t>(TotalSpawnCount));
+				int32 SpawnedCount = 0;
+				const FDebugPlaceActorOption& Option = GDebugPlaceActorOptions[DebugPlaceActorTypeIndex];
+				FSelectionManager& SelectionManager = EditorEngine->GetSelectionManager();
+
+				for (int32 Layer = 0; Layer < DebugGridLayers; ++Layer)
+				{
+					for (int32 Row = 0; Row < DebugGridRows; ++Row)
+					{
+						for (int32 Col = 0; Col < DebugGridCols; ++Col)
+						{
+							FVector SpawnLocation = GridOrigin
+								+ GridRight * ((static_cast<float>(Col) - ColOffset) * DebugGridSpacing)
+								+ GridForward * ((static_cast<float>(Row) - RowOffset) * DebugGridSpacing)
+								+ FVector(0.0f, 0.0f, (static_cast<float>(Layer) - LayerOffset) * DebugGridSpacing);
+
+							if (bDebugApplyJitter)
+							{
+								SpawnLocation += GridRight * JitterXYDist(RNG)
+									+ GridForward * JitterXYDist(RNG)
+									+ FVector(0.0f, 0.0f, JitterZDist(RNG));
+							}
+
+							AActor* SpawnedActor = SpawnDebugPlaceActor(World, Option.Type, SpawnLocation);
+							if (!SpawnedActor)
+							{
+								continue;
+							}
+
+							if (bDebugRandomYaw)
+							{
+								SpawnedActor->SetActorRotation(FVector(0.0f, YawDist(RNG), 0.0f));
+							}
+
+							SelectionManager.Select(SpawnedActor);
+							SpawnedActors.push_back(SpawnedActor);
+							++SpawnedCount;
+						}
+					}
+				}
+
+				World->SyncSpatialIndex();
+				DebugLastSpawnedActors = std::move(SpawnedActors);
+				FEditorConsoleWidget::AddLog("Grid placed: %d actors\n", SpawnedCount);
+			}
+		}
+
+		ImGui::SameLine();
+		if (ImGui::Button("Clear Last Batch"))
+		{
+			bPendingClearLastBatch = true;
+		}
+	}
+
+	ImGui::End();
+}
+
+void FEditorMainPanel::ProcessPendingDebugActions()
+{
+	if (!bPendingClearLastBatch || !EditorEngine)
+	{
+		return;
+	}
+	bPendingClearLastBatch = false;
+
+	UWorld* World = EditorEngine->GetFocusedWorld();
+	int32 DestroyedCount = 0;
+	if (!World)
+	{
+		DebugLastSpawnedActors.clear();
+		FEditorConsoleWidget::AddLog("Grid cleared: 0 actors\n");
+		return;
+	}
+
+	EditorEngine->GetSelectionManager().ClearSelection();
+	for (AActor* Actor : DebugLastSpawnedActors)
+	{
+		if (!Actor || Actor->GetFocusedWorld() != World)
+		{
+			continue;
+		}
+
+		World->DestroyActor(Actor);
+		++DestroyedCount;
+	}
+
+	DebugLastSpawnedActors.clear();
+	World->SyncSpatialIndex();
+	FEditorConsoleWidget::AddLog("Grid cleared: %d actors\n", DestroyedCount);
 }
 
 void FEditorMainPanel::Update()
@@ -517,9 +848,9 @@ void FEditorMainPanel::EnsureDefaultDockLayout(ImGuiID DockspaceId)
 	ImGui::DockBuilderSplitNode(RightNode, ImGuiDir_Up, 0.22f, &RightTopNode, &RightBottomNode);
 
 	ImGui::DockBuilderDockWindow("Viewport", MainNode);
-	ImGui::DockBuilderDockWindow("Scene Manager", RightTopNode);
+	ImGui::DockBuilderDockWindow("Outliner", RightTopNode);
 	ImGui::DockBuilderDockWindow("Stat Profiler", RightTopNode);
-	ImGui::DockBuilderDockWindow("Property Window", RightBottomNode);
+	ImGui::DockBuilderDockWindow("Details", RightBottomNode);
 	ImGui::DockBuilderDockWindow("Material Editor", RightBottomNode);
 	ImGui::DockBuilderDockWindow("ObjViewer Panel", RightBottomNode);
 	ImGui::DockBuilderDockWindow("SkeletalMesh Viewer", RightBottomNode);

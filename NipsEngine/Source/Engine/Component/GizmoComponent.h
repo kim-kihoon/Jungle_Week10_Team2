@@ -30,6 +30,11 @@ private:
 	int32 TrackingBoneIndex = -1;
 	EGizmoMode CurMode = EGizmoMode::Translate;
 	FVector LastIntersectionLocation;
+	FVector DragPlaneOrigin;
+	FVector DragStartIntersectionLocation;
+	FVector DragAxisVector;
+	FVector DragProjectDir;
+	FTransform DragStartWorldTransform = FTransform::Identity;
 	const float AxisLength = 1.0f;
 	float Radius = 0.1f;
 	const float ScaleSensitivity = 1.0f;
@@ -61,6 +66,10 @@ private:
 	FVector GetTargetLocation() const;
 	FVector GetTargetRotation() const;
 
+	bool BeginLinearDrag(const FRay& Ray);
+	bool GetLinearDragIntersection(const FRay& Ray, FVector& OutIntersection) const;
+	float ApplySnapToTotalDrag(float DragAmount) const;
+	void ApplyLinearDragFromStart(float DragAmount);
 	void UpdateLinearDrag(const FRay& Ray);
 	void UpdateAngularDrag(const FRay& Ray);
 

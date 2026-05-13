@@ -55,12 +55,32 @@ namespace
 
 		return bClicked;
 	}
+
+	void ShowLastItemTooltip(const char* Title, const char* Description)
+	{
+		if (!Title || !ImGui::IsItemHovered())
+		{
+			return;
+		}
+
+		ImGui::BeginTooltip();
+		ImGui::TextUnformatted(Title);
+		if (Description && Description[0] != '\0')
+		{
+			ImGui::Separator();
+			ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);
+			ImGui::TextUnformatted(Description);
+			ImGui::PopTextWrapPos();
+		}
+		ImGui::EndTooltip();
+	}
 }
 
 void FEditorPlayStreamWidget::Initialize(UEditorEngine* InEditorEngine)
 {
 	FEditorWidget::Initialize(InEditorEngine);
 	PlayIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Play.png");
+	PauseIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Pause.png");
 	StopIconTexture = FResourceManager::Get().LoadTexture("Asset/Editor/ToolIcons/Stop.png");
 }
 
@@ -81,11 +101,12 @@ void FEditorPlayStreamWidget::Render(float DeltaTime)
 	const char* CurrentPlayPauseLabel = bIsPlaying ? PauseLabel : (bIsPaused ? ResumeLabel : PlayLabel);
 
 	ImVec2 IconSize(24.0f, 24.0f);
-	const bool bHasPlayIcon = PlayIconTexture && PlayIconTexture->GetSRV();
+	UTexture* CurrentPlayPauseIconTexture = bIsPlaying ? PauseIconTexture : PlayIconTexture;
+	const bool bHasPlayPauseIcon = CurrentPlayPauseIconTexture && CurrentPlayPauseIconTexture->GetSRV();
 	const bool bHasStopIcon = StopIconTexture && StopIconTexture->GetSRV();
 	const ImVec2 IconButtonSize = ImVec2(34.0f, 27.0f);
 	const ImVec2 TextButtonSize = ImVec2(86.0f, 27.0f);
-	ImVec2 PlayBtnSize = bHasPlayIcon ? IconButtonSize : TextButtonSize;
+	ImVec2 PlayBtnSize = bHasPlayPauseIcon ? IconButtonSize : TextButtonSize;
 	ImVec2 StopBtnSize = bHasStopIcon ? IconButtonSize : TextButtonSize;
 
 	float Spacing = ImGui::GetStyle().ItemSpacing.x;
@@ -105,9 +126,10 @@ void FEditorPlayStreamWidget::Render(float DeltaTime)
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.830f, 0.830f, 0.830f, 1.0f));
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.620f, 0.620f, 0.620f, 1.0f));
 		
-		bool bPlayPauseClicked = bHasPlayIcon
-			? RenderIconButton("PlayPauseBtn", PlayIconTexture, PlayBtnSize, IconSize, IconTint)
+		bool bPlayPauseClicked = bHasPlayPauseIcon
+			? RenderIconButton("PlayPauseBtn", CurrentPlayPauseIconTexture, PlayBtnSize, IconSize, IconTint)
 			: ImGui::Button(CurrentPlayPauseLabel, PlayBtnSize);
+		ShowLastItemTooltip("Pause", "Pause the current play session and keep the simulation state.");
 
 		if (bPlayPauseClicked)
 		{
@@ -123,9 +145,12 @@ void FEditorPlayStreamWidget::Render(float DeltaTime)
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.620f, 0.820f, 0.365f, 1.0f));
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.420f, 0.620f, 0.220f, 1.0f));
 		
-		bool bPlayPauseClicked = bHasPlayIcon
-			? RenderIconButton("PlayPauseBtn", PlayIconTexture, PlayBtnSize, IconSize, IconTint)
+		bool bPlayPauseClicked = bHasPlayPauseIcon
+			? RenderIconButton("PlayPauseBtn", CurrentPlayPauseIconTexture, PlayBtnSize, IconSize, IconTint)
 			: ImGui::Button(CurrentPlayPauseLabel, PlayBtnSize);
+		ShowLastItemTooltip(
+			bIsPaused ? "Resume" : "Play",
+			bIsPaused ? "Resume the paused play session." : "Start playing the focused viewport scene.");
 
 		if (bPlayPauseClicked)
 		{
@@ -139,14 +164,17 @@ void FEditorPlayStreamWidget::Render(float DeltaTime)
 	// --- 2번 버튼 (Stop) ---
 	if (bIsEditing) ImGui::BeginDisabled();
 	
-	const ImVec4 StopIconTint(1.0f, 0.251f, 0.251f, 1.0f);       // #ff4040
+	const ImVec4 StopIconTint = bIsEditing
+		? ImVec4(0.86f, 0.86f, 0.86f, 1.0f)
+		: ImVec4(1.0f, 0.251f, 0.251f, 1.0f);       // #ff4040
 	ImGui::PushStyleColor(ImGuiCol_Button, StopIconTint);
-	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.333f, 0.333f, 1.0f));
-	ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.82f, 0.18f, 0.18f, 1.0f));
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, bIsEditing ? ImVec4(0.92f, 0.92f, 0.92f, 1.0f) : ImVec4(1.0f, 0.333f, 0.333f, 1.0f));
+	ImGui::PushStyleColor(ImGuiCol_ButtonActive, bIsEditing ? ImVec4(0.72f, 0.72f, 0.72f, 1.0f) : ImVec4(0.82f, 0.18f, 0.18f, 1.0f));
 	
 	bool bStopClicked = bHasStopIcon
 		? RenderIconButton("StopBtn", StopIconTexture, StopBtnSize, IconSize, StopIconTint)
 		: ImGui::Button(StopLabel, StopBtnSize);
+	ShowLastItemTooltip("Stop", "Stop the current play session and return to editing.");
 
 	if (bStopClicked)
 	{

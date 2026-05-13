@@ -1,4 +1,4 @@
-#include "Editor/UI/EditorToolbarWidget.h"
+﻿#include "Editor/UI/EditorToolbarWidget.h"
 
 #include "Editor/UI/EditorContentDrawerWidget.h"
 #include "Editor/UI/EditorSceneWidget.h"
@@ -121,17 +121,36 @@ namespace
 		return bClicked;
 	}
 
-	void ShowLastItemTooltip(const char* Text)
+	void ShowLastItemTooltip(const char* Title, const char* Description = nullptr)
 	{
-		if (Text && ImGui::IsItemHovered())
+		if (!Title || !ImGui::IsItemHovered())
 		{
-			ImGui::SetTooltip("%s", Text);
+			return;
 		}
+
+		ImGui::BeginTooltip();
+		ImGui::TextUnformatted(Title);
+		if (Description && Description[0] != '\0')
+		{
+			ImGui::Separator();
+			ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);
+			ImGui::TextUnformatted(Description);
+			ImGui::PopTextWrapPos();
+		}
+		ImGui::EndTooltip();
 	}
 
-	bool DrawSnapPopup(const char* PopupId, const float* Values, int32 ValueCount, float CurrentValue, bool bEnabled, bool bDegrees, bool& bOutEnabled, float& OutValue)
+	ImVec2 GetLastItemPopupPos()
+	{
+		const ImVec2 ItemMin = ImGui::GetItemRectMin();
+		const ImVec2 ItemMax = ImGui::GetItemRectMax();
+		return ImVec2(ItemMin.x, ItemMax.y + ImGui::GetStyle().ItemSpacing.y);
+	}
+
+	bool DrawSnapPopup(const char* PopupId, const ImVec2& PopupPos, const float* Values, int32 ValueCount, float CurrentValue, bool bEnabled, bool bDegrees, bool& bOutEnabled, float& OutValue)
 	{
 		bool bChanged = false;
+		ImGui::SetNextWindowPos(PopupPos, ImGuiCond_Always);
 		if (!ImGui::BeginPopup(PopupId))
 		{
 			return false;
@@ -307,7 +326,8 @@ void FEditorToolbarWidget::SetPanelVisibilityRefs(
 	bool* InShowMaterialEditor,
 	bool* InShowStatProfiler,
 	bool* InShowCameraShake,
-	bool* InShowSkeletalMeshViewer)
+	bool* InShowSkeletalMeshViewer,
+	bool* InShowEditorDebug)
 {
 	bShowConsole = InShowConsole;
 	bShowControl = InShowControl;
@@ -317,6 +337,7 @@ void FEditorToolbarWidget::SetPanelVisibilityRefs(
 	bShowStatProfiler = InShowStatProfiler;
 	bShowCameraShake = InShowCameraShake;
 	bShowSkeletalMeshViewer = InShowSkeletalMeshViewer;
+	bShowEditorDebug = InShowEditorDebug;
 }
 
 void FEditorToolbarWidget::Render(float DeltaTime)
@@ -379,7 +400,7 @@ void FEditorToolbarWidget::Render(float DeltaTime)
 	}
 
 	RenderFilesMenu();
-	RenderViewMenu();
+    RenderWindowMenu();
 	RenderEditMenu();
 	RenderHelpMenu();
 
@@ -438,7 +459,8 @@ void FEditorToolbarWidget::RenderEditorToolBar(float MenuBarHeight, float ToolBa
 		const bool bShowSettingsClicked = ShowFlagIconTexture && ShowFlagIconTexture->GetSRV()
 			? RenderToolbarIconButton("##ShowSettings", ShowFlagIconTexture, SettingsButtonSize, SettingsIconSize, SettingsIconTint)
 			: ImGui::Button("Show", ImVec2(58.0f, 22.0f));
-		ShowLastItemTooltip("Show settings");
+		const ImVec2 ShowSettingsPopupPos = GetLastItemPopupPos();
+		ShowLastItemTooltip("Show settings", "Open viewport visibility and overlay display options.");
 		if (bShowSettingsClicked)
 		{
 			ImGui::OpenPopup("ShowSettingsPopup");
@@ -448,12 +470,14 @@ void FEditorToolbarWidget::RenderEditorToolBar(float MenuBarHeight, float ToolBa
 		const bool bCameraSettingsClicked = CameraIconTexture && CameraIconTexture->GetSRV()
 			? RenderToolbarIconButton("##CameraSettings", CameraIconTexture, SettingsButtonSize, SettingsIconSize, SettingsIconTint)
 			: ImGui::Button("Camera", ImVec2(68.0f, 22.0f));
-		ShowLastItemTooltip("Camera settings");
+		const ImVec2 CameraSettingsPopupPos = GetLastItemPopupPos();
+		ShowLastItemTooltip("Camera settings", "Open camera movement and viewport camera options.");
 		if (bCameraSettingsClicked)
 		{
 			ImGui::OpenPopup("CameraSettingsPopup");
 		}
 
+		ImGui::SetNextWindowPos(ShowSettingsPopupPos, ImGuiCond_Always);
 		ImGui::SetNextWindowSize(ImVec2(360.0f, 430.0f), ImGuiCond_Appearing);
 		if (ImGui::BeginPopup("ShowSettingsPopup"))
 		{
@@ -468,6 +492,7 @@ void FEditorToolbarWidget::RenderEditorToolBar(float MenuBarHeight, float ToolBa
 			ImGui::EndPopup();
 		}
 
+		ImGui::SetNextWindowPos(CameraSettingsPopupPos, ImGuiCond_Always);
 		ImGui::SetNextWindowSize(ImVec2(360.0f, 240.0f), ImGuiCond_Appearing);
 		if (ImGui::BeginPopup("CameraSettingsPopup"))
 		{
@@ -504,17 +529,17 @@ void FEditorToolbarWidget::RenderAddActorMenu(int32 ViewportIndex)
 	{
 		ImGui::OpenPopup("AddActorMenu");
 	}
+	const ImVec2 AddActorPopupPos = GetLastItemPopupPos();
+	ShowLastItemTooltip("Add actor", "Open the actor creation menu for the focused viewport.");
 	ImGui::SameLine();
 	ImGui::SetNextItemWidth(CountWidth);
 	if (ImGui::DragInt("##SpawnCount", &SpawnCount, 0.1f, 1, 100))
 	{
 		SpawnCount = std::clamp(SpawnCount, 1, 100);
 	}
-	if (ImGui::IsItemHovered())
-	{
-		ImGui::SetTooltip("Spawn count");
-	}
+	ShowLastItemTooltip("Spawn count", "Set how many actors to create from the Add menu.");
 
+	ImGui::SetNextWindowPos(AddActorPopupPos, ImGuiCond_Always);
 	if (!ImGui::BeginPopup("AddActorMenu"))
 	{
 		ImGui::PopID();
@@ -595,7 +620,7 @@ void FEditorToolbarWidget::RenderGizmoTools()
 	const bool bTranslateClicked = bHasTranslateIcon
 		? RenderToolbarIconButton("##GizmoTranslate", TranslateIconTexture, GizmoModeButtonSize, GizmoModeIconSize, TranslateTint)
 		: ImGui::Selectable("Move", Gizmo->IsTranslateMode(), 0, ImVec2(58.0f, 22.0f));
-	ShowLastItemTooltip("Location");
+	ShowLastItemTooltip("Location", "Move the selected actor, component, or bone with the translate gizmo.");
 	if (bTranslateClicked)
 	{
 		Gizmo->SetTranslateMode();
@@ -604,7 +629,7 @@ void FEditorToolbarWidget::RenderGizmoTools()
 	const bool bRotateClicked = bHasRotateIcon
 		? RenderToolbarIconButton("##GizmoRotate", RotateIconTexture, GizmoModeButtonSize, GizmoModeIconSize, RotateTint)
 		: ImGui::Selectable("Rotate", Gizmo->IsRotateMode(), 0, ImVec2(58.0f, 22.0f));
-	ShowLastItemTooltip("Rotation");
+	ShowLastItemTooltip("Rotation", "Rotate the selected actor, component, or bone with the rotate gizmo.");
 	if (bRotateClicked)
 	{
 		Gizmo->SetRotateMode();
@@ -613,12 +638,14 @@ void FEditorToolbarWidget::RenderGizmoTools()
 	const bool bScaleClicked = bHasScaleIcon
 		? RenderToolbarIconButton("##GizmoScale", ScaleIconTexture, GizmoModeButtonSize, GizmoModeIconSize, ScaleTint)
 		: ImGui::Selectable("Scale", Gizmo->IsScaleMode(), 0, ImVec2(58.0f, 22.0f));
-	ShowLastItemTooltip("Scale");
+	ShowLastItemTooltip("Scale", "Scale the selected actor, component, or bone with the scale gizmo.");
 	if (bScaleClicked)
 	{
 		Gizmo->SetScaleMode();
 	}
 	ImGui::SameLine();
+    ImGui::TextDisabled("|");
+    ImGui::SameLine();
 
 	const bool bWorldSpace = Gizmo->IsWorldSpace();
 	UTexture* CurrentSpaceIconTexture = bWorldSpace ? WorldSpaceIconTexture : LocalSpaceIconTexture;
@@ -629,14 +656,17 @@ void FEditorToolbarWidget::RenderGizmoTools()
 	const bool bSpaceClicked = bHasSpaceIcon
 		? RenderToolbarIconButton("##GizmoSpace", CurrentSpaceIconTexture, SpaceButtonSize, SpaceIconSize, InactiveTint)
 		: ImGui::Selectable(bWorldSpace ? "World" : "Local", false, 0, ImVec2(58.0f, 22.0f));
-	ShowLastItemTooltip(bWorldSpace ? "World space" : "Local space");
+	ShowLastItemTooltip(
+		bWorldSpace ? "World space" : "Local space",
+		bWorldSpace ? "Use world axes for gizmo movement and rotation." : "Use the selected object's local axes for gizmo movement and rotation.");
 
 	if (bSpaceClicked)
 	{
 		Gizmo->SetWorldSpace(!bWorldSpace);
 	}
 	ImGui::SameLine();
-
+    ImGui::TextDisabled("|");
+    ImGui::SameLine();
 	constexpr ImVec2 SnapButtonSize(28.0f, 22.0f);
 	constexpr ImVec2 SnapIconSize(18.0f, 18.0f);
 	constexpr float DegToRad = 0.017453292519943295f;
@@ -652,14 +682,15 @@ void FEditorToolbarWidget::RenderGizmoTools()
 	const bool bTranslateSnapClicked = bHasTranslateSnapIcon
 		? RenderToolbarIconButton("##TranslateSnap", TranslateSnapIconTexture, SnapButtonSize, SnapIconSize, Gizmo->IsTranslateSnapEnabled() ? ActiveTint : InactiveTint)
 		: ImGui::Button("T Snap", ImVec2(62.0f, 22.0f));
-	ShowLastItemTooltip("Location snap");
+	const ImVec2 TranslateSnapPopupPos = GetLastItemPopupPos();
+	ShowLastItemTooltip("Location snap", "Choose fixed distance increments for translate gizmo movement.");
 	if (bTranslateSnapClicked)
 	{
 		ImGui::OpenPopup("TranslateSnapPopup");
 	}
 	bool bSnapEnabled = Gizmo->IsTranslateSnapEnabled();
 	float SnapValue = Gizmo->GetTranslateSnapValue();
-	if (DrawSnapPopup("TranslateSnapPopup", TranslateSnapValues, IM_ARRAYSIZE(TranslateSnapValues), SnapValue, bSnapEnabled, false, bSnapEnabled, SnapValue))
+	if (DrawSnapPopup("TranslateSnapPopup", TranslateSnapPopupPos, TranslateSnapValues, IM_ARRAYSIZE(TranslateSnapValues), SnapValue, bSnapEnabled, false, bSnapEnabled, SnapValue))
 	{
 		Gizmo->SetTranslateSnap(bSnapEnabled, SnapValue);
 	}
@@ -668,14 +699,15 @@ void FEditorToolbarWidget::RenderGizmoTools()
 	const bool bRotateSnapClicked = bHasRotateSnapIcon
 		? RenderToolbarIconButton("##RotateSnap", RotateSnapIconTexture, SnapButtonSize, SnapIconSize, Gizmo->IsRotateSnapEnabled() ? ActiveTint : InactiveTint)
 		: ImGui::Button("R Snap", ImVec2(62.0f, 22.0f));
-	ShowLastItemTooltip("Rotation snap");
+	const ImVec2 RotateSnapPopupPos = GetLastItemPopupPos();
+	ShowLastItemTooltip("Rotation snap", "Choose fixed angle increments for rotate gizmo movement.");
 	if (bRotateSnapClicked)
 	{
 		ImGui::OpenPopup("RotateSnapPopup");
 	}
 	bSnapEnabled = Gizmo->IsRotateSnapEnabled();
 	SnapValue = Gizmo->GetRotateSnapValue() * RadToDeg;
-	if (DrawSnapPopup("RotateSnapPopup", RotateSnapValuesDeg, IM_ARRAYSIZE(RotateSnapValuesDeg), SnapValue, bSnapEnabled, true, bSnapEnabled, SnapValue))
+	if (DrawSnapPopup("RotateSnapPopup", RotateSnapPopupPos, RotateSnapValuesDeg, IM_ARRAYSIZE(RotateSnapValuesDeg), SnapValue, bSnapEnabled, true, bSnapEnabled, SnapValue))
 	{
 		Gizmo->SetRotateSnap(bSnapEnabled, SnapValue * DegToRad);
 	}
@@ -684,14 +716,15 @@ void FEditorToolbarWidget::RenderGizmoTools()
 	const bool bScaleSnapClicked = bHasScaleSnapIcon
 		? RenderToolbarIconButton("##ScaleSnap", ScaleSnapIconTexture, SnapButtonSize, SnapIconSize, Gizmo->IsScaleSnapEnabled() ? ActiveTint : InactiveTint)
 		: ImGui::Button("S Snap", ImVec2(62.0f, 22.0f));
-	ShowLastItemTooltip("Scale snap");
+	const ImVec2 ScaleSnapPopupPos = GetLastItemPopupPos();
+	ShowLastItemTooltip("Scale snap", "Choose fixed size increments for scale gizmo changes.");
 	if (bScaleSnapClicked)
 	{
 		ImGui::OpenPopup("ScaleSnapPopup");
 	}
 	bSnapEnabled = Gizmo->IsScaleSnapEnabled();
 	SnapValue = Gizmo->GetScaleSnapValue();
-	if (DrawSnapPopup("ScaleSnapPopup", ScaleSnapValues, IM_ARRAYSIZE(ScaleSnapValues), SnapValue, bSnapEnabled, false, bSnapEnabled, SnapValue))
+	if (DrawSnapPopup("ScaleSnapPopup", ScaleSnapPopupPos, ScaleSnapValues, IM_ARRAYSIZE(ScaleSnapValues), SnapValue, bSnapEnabled, false, bSnapEnabled, SnapValue))
 	{
 		Gizmo->SetScaleSnap(bSnapEnabled, SnapValue);
 	}
@@ -782,9 +815,9 @@ void FEditorToolbarWidget::RenderFilesMenu()
 	ImGui::EndMenu();
 }
 
-void FEditorToolbarWidget::RenderViewMenu()
+void FEditorToolbarWidget::RenderWindowMenu()
 {
-	if (!ImGui::BeginMenu("View"))
+	if (!ImGui::BeginMenu("Window"))
 	{
 		return;
 	}
@@ -802,11 +835,12 @@ void FEditorToolbarWidget::RenderViewMenu()
 		}
 	}
 	if (bShowProperty) ImGui::MenuItem("Property", nullptr, bShowProperty);
-	if (bShowSceneManager) ImGui::MenuItem("Scene Manager", nullptr, bShowSceneManager);
+	if (bShowSceneManager) ImGui::MenuItem("Outliner", nullptr, bShowSceneManager);
 	if (bShowMaterialEditor) ImGui::MenuItem("Material Editor", nullptr, bShowMaterialEditor);
 	if (bShowStatProfiler) ImGui::MenuItem("Stat Profiler", nullptr, bShowStatProfiler);
 	if (bShowCameraShake) ImGui::MenuItem("Camera Shake", nullptr, bShowCameraShake);
 	if (bShowSkeletalMeshViewer) ImGui::MenuItem("SkeletalMesh Viewer", nullptr, bShowSkeletalMeshViewer);
+	if (bShowEditorDebug) ImGui::MenuItem("Editor Debug", nullptr, bShowEditorDebug);
 
 	if (ContentDrawerWidget)
 	{

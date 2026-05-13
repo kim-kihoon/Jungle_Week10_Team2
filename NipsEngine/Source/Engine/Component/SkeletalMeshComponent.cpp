@@ -18,6 +18,9 @@ void USkeletalMeshComponent::TickComponent(float DeltaTime)
 
     if (bBoneTransformsDirty || bSkinningDirty)
     {
+        // Bone pose가 바뀐 frame에는 CPU skinned vertex를 즉시 다시 만든다.
+        // 이렇게 해두면 render collector가 같은 frame에 UpdateRenderBuffer()를 호출할 때
+        // 최신 pose가 반영된 vertex buffer를 업로드할 수 있다.
         ComputeSkinnedVertices();
     }
 }

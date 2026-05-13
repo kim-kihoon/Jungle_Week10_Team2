@@ -1,4 +1,4 @@
-#include "Editor/UI/EditorSceneWidget.h"
+﻿#include "Editor/UI/EditorSceneWidget.h"
 
 #include "Editor/EditorEngine.h"
 #include "Engine/Core/Common.h"
@@ -189,7 +189,7 @@ void FEditorSceneWidget::Render(float DeltaTime)
 	}
 
 	ImGui::SetNextWindowSize(ImVec2(400.0f, 350.0f), ImGuiCond_Once);
-	if (!ImGui::Begin("Scene Manager", &bIsOpen))
+	if (!ImGui::Begin("Outliner", &bIsOpen))
 	{
 		ImGui::End();
 		return;
@@ -323,7 +323,32 @@ void FEditorSceneWidget::Render(float DeltaTime)
 	Clipper.End();
 	ImGui::EndChild();
 
-	if (ActorToDelete)
+	const bool bDeleteSelectedActors =
+		ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
+		ImGui::IsKeyReleased(ImGuiKey_Delete) &&
+		!Selection.IsEmpty();
+
+	if (bDeleteSelectedActors)
+	{
+		const TArray<AActor*> SelectedActors = Selection.GetSelectedActors();
+		Selection.ClearSelection();
+		EditorEngine->GetMainPanel().ResetWidgetSelections();
+		LastClickedActorIndex = -1;
+
+		for (AActor* Actor : SelectedActors)
+		{
+			if (!Actor)
+			{
+				continue;
+			}
+
+			if (UWorld* ActorWorld = Actor->GetFocusedWorld())
+			{
+				ActorWorld->DestroyActor(Actor);
+			}
+		}
+	}
+	else if (ActorToDelete)
 	{
 		UWorld* ActorWorld = ActorToDelete->GetFocusedWorld();
 		Selection.Deselect(ActorToDelete);
@@ -335,5 +360,5 @@ void FEditorSceneWidget::Render(float DeltaTime)
 		}
 	}
 
-	ImGui::End(); // Begin("Scene Manager")에 대한 End
+	ImGui::End(); // Begin("Outliner")에 대한 End
 }

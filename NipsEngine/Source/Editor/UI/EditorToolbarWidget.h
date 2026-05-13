@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Editor/UI/EditorWidget.h"
 
@@ -23,7 +23,8 @@ public:
 		bool* InShowMaterialEditor,
 		bool* InShowStatProfiler,
 		bool* InShowCameraShake,
-		bool* InShowSkeletalMeshViewer);
+		bool* InShowSkeletalMeshViewer,
+		bool* InShowEditorDebug = nullptr);
 	virtual void Initialize(UEditorEngine* InEditorEngine) override;
 	virtual void Render(float DeltaTime) override;
 	float GetReservedTopHeight() const { return ReservedTopHeight; }
@@ -33,7 +34,7 @@ private:
 	bool SaveSceneFileDialog(FString& OutFilePath) const;
 	void RenderEditorToolBar(float MenuBarHeight, float ToolBarHeight);
 	void RenderFilesMenu();
-	void RenderViewMenu();
+    void RenderWindowMenu();
 	void RenderEditMenu();
 	void RenderHelpMenu();
 	void RenderAddActorMenu(int32 ViewportIndex);
@@ -66,4 +67,5 @@ private:
 	bool* bShowStatProfiler = nullptr;
 	bool* bShowCameraShake = nullptr;
 	bool* bShowSkeletalMeshViewer = nullptr;
+	bool* bShowEditorDebug = nullptr;
 };

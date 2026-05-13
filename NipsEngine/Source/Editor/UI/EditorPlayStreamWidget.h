@@ -17,6 +17,7 @@ private:
 	const char* StopLabel   = "■ Stop";
 
 	UTexture* PlayIconTexture = nullptr;
+	UTexture* PauseIconTexture = nullptr;
 	UTexture* StopIconTexture = nullptr;
 };
 
