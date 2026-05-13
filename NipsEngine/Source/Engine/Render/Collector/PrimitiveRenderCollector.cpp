@@ -444,7 +444,7 @@ void FPrimitiveRenderCollector::CollectFromComponent(
 
 	case EPrimitiveType::EPT_SkeletalMesh:
 	{
-        if (!ShowFlags.bPrimitives)
+        if (!ShowFlags.bPrimitives || !ShowFlags.bSkeletalMesh)
             return;
 
         USkinnedMeshComponent* SkinnedMeshComp = static_cast<USkinnedMeshComponent*>(Primitive);
