@@ -682,6 +682,26 @@ void FEditorContentDrawerWidget::RenderBottomBar(const ImGuiViewport* Viewport, 
 		{
 			ImGui::SetTooltip("`");
 		}
+
+		if (ConsoleWidget)
+		{
+			ImGui::SameLine(0.0f, 8.0f);
+			const float CompactInputWidth = std::clamp(ImGui::GetContentRegionAvail().x, 180.0f, 420.0f);
+			ConsoleWidget->RenderCompactInput(CompactInputWidth);
+			if (ConsoleWidget->ConsumeCompactOpenRequest())
+			{
+				StartConsoleTakeover();
+				float TakeoverHeight = 0.0f;
+				if (ConsumeConsoleTakeover(TakeoverHeight))
+				{
+					ConsoleWidget->OpenFromDrawerTakeover(TakeoverHeight);
+				}
+				else
+				{
+					ConsoleWidget->SetOpen(true);
+				}
+			}
+		}
 	}
 	ImGui::End();
 

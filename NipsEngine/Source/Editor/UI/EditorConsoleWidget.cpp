@@ -81,6 +81,13 @@ bool FEditorConsoleWidget::ConsumeOpenRequest()
 	return bResult;
 }
 
+bool FEditorConsoleWidget::ConsumeCompactOpenRequest()
+{
+	const bool bResult = bCompactOpenRequested;
+	bCompactOpenRequested = false;
+	return bResult;
+}
+
 bool FEditorConsoleWidget::ShouldRender() const
 {
 	return bOpen || DrawerAnimationAlpha > 0.0f;
@@ -123,6 +130,11 @@ void FEditorConsoleWidget::OpenFromDrawerTakeover(float InDrawerHeight)
 
 void FEditorConsoleWidget::Render(float DeltaTime)
 {
+	if (bOpen && ImGui::IsKeyPressed(ImGuiKey_GraveAccent, false))
+	{
+		SetOpen(false);
+	}
+
 	const float TargetAlpha = bOpen ? 1.0f : 0.0f;
 	const float AlphaStep = std::clamp(DeltaTime * ConsoleDrawerAnimationSpeed, 0.0f, 1.0f);
 	DrawerAnimationAlpha += (TargetAlpha - DrawerAnimationAlpha) * AlphaStep;
@@ -254,33 +266,13 @@ void FEditorConsoleWidget::Render(float DeltaTime)
 	ImGui::EndChild();
 	ImGui::Separator();
 
-	ImGuiInputTextFlags Flags = ImGuiInputTextFlags_EnterReturnsTrue
-		| ImGuiInputTextFlags_EscapeClearsAll
-		| ImGuiInputTextFlags_CallbackHistory
-		| ImGuiInputTextFlags_CallbackCompletion
-		| ImGuiInputTextFlags_CallbackCharFilter;
-
 	if (bRequestFocusInput)
 	{
 		ImGui::SetKeyboardFocusHere(0);
 		bRequestFocusInput = false;
 	}
 
-	UpdateCompletionCandidates();
-
-	if (ImGui::InputText("Input", InputBuf, sizeof(InputBuf), Flags, &TextEditCallback, this))
-	{
-		if (!CompleteSelectedCandidateInBuffer())
-		{
-			ExecCommand(InputBuf);
-			strcpy_s(InputBuf, "");
-			CompletionCandidates.clear();
-			bCompletionSelectionActive = false;
-			CompletionInputSnapshot.clear();
-		}
-	}
-	UpdateCompletionCandidates();
-	RenderCompletionCandidates();
+	RenderCommandInput("Input", nullptr, false);
 
 	ImGui::SetItemDefaultFocus();
 
@@ -293,9 +285,76 @@ void FEditorConsoleWidget::Render(float DeltaTime)
 	}
 }
 
+void FEditorConsoleWidget::RenderCompactInput(float Width)
+{
+	const ImGuiIO& IO = ImGui::GetIO();
+	if (!bOpen && ImGui::IsKeyPressed(ImGuiKey_GraveAccent, false))
+	{
+		if (bCompactInputActive)
+		{
+			bCompactOpenRequested = true;
+			bRequestFocusInput = true;
+		}
+		else if (!IO.WantTextInput)
+		{
+			bRequestFocusCompactInput = true;
+		}
+	}
+
+	if (Width > 0.0f)
+	{
+		ImGui::SetNextItemWidth(Width);
+	}
+
+	if (bRequestFocusCompactInput)
+	{
+		ImGui::SetKeyboardFocusHere(0);
+		bRequestFocusCompactInput = false;
+	}
+
+	RenderCommandInput("##ConsoleCompactInput", "Enter console command", true);
+	bCompactInputActive = ImGui::IsItemActive();
+}
+
 void FEditorConsoleWidget::RegisterCommand(const FString& Name, CommandFn Fn)
 {
 	Commands[Name] = Fn;
+}
+
+void FEditorConsoleWidget::SubmitInputBuffer()
+{
+	if (!CompleteSelectedCandidateInBuffer())
+	{
+		ExecCommand(InputBuf);
+		strcpy_s(InputBuf, "");
+		CompletionCandidates.clear();
+		bCompletionSelectionActive = false;
+		CompletionInputSnapshot.clear();
+	}
+}
+
+bool FEditorConsoleWidget::RenderCommandInput(const char* Label, const char* Hint, bool bUseHint)
+{
+	ImGuiInputTextFlags Flags = ImGuiInputTextFlags_EnterReturnsTrue
+		| ImGuiInputTextFlags_EscapeClearsAll
+		| ImGuiInputTextFlags_CallbackHistory
+		| ImGuiInputTextFlags_CallbackCompletion
+		| ImGuiInputTextFlags_CallbackCharFilter;
+
+	UpdateCompletionCandidates();
+
+	const bool bSubmitted = bUseHint
+		? ImGui::InputTextWithHint(Label, Hint ? Hint : "", InputBuf, sizeof(InputBuf), Flags, &TextEditCallback, this)
+		: ImGui::InputText(Label, InputBuf, sizeof(InputBuf), Flags, &TextEditCallback, this);
+
+	if (bSubmitted)
+	{
+		SubmitInputBuffer();
+	}
+
+	UpdateCompletionCandidates();
+	RenderCompletionCandidates();
+	return bSubmitted;
 }
 
 void FEditorConsoleWidget::UpdateCompletionCandidates()
