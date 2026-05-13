@@ -451,6 +451,7 @@ CMakeLists.txt
 
 # ignore Build Files
 NipsEngine/Build/
+EditorReleaseBuild/
 NipsEngine/Saves/**
 NipsEngine/imgui*.ini
 vcpkg/
