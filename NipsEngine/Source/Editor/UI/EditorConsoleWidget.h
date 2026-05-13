@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "Core/CoreMinimal.h"
 #include "Core/Logger.h"
 #include <cstdarg>
@@ -75,7 +75,6 @@ private:
 	void RegisterCommand(const FString& Name, CommandFn Fn);
 	void ExecCommand(const char* CommandLine);
 	static int32 TextEditCallback(ImGuiInputTextCallbackData* Data);
-	void RenderResizeHandle(float WorkAreaHeight);
 	void UpdateCompletionCandidates();
 	TArray<FCompletionCandidate> GetCompletionCandidates(const FString& Input) const;
 	void RenderCompletionCandidates();

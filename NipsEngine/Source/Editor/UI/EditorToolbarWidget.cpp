@@ -816,7 +816,7 @@ void FEditorToolbarWidget::RenderWindowMenu()
 		}
 	}
 	if (bShowProperty) ImGui::MenuItem("Property", nullptr, bShowProperty);
-	if (bShowSceneManager) ImGui::MenuItem("Scene Manager", nullptr, bShowSceneManager);
+	if (bShowSceneManager) ImGui::MenuItem("Outliner", nullptr, bShowSceneManager);
 	if (bShowMaterialEditor) ImGui::MenuItem("Material Editor", nullptr, bShowMaterialEditor);
 	if (bShowStatProfiler) ImGui::MenuItem("Stat Profiler", nullptr, bShowStatProfiler);
 	if (bShowCameraShake) ImGui::MenuItem("Camera Shake", nullptr, bShowCameraShake);

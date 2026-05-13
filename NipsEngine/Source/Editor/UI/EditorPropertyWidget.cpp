@@ -163,7 +163,7 @@ void FEditorPropertyWidget::Render(float DeltaTime)
 		return;
 
 	ImGui::SetNextWindowSize(ImVec2(350.0f, 500.0f), ImGuiCond_Once);
-	if (!ImGui::Begin("Property Window", &bIsOpen))
+	if (!ImGui::Begin("Details", &bIsOpen))
 	{
 		ImGui::End();
 		return;

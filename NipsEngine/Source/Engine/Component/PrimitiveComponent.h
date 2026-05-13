@@ -22,7 +22,7 @@ class UPrimitiveComponent : public USceneComponent
 public:
     DECLARE_CLASS(UPrimitiveComponent, USceneComponent)
 
-    /* For Property window */
+    /* For Details panel */
     void GetEditableProperties(TArray<FPropertyDescriptor>& OutProps) override;
     void PostEditProperty(const char * PropertyName) override;
 

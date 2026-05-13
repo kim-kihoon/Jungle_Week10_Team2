@@ -1,4 +1,4 @@
-#include "Editor/UI/EditorContentDrawerWidget.h"
+﻿#include "Editor/UI/EditorContentDrawerWidget.h"
 
 #include "Editor/EditorEngine.h"
 #include "Editor/UI/EditorConsoleWidget.h"
@@ -732,8 +732,6 @@ void FEditorContentDrawerWidget::RenderDrawerToolbar()
 
 void FEditorContentDrawerWidget::RenderFolderTree()
 {
-	ImGui::TextDisabled("Folders");
-	ImGui::Separator();
 	RenderFolderNode("Asset");
 }
 

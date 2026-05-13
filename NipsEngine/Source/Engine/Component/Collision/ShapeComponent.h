@@ -12,7 +12,7 @@ public:
 
     UShapeComponent();
 
-    // ─────────────── Property Window & Serializer ───────────────
+    // ─────────────── Details & Serializer ───────────────
     void GetEditableProperties(TArray<FPropertyDescriptor>& OutProps) override;
     void PostEditProperty(const char* PropertyName) override;
     void Serialize(FArchive& Ar) override;

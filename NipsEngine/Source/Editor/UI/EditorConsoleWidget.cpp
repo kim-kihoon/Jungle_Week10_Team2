@@ -188,15 +188,6 @@ void FEditorConsoleWidget::Render(float DeltaTime)
 		return;
 	}
 
-	RenderResizeHandle(AvailableHeight);
-
-	if (ImGui::SmallButton("Clear"))
-	{
-		Clear();
-	}
-
-	ImGui::Separator();
-
 	if (ImGui::BeginPopup("Options"))
 	{
 		ImGui::Checkbox("Auto-scroll", &AutoScroll);
@@ -300,35 +291,6 @@ void FEditorConsoleWidget::Render(float DeltaTime)
 	{
 		SetOpen(false);
 	}
-}
-
-void FEditorConsoleWidget::RenderResizeHandle(float WorkAreaHeight)
-{
-	const float HandleHeight = 6.0f;
-	ImGui::InvisibleButton("##ConsoleDrawerResizeHandle", ImVec2(-1.0f, HandleHeight));
-
-	const bool bHovered = ImGui::IsItemHovered();
-	const bool bActive = ImGui::IsItemActive();
-	if (bHovered || bActive)
-	{
-		ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
-	}
-
-	if (bActive)
-	{
-		DrawerHeight = std::clamp(
-			DrawerHeight - ImGui::GetIO().MouseDelta.y,
-			std::min(220.0f, WorkAreaHeight * 0.8f),
-			std::max(220.0f, WorkAreaHeight * 0.82f));
-	}
-
-	ImDrawList* DrawList = ImGui::GetWindowDrawList();
-	const ImVec2 Min = ImGui::GetItemRectMin();
-	const ImVec2 Max = ImGui::GetItemRectMax();
-	DrawList->AddRectFilled(
-		Min,
-		Max,
-		(bHovered || bActive) ? IM_COL32(36, 36, 36, 220) : IM_COL32(26, 26, 26, 180));
 }
 
 void FEditorConsoleWidget::RegisterCommand(const FString& Name, CommandFn Fn)

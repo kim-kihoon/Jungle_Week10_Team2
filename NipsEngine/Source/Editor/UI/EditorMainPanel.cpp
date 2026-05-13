@@ -517,9 +517,9 @@ void FEditorMainPanel::EnsureDefaultDockLayout(ImGuiID DockspaceId)
 	ImGui::DockBuilderSplitNode(RightNode, ImGuiDir_Up, 0.22f, &RightTopNode, &RightBottomNode);
 
 	ImGui::DockBuilderDockWindow("Viewport", MainNode);
-	ImGui::DockBuilderDockWindow("Scene Manager", RightTopNode);
+	ImGui::DockBuilderDockWindow("Outliner", RightTopNode);
 	ImGui::DockBuilderDockWindow("Stat Profiler", RightTopNode);
-	ImGui::DockBuilderDockWindow("Property Window", RightBottomNode);
+	ImGui::DockBuilderDockWindow("Details", RightBottomNode);
 	ImGui::DockBuilderDockWindow("Material Editor", RightBottomNode);
 	ImGui::DockBuilderDockWindow("ObjViewer Panel", RightBottomNode);
 	ImGui::DockBuilderDockWindow("SkeletalMesh Viewer", RightBottomNode);
