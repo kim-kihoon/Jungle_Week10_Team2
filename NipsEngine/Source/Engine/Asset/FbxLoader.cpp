@@ -22,6 +22,91 @@ namespace
 		return Value;
 	}
 
+	void HashCombine(size_t& Seed, size_t Value)
+	{
+		Seed ^= Value + 0x9e3779b9u + (Seed << 6) + (Seed >> 2);
+	}
+
+	void HashCombineFloat(size_t& Seed, float Value)
+	{
+		HashCombine(Seed, std::hash<float>{}(Value));
+	}
+
+	void HashCombineVector(size_t& Seed, const FVector& Value)
+	{
+		HashCombineFloat(Seed, Value.X);
+		HashCombineFloat(Seed, Value.Y);
+		HashCombineFloat(Seed, Value.Z);
+	}
+
+	void HashCombineVector2(size_t& Seed, const FVector2& Value)
+	{
+		HashCombineFloat(Seed, Value.X);
+		HashCombineFloat(Seed, Value.Y);
+	}
+
+	void HashCombineColor(size_t& Seed, const FColor& Value)
+	{
+		HashCombineFloat(Seed, Value.R);
+		HashCombineFloat(Seed, Value.G);
+		HashCombineFloat(Seed, Value.B);
+		HashCombineFloat(Seed, Value.A);
+	}
+
+	struct FSkeletalMeshVertexHasher
+	{
+		size_t operator()(const FSkeletalMeshVertex& Vertex) const
+		{
+			// Import 결과를 보존하기 위해 렌더링/스키닝에 쓰이는 모든 속성을 exact match 기준으로 묶는다.
+			size_t Seed = 0;
+			HashCombineVector(Seed, Vertex.Position);
+			HashCombineColor(Seed, Vertex.Color);
+			HashCombineVector(Seed, Vertex.Normal);
+			HashCombineVector2(Seed, Vertex.UVs);
+			HashCombineVector(Seed, Vertex.Tangent);
+			HashCombineVector(Seed, Vertex.Bitangent);
+
+			for (int32 InfluenceIndex = 0; InfluenceIndex < MAX_SKELETAL_BONE_INFLUENCES; ++InfluenceIndex)
+			{
+				HashCombine(Seed, std::hash<int32>{}(Vertex.BoneIndices[InfluenceIndex]));
+				HashCombineFloat(Seed, Vertex.BoneWeights[InfluenceIndex]);
+			}
+
+			return Seed;
+		}
+	};
+
+	struct FSkeletalMeshVertexEqual
+	{
+		bool operator()(const FSkeletalMeshVertex& Left, const FSkeletalMeshVertex& Right) const
+		{
+			// Epsilon 병합은 normal, UV seam, bone weight 차이를 합칠 수 있으므로 사용하지 않는다.
+			if (Left.Position != Right.Position ||
+				Left.Color.R != Right.Color.R ||
+				Left.Color.G != Right.Color.G ||
+				Left.Color.B != Right.Color.B ||
+				Left.Color.A != Right.Color.A ||
+				Left.Normal != Right.Normal ||
+				Left.UVs != Right.UVs ||
+				Left.Tangent != Right.Tangent ||
+				Left.Bitangent != Right.Bitangent)
+			{
+				return false;
+			}
+
+			for (int32 InfluenceIndex = 0; InfluenceIndex < MAX_SKELETAL_BONE_INFLUENCES; ++InfluenceIndex)
+			{
+				if (Left.BoneIndices[InfluenceIndex] != Right.BoneIndices[InfluenceIndex] ||
+					Left.BoneWeights[InfluenceIndex] != Right.BoneWeights[InfluenceIndex])
+				{
+					return false;
+				}
+			}
+
+			return true;
+		}
+	};
+
 	struct FFbxLoadContext
 	{
 		FString SourcePath;
@@ -33,7 +118,35 @@ namespace
 		//아래 두 항목은 Collect Skeleton 에서 채워짐
 		FSkeletalMesh LoadedMesh;
 		TMap<FbxNode*, int32> BoneIndexMap;
+
+		uint32 RawVertexCount = 0;
+		TMap<FSkeletalMeshVertex, uint32, FSkeletalMeshVertexHasher, FSkeletalMeshVertexEqual> UniqueVertexIndices;
 	};
+
+	uint32 AddUniqueSkeletalMeshVertex(FFbxLoadContext& Context, const FSkeletalMeshVertex& Vertex)
+	{
+		auto ExistingIt = Context.UniqueVertexIndices.find(Vertex);
+		if (ExistingIt != Context.UniqueVertexIndices.end())
+		{
+			return ExistingIt->second;
+		}
+
+		const uint32 NewVertexIndex = static_cast<uint32>(Context.LoadedMesh.Vertices.size());
+		Context.LoadedMesh.Vertices.push_back(Vertex);
+		Context.UniqueVertexIndices.emplace(Vertex, NewVertexIndex);
+		return NewVertexIndex;
+	}
+
+	float CalculateReductionPercent(uint32 RawVertexCount, uint32 UniqueVertexCount)
+	{
+		if (RawVertexCount == 0)
+		{
+			return 0.0f;
+		}
+
+		const uint32 RemovedVertexCount = RawVertexCount > UniqueVertexCount ? RawVertexCount - UniqueVertexCount : 0;
+		return (static_cast<float>(RemovedVertexCount) / static_cast<float>(RawVertexCount)) * 100.0f;
+	}
 
 	bool CreateFbxSdkContext(FFbxLoadContext& Context)
 	{
@@ -83,6 +196,8 @@ namespace
 		Context.Scene = nullptr;
 
 		Context.BoneIndexMap.clear();
+		Context.UniqueVertexIndices.clear();
+		Context.RawVertexCount = 0;
 	}
 
 	/**
@@ -949,6 +1064,10 @@ namespace
 		const bool bHasSkeleton = !Context.LoadedMesh.Bones.empty();
 
 		const int32 PolygonCount = static_cast<int32>(Mesh->GetPolygonCount());
+		const size_t MaxAdditionalVertexCount = static_cast<size_t>(PolygonCount) * 3;
+		Context.LoadedMesh.Vertices.reserve(Context.LoadedMesh.Vertices.size() + MaxAdditionalVertexCount);
+		Context.UniqueVertexIndices.reserve(Context.UniqueVertexIndices.size() + MaxAdditionalVertexCount);
+
 		for (int32 PolygonIndex = 0; PolygonIndex < PolygonCount; ++PolygonIndex)
 		{
 			const int32 PolygonSize = static_cast<int32>(Mesh->GetPolygonSize(PolygonIndex));
@@ -959,18 +1078,20 @@ namespace
 
 			const int32 MaterialIndex = GetPolygonMaterialIndex(Mesh, PolygonIndex, MaterialCount);
 
-			uint32 TriangleIndices[3] = { 0, 0, 0 };
+			FSkeletalMeshVertex TriangleVertices[3];
+			bool bTriangleValid = true;
 			for (int32 PolygonVertexIndex = 0; PolygonVertexIndex < 3; ++PolygonVertexIndex)
 			{
 				const int32 ControlPointIndex = static_cast<int32>(Mesh->GetPolygonVertex(PolygonIndex, PolygonVertexIndex));
 				if (ControlPointIndex < 0 || ControlPointIndex >= ControlPointCount)
 				{
-					continue;
+					bTriangleValid = false;
+					break;
 				}
 
-				FSkeletalMeshVertex Vertex;
-                const FVector LocalPosition = ToEngineVector(Mesh->GetControlPointAt(ControlPointIndex));
-                Vertex.Position = LocalPosition;
+				FSkeletalMeshVertex& Vertex = TriangleVertices[PolygonVertexIndex];
+				const FVector LocalPosition = ToEngineVector(Mesh->GetControlPointAt(ControlPointIndex));
+				Vertex.Position = LocalPosition;
 				Vertex.Normal = GetPolygonVertexNormal(Mesh, PolygonIndex, PolygonVertexIndex);
 				Vertex.UVs = GetPolygonVertexUV(Mesh, PolygonIndex, PolygonVertexIndex, UVSetName);
 
@@ -982,19 +1103,22 @@ namespace
 				{
 					AssignBoneInfluencesToVertex(TArray<FBoneInfluence>(), bHasSkeleton, Vertex);
 				}
-
-				TriangleIndices[PolygonVertexIndex] = static_cast<uint32>(Context.LoadedMesh.Vertices.size());
-				Context.LoadedMesh.Vertices.push_back(Vertex);
 			}
 
-			CalculateTriangleTangent(
-				Context.LoadedMesh.Vertices[TriangleIndices[0]],
-				Context.LoadedMesh.Vertices[TriangleIndices[1]],
-				Context.LoadedMesh.Vertices[TriangleIndices[2]]);
+			if (!bTriangleValid)
+			{
+				continue;
+			}
 
-			IndicesByMaterial[MaterialIndex].push_back(TriangleIndices[0]);
-			IndicesByMaterial[MaterialIndex].push_back(TriangleIndices[1]);
-			IndicesByMaterial[MaterialIndex].push_back(TriangleIndices[2]);
+			// Tangent/bitangent까지 최종화한 뒤 dedupe해야 같은 위치라도 다른 shading seam을 유지할 수 있다.
+			CalculateTriangleTangent(TriangleVertices[0], TriangleVertices[1], TriangleVertices[2]);
+			Context.RawVertexCount += 3;
+
+			for (int32 TriangleVertexIndex = 0; TriangleVertexIndex < 3; ++TriangleVertexIndex)
+			{
+				const uint32 VertexIndex = AddUniqueSkeletalMeshVertex(Context, TriangleVertices[TriangleVertexIndex]);
+				IndicesByMaterial[MaterialIndex].push_back(VertexIndex);
+			}
 		}
 
 		for (int32 MaterialIndex = 0; MaterialIndex < MaterialCount; ++MaterialIndex)
@@ -1024,6 +1148,8 @@ namespace
 		Context.LoadedMesh.Indices.clear();
 		Context.LoadedMesh.Sections.clear();
 		Context.LoadedMesh.MaterialSlots.clear();
+		Context.UniqueVertexIndices.clear();
+		Context.RawVertexCount = 0;
 
 		if (Context.Scene == nullptr)
 		{
@@ -1040,8 +1166,15 @@ namespace
 			}
 		});
 
-		UE_LOG("FBX skeletal mesh extracted. Vertices: %d, Indices: %d, Sections: %d, Path: %s",
+		const uint32 UniqueVertexCount = static_cast<uint32>(Context.LoadedMesh.Vertices.size());
+		const uint32 RemovedVertexCount = Context.RawVertexCount > UniqueVertexCount ? Context.RawVertexCount - UniqueVertexCount : 0;
+		const float ReductionPercent = CalculateReductionPercent(Context.RawVertexCount, UniqueVertexCount);
+
+		UE_LOG("FBX skeletal mesh extracted. RawVertices: %d, UniqueVertices: %d, RemovedDuplicates: %d, Reduction: %.2f%%, Indices: %d, Sections: %d, Path: %s",
+			static_cast<int32>(Context.RawVertexCount),
 			static_cast<int32>(Context.LoadedMesh.Vertices.size()),
+			static_cast<int32>(RemovedVertexCount),
+			ReductionPercent,
 			static_cast<int32>(Context.LoadedMesh.Indices.size()),
 			static_cast<int32>(Context.LoadedMesh.Sections.size()),
 			Context.SourcePath.c_str());
