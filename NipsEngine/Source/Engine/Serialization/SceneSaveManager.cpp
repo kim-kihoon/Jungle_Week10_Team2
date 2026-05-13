@@ -1081,7 +1081,7 @@ void FSceneSaveManager::DeserializeProperties(UActorComponent* Comp, json::JSON&
 			FString MeshPath = Value.ToString();
 			if (!MeshPath.empty())
 			{
-				*static_cast<FString*>(Prop.ValuePtr) = FResourceManager::Get().MakeStaticMeshBinaryPath(MeshPath);
+				*static_cast<FString*>(Prop.ValuePtr) = FResourceManager::Get().MakeStaticMeshAssetPath(MeshPath);
 				Comp->PostEditProperty(Prop.Name);
 				continue;
 			}

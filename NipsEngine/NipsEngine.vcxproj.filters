@@ -380,9 +380,6 @@
     <ClCompile Include="Source\Engine\Asset\BinarySerializer.cpp">
       <Filter>Source\Engine\Asset</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Engine\Asset\FbxLoader.cpp">
-      <Filter>Source\Engine\Asset</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Engine\Asset\FileUtils.cpp">
       <Filter>Source\Engine\Asset</Filter>
     </ClCompile>
@@ -392,10 +389,22 @@
     <ClCompile Include="Source\Editor\Importer\ObjStaticMeshImporter.cpp">
       <Filter>Source\Editor\Importer</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Editor\Importer\FbxStaticMeshImporter.cpp">
+      <Filter>Source\Editor\Importer</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Editor\Importer\FbxSkeletalMeshImporter.cpp">
+      <Filter>Source\Editor\Importer</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Editor\Importer\FbxSkeletalMeshExtractor.cpp">
+      <Filter>Source\Editor\Importer</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Engine\Asset\ParticleAtlasLoader.cpp">
       <Filter>Source\Engine\Asset</Filter>
     </ClCompile>
     <ClCompile Include="Source\Engine\Asset\SkeletalMesh.cpp">
+      <Filter>Source\Engine\Asset</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Asset\Skeleton.cpp">
       <Filter>Source\Engine\Asset</Filter>
     </ClCompile>
     <ClCompile Include="Source\Engine\Asset\StaticMesh.cpp">
@@ -1063,9 +1072,6 @@
     <ClInclude Include="Source\Engine\Asset\BinarySerializer.h">
       <Filter>Source\Engine\Asset</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Engine\Asset\FbxLoader.h">
-      <Filter>Source\Engine\Asset</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Engine\Asset\FileUtils.h">
       <Filter>Source\Engine\Asset</Filter>
     </ClInclude>
@@ -1078,6 +1084,15 @@
     <ClInclude Include="Source\Editor\Importer\ObjStaticMeshImporter.h">
       <Filter>Source\Editor\Importer</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Editor\Importer\FbxStaticMeshImporter.h">
+      <Filter>Source\Editor\Importer</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Editor\Importer\FbxSkeletalMeshImporter.h">
+      <Filter>Source\Editor\Importer</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Editor\Importer\FbxSkeletalMeshExtractor.h">
+      <Filter>Source\Editor\Importer</Filter>
+    </ClInclude>
     <ClInclude Include="Source\Editor\Importer\ObjRawTypes.h">
       <Filter>Source\Editor\Importer</Filter>
     </ClInclude>
@@ -1088,6 +1103,9 @@
       <Filter>Source\Engine\Asset</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Asset\SkeletalMeshTypes.h">
+      <Filter>Source\Engine\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Asset\Skeleton.h">
       <Filter>Source\Engine\Asset</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Asset\StaticMesh.h">

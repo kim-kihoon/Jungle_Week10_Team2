@@ -200,7 +200,7 @@ namespace
 		{
 			return EEditorAssetKind::StaticMesh;
 		}
-		if (SkeletalMeshPaths.contains(PathKey) || Extension == ".fbx")
+		if (SkeletalMeshPaths.contains(PathKey))
 		{
 			return EEditorAssetKind::SkeletalMesh;
 		}

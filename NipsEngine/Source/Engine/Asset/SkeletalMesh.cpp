@@ -1,5 +1,6 @@
 ﻿#include "SkeletalMesh.h"
 
+#include "Asset/Skeleton.h"
 #include "Core/Logger.h"
 
 DEFINE_CLASS(USkeletalMesh, UObject)
@@ -27,6 +28,12 @@ void USkeletalMesh::SetMeshData(FSkeletalMesh* InMeshData)
     RebuildLocalBoundsFromMeshData();
 }
 
+void USkeletalMesh::SetSkeleton(USkeleton* InSkeleton)
+{
+    Skeleton = InSkeleton;
+    CalculateInvRefMatrices();
+}
+
 FSkeletalMesh* USkeletalMesh::GetMeshData()
 {
     return MeshData;
@@ -37,10 +44,26 @@ const FSkeletalMesh* USkeletalMesh::GetMeshData() const
     return MeshData;
 }
 
+USkeleton* USkeletalMesh::GetSkeleton()
+{
+    return Skeleton;
+}
+
+const USkeleton* USkeletalMesh::GetSkeleton() const
+{
+    return Skeleton;
+}
+
 const FString& USkeletalMesh::GetAssetPathFileName() const
 {
     static FString Empty = {};
     return MeshData ? MeshData->PathFileName : Empty;
+}
+
+const FString& USkeletalMesh::GetSkeletonAssetPath() const
+{
+    static FString Empty = {};
+    return MeshData ? MeshData->SkeletonAssetPath : Empty;
 }
 
 const TArray<FSkeletalMeshVertex>& USkeletalMesh::GetVertices() const
@@ -70,12 +93,20 @@ const TArray<FSkeletalMeshMaterialSlot>& USkeletalMesh::GetMaterialSlots() const
 const TArray<FSkeletalBone>& USkeletalMesh::GetBones() const
 {
     static const TArray<FSkeletalBone> Empty = {};
+    if (Skeleton != nullptr)
+    {
+        return Skeleton->GetBones();
+    }
     return MeshData ? MeshData->Bones : Empty;
 }
 
 const TArray<FMatrix>& USkeletalMesh::GetInverseBindPoseMatrices() const
 {
     static const TArray<FMatrix> Empty = {};
+    if (Skeleton != nullptr)
+    {
+        return Skeleton->GetInverseBindPoseMatrices();
+    }
     return MeshData ? MeshData->InverseBindPoseMatrices : Empty;
 }
 
@@ -92,11 +123,20 @@ bool USkeletalMesh::HasValidMeshData() const
 
 bool USkeletalMesh::HasValidSkeleton() const
 {
+    if (Skeleton != nullptr)
+    {
+        return Skeleton->HasValidSkeleton();
+    }
     return MeshData != nullptr && !MeshData->Bones.empty() && MeshData->Bones.size() == MeshData->InverseBindPoseMatrices.size();
 }
 
 void USkeletalMesh::CalculateInvRefMatrices()
 {
+    if (Skeleton != nullptr)
+    {
+        return;
+    }
+
     if (MeshData == nullptr)
     {
         return;

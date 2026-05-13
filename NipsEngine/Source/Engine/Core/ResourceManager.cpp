@@ -26,11 +26,14 @@
 #include "Core/StringUtils.h"
 #include "Settings/EngineSettings.h"
 #include "Asset/BinarySerializer.h"
+#include "Asset/Skeleton.h"
 #include "Asset/StaticMeshTypes.h"
 #include "Asset\SkeletalMesh.h"
 #include "Asset/StaticMeshSimplifier.h"
 #include "Render/Scene/RenderCommand.h"
 #if WITH_EDITOR
+#include "Editor/Importer/FbxSkeletalMeshImporter.h"
+#include "Editor/Importer/FbxStaticMeshImporter.h"
 #include "Editor/Importer/ObjStaticMeshImporter.h"
 #endif
 namespace
@@ -86,9 +89,44 @@ namespace
 		return Value;
 	}
 
-	bool IsStaticMeshBinaryPath(const FString& Path)
+	bool IsStaticMeshAssetPath(const FString& Path)
 	{
-		return ToLowerAscii(std::filesystem::path(FPaths::ToWide(Path)).extension().string()) == ".bin";
+		return ToLowerAscii(std::filesystem::path(FPaths::ToWide(Path)).extension().string()) == ".asset";
+	}
+
+	bool RegisterCompiledAssetPath(FResourceManager& ResourceManager, const FString& AssetPath)
+	{
+		FBinarySerializer Serializer;
+		FStaticMeshBinaryHeader Header;
+		if (!Serializer.ReadAssetHeader(AssetPath, Header))
+		{
+			return false;
+		}
+
+		switch (Header.AssetType)
+		{
+		case ECompiledAssetType::StaticMesh:
+			return ResourceManager.RegisterStaticMeshAsset(AssetPath);
+		case ECompiledAssetType::SkeletalMesh:
+			return ResourceManager.RegisterSkeletalMeshAsset(AssetPath);
+		case ECompiledAssetType::Skeleton:
+			return ResourceManager.RegisterSkeletonAsset(AssetPath);
+		default:
+			return false;
+		}
+	}
+
+	bool IsManagedCompiledAssetType(ECompiledAssetType AssetType)
+	{
+		return AssetType == ECompiledAssetType::StaticMesh ||
+			AssetType == ECompiledAssetType::SkeletalMesh ||
+			AssetType == ECompiledAssetType::Skeleton;
+	}
+
+	bool IsPathUnder(const std::filesystem::path& Path, const std::filesystem::path& RootPath)
+	{
+		const std::filesystem::path RelativePath = Path.lexically_relative(RootPath);
+		return !RelativePath.empty() && *RelativePath.begin() != std::filesystem::path(L"..");
 	}
 
 	TArray<FShaderMacro> NormalizeShaderMacros(TArray<FShaderMacro> Macros)
@@ -414,32 +452,55 @@ namespace
 
 #pragma region __BINARY__
 
-FString FResourceManager::MakeStaticMeshBinaryPath(const FString& SourcePath) const
+FString FResourceManager::MakeStaticMeshAssetPath(const FString& SourcePath) const
 {
 	namespace fs = std::filesystem;
 
 	fs::path SourceFsPath(FPaths::ToWide(FPaths::Normalize(SourcePath)));
-	fs::path SourceRelPath = SourceFsPath;
-	const fs::path MeshRoot(L"Asset/Mesh");
-
-	fs::path SourceUnderMesh = SourceRelPath.lexically_relative(MeshRoot);
-	if (SourceUnderMesh.empty() || *SourceUnderMesh.begin() == fs::path(L".."))
+	if (SourceFsPath.is_absolute())
 	{
-		const fs::path AssetRoot(L"Asset");
-		SourceUnderMesh = SourceRelPath.lexically_relative(AssetRoot);
-		if (SourceUnderMesh.empty() || *SourceUnderMesh.begin() == fs::path(L".."))
+		const fs::path RootPath(FPaths::RootDir());
+		const fs::path RelativeToRoot = SourceFsPath.lexically_relative(RootPath);
+		if (!RelativeToRoot.empty() && *RelativeToRoot.begin() != fs::path(L".."))
 		{
-			SourceUnderMesh = SourceRelPath.filename();
+			SourceFsPath = RelativeToRoot;
 		}
 	}
 
-	SourceUnderMesh.replace_extension(L".bin");
+	fs::path RelativeAssetPath = SourceFsPath;
+	RelativeAssetPath.replace_extension(L".asset");
 
-	fs::path RelativeBinaryPath = (MeshRoot / L"Bin" / SourceUnderMesh).lexically_normal();
-	fs::path AbsoluteBinaryPath = fs::path(FPaths::RootDir()) / RelativeBinaryPath;
-	fs::create_directories(AbsoluteBinaryPath.parent_path());
+	fs::path AbsoluteAssetPath(FPaths::ToAbsolute(RelativeAssetPath.generic_wstring()));
+	fs::create_directories(AbsoluteAssetPath.parent_path());
 
-	return FPaths::ToUtf8(RelativeBinaryPath.generic_wstring());
+	return FPaths::ToUtf8(RelativeAssetPath.generic_wstring());
+}
+
+FString FResourceManager::MakeSkeletalMeshAssetPath(const FString& SourcePath) const
+{
+	return MakeStaticMeshAssetPath(SourcePath);
+}
+
+FString FResourceManager::MakeSkeletonAssetPath(const FString& SourcePath) const
+{
+	namespace fs = std::filesystem;
+
+	fs::path SourceFsPath(FPaths::ToWide(FPaths::Normalize(SourcePath)));
+	if (SourceFsPath.is_absolute())
+	{
+		const fs::path RootPath(FPaths::RootDir());
+		const fs::path RelativeToRoot = SourceFsPath.lexically_relative(RootPath);
+		if (!RelativeToRoot.empty() && *RelativeToRoot.begin() != fs::path(L".."))
+		{
+			SourceFsPath = RelativeToRoot;
+		}
+	}
+
+	fs::path RelativeAssetPath = SourceFsPath.parent_path() / (SourceFsPath.stem().wstring() + L"_Skeleton.asset");
+	fs::path AbsoluteAssetPath(FPaths::ToAbsolute(RelativeAssetPath.generic_wstring()));
+	fs::create_directories(AbsoluteAssetPath.parent_path());
+
+	return FPaths::ToUtf8(RelativeAssetPath.generic_wstring());
 }
 
 FString FResourceManager::MakeSkeletalMeshMaterialOverridePath(const FString& SourcePath) const
@@ -447,9 +508,14 @@ FString FResourceManager::MakeSkeletalMeshMaterialOverridePath(const FString& So
 	return SourcePath + ".skelmat.json";
 }
 
-bool FResourceManager::RegisterStaticMeshBinary(const FString& BinaryPath)
+bool FResourceManager::RegisterStaticMeshAsset(const FString& AssetPath)
 {
-	const FString NormalizedPath = FPaths::Normalize(BinaryPath);
+	const FString NormalizedPath = FPaths::Normalize(AssetPath);
+	if (!IsStaticMeshAssetPath(NormalizedPath))
+	{
+		return false;
+	}
+
 	FStaticMeshBinaryHeader Header;
 	if (!BinarySerializer.ReadStaticMeshHeader(NormalizedPath, Header))
 	{
@@ -466,6 +532,50 @@ bool FResourceManager::RegisterStaticMeshBinary(const FString& BinaryPath)
 	if (std::find(ObjFilePaths.begin(), ObjFilePaths.end(), NormalizedPath) == ObjFilePaths.end())
 	{
 		ObjFilePaths.push_back(NormalizedPath);
+	}
+
+	return true;
+}
+
+bool FResourceManager::RegisterSkeletalMeshAsset(const FString& AssetPath)
+{
+	const FString NormalizedPath = FPaths::Normalize(AssetPath);
+	if (!IsStaticMeshAssetPath(NormalizedPath))
+	{
+		return false;
+	}
+
+	FStaticMeshBinaryHeader Header;
+	if (!BinarySerializer.ReadSkeletalMeshHeader(NormalizedPath, Header))
+	{
+		return false;
+	}
+
+	if (std::find(SkeletalMeshFilePaths.begin(), SkeletalMeshFilePaths.end(), NormalizedPath) == SkeletalMeshFilePaths.end())
+	{
+		SkeletalMeshFilePaths.push_back(NormalizedPath);
+	}
+
+	return true;
+}
+
+bool FResourceManager::RegisterSkeletonAsset(const FString& AssetPath)
+{
+	const FString NormalizedPath = FPaths::Normalize(AssetPath);
+	if (!IsStaticMeshAssetPath(NormalizedPath))
+	{
+		return false;
+	}
+
+	FStaticMeshBinaryHeader Header;
+	if (!BinarySerializer.ReadSkeletonHeader(NormalizedPath, Header))
+	{
+		return false;
+	}
+
+	if (std::find(SkeletonFilePaths.begin(), SkeletonFilePaths.end(), NormalizedPath) == SkeletonFilePaths.end())
+	{
+		SkeletonFilePaths.push_back(NormalizedPath);
 	}
 
 	return true;
@@ -514,6 +624,7 @@ void FResourceManager::LoadFromAssetDirectory(const FString& Path)
 	MaterialFilePaths.clear();
 	ParticleFilePaths.clear();
 	SkeletalMeshFilePaths.clear();
+	SkeletonFilePaths.clear();
 	StaticMeshRegistry.clear();
 
 	InitializeDefaultResources(CachedDevice.Get());
@@ -534,6 +645,7 @@ void FResourceManager::LoadFromAssetDirectory(const FString& Path)
 	TArray<FString> MaterialInstanceFiles;
 #if WITH_EDITOR
 	TArray<FString> ObjSourceFiles;
+	TArray<FString> FbxSourceFiles;
 #endif
 
 	for (const auto& Entry : fs::recursive_directory_iterator(RootPath))
@@ -559,9 +671,9 @@ void FResourceManager::LoadFromAssetDirectory(const FString& Path)
 			ObjSourceFiles.push_back(RelativePath);
 #endif
 		}
-		else if (Extension == L".bin")
+		else if (Extension == L".asset")
 		{
-			RegisterStaticMeshBinary(RelativePath);
+			RegisterCompiledAssetPath(*this, RelativePath);
 		}
 		else if (Extension == L".mtl")
 		{
@@ -602,7 +714,9 @@ void FResourceManager::LoadFromAssetDirectory(const FString& Path)
 		}
         else if (Extension == L".fbx")
         {
-            SkeletalMeshFilePaths.push_back(RelativePath);
+#if WITH_EDITOR
+            FbxSourceFiles.push_back(RelativePath);
+#endif
         }
 	}
 
@@ -611,6 +725,25 @@ void FResourceManager::LoadFromAssetDirectory(const FString& Path)
 	for (const FString& ObjSourcePath : ObjSourceFiles)
 	{
 		ObjImporter.ImportIfNeeded(*this, ObjSourcePath, &MaterialFiles);
+	}
+
+	FFbxStaticMeshImporter FbxStaticMeshImporter;
+	FFbxSkeletalMeshImporter FbxSkeletalMeshImporter;
+	for (const FString& FbxSourcePath : FbxSourceFiles)
+	{
+		const EFbxStaticMeshImportResult ImportResult =
+			FbxStaticMeshImporter.ImportIfStaticMeshNeeded(*this, FbxSourcePath, &MaterialFiles);
+		if (ImportResult == EFbxStaticMeshImportResult::ImportedStaticMesh)
+		{
+			continue;
+		}
+
+		const EFbxSkeletalMeshImportResult SkeletalImportResult =
+			FbxSkeletalMeshImporter.ImportIfSkeletalMeshNeeded(*this, FbxSourcePath, &MaterialFiles);
+		if (SkeletalImportResult == EFbxSkeletalMeshImportResult::Failed)
+		{
+			UE_LOG("[ResourceManager] FBX skeletal import failed: %s", FbxSourcePath.c_str());
+		}
 	}
 #endif
 
@@ -651,6 +784,7 @@ void FResourceManager::RefreshFromAssetDirectory(const FString& Path)
 	MaterialFilePaths.clear();
 	ParticleFilePaths.clear();
 	SkeletalMeshFilePaths.clear();
+	SkeletonFilePaths.clear();
 	StaticMeshRegistry.clear();
 	FontResources.clear();
 	ParticleResources.clear();
@@ -662,6 +796,7 @@ void FResourceManager::RefreshFromAssetDirectory(const FString& Path)
 	TArray<FString> MaterialInstanceFiles;
 #if WITH_EDITOR
 	TArray<FString> ObjSourceFiles;
+	TArray<FString> FbxSourceFiles;
 #endif
 
 	if (!fs::exists(RootPath) || !fs::is_directory(RootPath))
@@ -695,9 +830,9 @@ void FResourceManager::RefreshFromAssetDirectory(const FString& Path)
 				ObjSourceFiles.push_back(RelativePath);
 #endif
 			}
-			else if (Extension == L".bin")
+			else if (Extension == L".asset")
 			{
-				RegisterStaticMeshBinary(RelativePath);
+				RegisterCompiledAssetPath(*this, RelativePath);
 			}
 			else if (Extension == L".mtl")
 			{
@@ -742,7 +877,9 @@ void FResourceManager::RefreshFromAssetDirectory(const FString& Path)
 			}
 			else if (Extension == L".fbx")
 			{
-				SkeletalMeshFilePaths.push_back(RelativePath);
+#if WITH_EDITOR
+				FbxSourceFiles.push_back(RelativePath);
+#endif
 			}
 		}
 	}
@@ -756,6 +893,25 @@ void FResourceManager::RefreshFromAssetDirectory(const FString& Path)
 	for (const FString& ObjSourcePath : ObjSourceFiles)
 	{
 		ObjImporter.ImportIfNeeded(*this, ObjSourcePath, &MaterialFiles);
+	}
+
+	FFbxStaticMeshImporter FbxStaticMeshImporter;
+	FFbxSkeletalMeshImporter FbxSkeletalMeshImporter;
+	for (const FString& FbxSourcePath : FbxSourceFiles)
+	{
+		const EFbxStaticMeshImportResult ImportResult =
+			FbxStaticMeshImporter.ImportIfStaticMeshNeeded(*this, FbxSourcePath, &MaterialFiles);
+		if (ImportResult == EFbxStaticMeshImportResult::ImportedStaticMesh)
+		{
+			continue;
+		}
+
+		const EFbxSkeletalMeshImportResult SkeletalImportResult =
+			FbxSkeletalMeshImporter.ImportIfSkeletalMeshNeeded(*this, FbxSourcePath, &MaterialFiles);
+		if (SkeletalImportResult == EFbxSkeletalMeshImportResult::Failed)
+		{
+			UE_LOG("[ResourceManager] FBX skeletal import failed: %s", FbxSourcePath.c_str());
+		}
 	}
 #endif
 
@@ -785,37 +941,74 @@ void FResourceManager::DeleteAllCacheFiles()
 {
 	namespace fs = std::filesystem;
 
-	const fs::path BinRootPath = fs::path(FPaths::RootDir()) / "Asset" / "Mesh" / "Bin";
+	const fs::path ProjectRootPath(FPaths::RootDir());
+	const TArray<fs::path> CacheRootPaths = {
+		ProjectRootPath / "Asset" / "Mesh",
+		ProjectRootPath / "Asset" / "Fbx",
+	};
 
-	if (!fs::exists(BinRootPath) || !fs::is_directory(BinRootPath))
+	TArray<fs::path> CandidateDirectories;
+	for (const fs::path& CacheRootPath : CacheRootPaths)
 	{
-		return;
-	}
-
-	for (const auto& Entry : fs::recursive_directory_iterator(BinRootPath))
-	{
-		if (!Entry.is_regular_file())
+		if (!fs::exists(CacheRootPath) || !fs::is_directory(CacheRootPath))
 		{
 			continue;
 		}
 
-		const fs::path& FilePath = Entry.path();
-		if (FilePath.extension() == L".bin")
+		for (const auto& Entry : fs::recursive_directory_iterator(CacheRootPath))
 		{
+			if (!Entry.is_regular_file())
+			{
+				continue;
+			}
+
+			const fs::path& FilePath = Entry.path();
+			if (ToLowerPathToken(FilePath.extension().wstring()) != L".asset")
+			{
+				continue;
+			}
+
+			const FString RelativePath = FPaths::ToRelativeString(FilePath.generic_wstring());
+			FStaticMeshBinaryHeader Header;
+			if (!BinarySerializer.ReadAssetHeader(RelativePath, Header) ||
+				!IsManagedCompiledAssetType(Header.AssetType))
+			{
+				continue;
+			}
+
 			std::error_code Ec;
 			fs::remove(FilePath, Ec);
+			fs::path DirectoryPath = FilePath.parent_path();
+			while (!DirectoryPath.empty() && IsPathUnder(DirectoryPath, CacheRootPath))
+			{
+				CandidateDirectories.push_back(DirectoryPath);
+				if (DirectoryPath == CacheRootPath)
+				{
+					break;
+				}
+				DirectoryPath = DirectoryPath.parent_path();
+			}
 		}
 	}
 
-	// 빈 디렉토리 정리
-	for (auto It = fs::recursive_directory_iterator(BinRootPath);
-		 It != fs::recursive_directory_iterator();
-		 ++It)
+	std::sort(CandidateDirectories.begin(), CandidateDirectories.end(), [](const fs::path& Left, const fs::path& Right)
+	{
+		const std::wstring LeftPath = Left.generic_wstring();
+		const std::wstring RightPath = Right.generic_wstring();
+		if (LeftPath.size() != RightPath.size())
+		{
+			return LeftPath.size() > RightPath.size();
+		}
+		return LeftPath > RightPath;
+	});
+	CandidateDirectories.erase(std::unique(CandidateDirectories.begin(), CandidateDirectories.end()), CandidateDirectories.end());
+
+	for (const fs::path& DirectoryPath : CandidateDirectories)
 	{
 		std::error_code Ec;
-		if (It->is_directory(Ec) && fs::is_empty(It->path(), Ec))
+		if (fs::exists(DirectoryPath, Ec) && fs::is_directory(DirectoryPath, Ec) && fs::is_empty(DirectoryPath, Ec))
 		{
-			fs::remove(It->path(), Ec);
+			fs::remove(DirectoryPath, Ec);
 		}
 	}
 
@@ -1150,6 +1343,18 @@ void FResourceManager::ReleaseGPUResources()
 	}
 	StaticMeshes.clear();
 	StaticMeshRegistry.clear();
+
+	for (auto& [Path, SkeletalMeshAsset] : SkeletalMeshes)
+	{
+		UObjectManager::Get().DestroyObject(SkeletalMeshAsset);
+	}
+	SkeletalMeshes.clear();
+
+	for (auto& [Path, SkeletonAsset] : Skeletons)
+	{
+		UObjectManager::Get().DestroyObject(SkeletonAsset);
+	}
+	Skeletons.clear();
 
 	// D3D state object caches
 	SamplerStates.clear();
@@ -2220,7 +2425,7 @@ UStaticMesh* FResourceManager::LoadStaticMesh(const FString& Path, bool bNormali
 UStaticMesh* FResourceManager::LoadStaticMeshWithOptions(const FString& Path, const FStaticMeshLoadOptions& LoadOptions)
 {
 	(void)LoadOptions;
-	const FString MeshPath = FPaths::Normalize(Path);
+	FString MeshPath = FPaths::Normalize(Path);
 
 	// 메모리 캐시 확인
 	if (UStaticMesh* FoundMesh = FindStaticMesh(MeshPath))
@@ -2228,9 +2433,9 @@ UStaticMesh* FResourceManager::LoadStaticMeshWithOptions(const FString& Path, co
 		return FoundMesh;
 	}
 
-	if (!IsStaticMeshBinaryPath(MeshPath))
+	if (!IsStaticMeshAssetPath(MeshPath))
 	{
-		UE_LOG("[StaticMeshLoad] Runtime static mesh path must be .bin: %s", MeshPath.c_str());
+		UE_LOG("[StaticMeshLoad] Runtime static mesh path must be .asset: %s", MeshPath.c_str());
 		return nullptr;
 	}
 
@@ -2291,7 +2496,7 @@ UStaticMesh* FResourceManager::LoadStaticMeshWithOptions(const FString& Path, co
 		UE_LOG("[StaticMeshLoad] LOD generation skipped for %s (LOD is off)", MeshPath.c_str());
 	}
 
-	StaticMeshes.insert({MeshPath, LoadedMesh});
+	StaticMeshes.insert({ MeshPath, LoadedMesh });
 
 	return LoadedMesh;
 }
@@ -2411,23 +2616,57 @@ bool FResourceManager::SaveSkeletalMeshMaterialOverrides(const FString& Path, co
 
 USkeletalMesh* FResourceManager::LoadSkeletalMesh(const FString& Path)
 {
-    if (USkeletalMesh* FoundMesh = FindSkeletalMesh(Path))
+	const FString MeshPath = FPaths::Normalize(Path);
+    if (USkeletalMesh* FoundMesh = FindSkeletalMesh(MeshPath))
     {
         return FoundMesh;
     }
 
-    USkeletalMesh* LoadedMesh = FbxLoader.Load(Path);
+	if (!IsStaticMeshAssetPath(MeshPath))
+	{
+		UE_LOG("[SkeletalMeshLoad] Runtime skeletal mesh path must be .asset: %s", MeshPath.c_str());
+		return nullptr;
+	}
 
-    if (LoadedMesh == nullptr)
-    {
-        UE_LOG("[SkeletalMeshLoad] Failed | Path=%s", Path.c_str());
-        return nullptr;
-    }
+	FSkeletalMesh* LoadedMeshData = new FSkeletalMesh();
+	if (!BinarySerializer.LoadSkeletalMesh(MeshPath, *LoadedMeshData))
+	{
+		delete LoadedMeshData;
+		UE_LOG("[SkeletalMeshLoad] Failed to load asset: %s", MeshPath.c_str());
+		return nullptr;
+	}
 
-    LoadSkeletalMeshMaterialOverrides(Path, LoadedMesh);
+	LoadedMeshData->PathFileName = MeshPath;
+	if (LoadedMeshData->SkeletonAssetPath.empty())
+	{
+		delete LoadedMeshData;
+		UE_LOG("[SkeletalMeshLoad] Missing skeleton asset path: %s", MeshPath.c_str());
+		return nullptr;
+	}
+
+	USkeleton* LoadedSkeleton = LoadSkeleton(LoadedMeshData->SkeletonAssetPath);
+	if (LoadedSkeleton == nullptr)
+	{
+		delete LoadedMeshData;
+		UE_LOG("[SkeletalMeshLoad] Failed to load skeleton %s for %s",
+			LoadedMeshData->SkeletonAssetPath.c_str(),
+			MeshPath.c_str());
+		return nullptr;
+	}
+
+	USkeletalMesh* LoadedMesh = UObjectManager::Get().CreateObject<USkeletalMesh>();
+	LoadedMesh->SetMeshData(LoadedMeshData);
+	LoadedMesh->SetSkeleton(LoadedSkeleton);
+
+    LoadSkeletalMeshMaterialOverrides(MeshPath, LoadedMesh);
 
     for (FSkeletalMeshMaterialSlot& Slot : LoadedMesh->GetMeshData()->MaterialSlots)
     {
+		if (Slot.Material == nullptr && !Slot.MaterialAssetPath.empty())
+		{
+			Slot.Material = GetMaterialInterface(Slot.MaterialAssetPath);
+		}
+
         if (Slot.Material == nullptr)
         {
             Slot.Material = GetMaterialInterface(Slot.SlotName);
@@ -2439,9 +2678,11 @@ USkeletalMesh* FResourceManager::LoadSkeletalMesh(const FString& Path)
         }
     }
 
-    SkeletalMeshes.insert({ Path, LoadedMesh });
+    SkeletalMeshes.insert({ MeshPath, LoadedMesh });
 
-    UE_LOG("[SkeletalMeshLoad] Loaded | Path=%s", Path.c_str());
+    UE_LOG("[SkeletalMeshLoad] Loaded | Path=%s | Skeleton=%s",
+		MeshPath.c_str(),
+		LoadedMeshData->SkeletonAssetPath.c_str());
 
     return LoadedMesh;
 }
@@ -2449,6 +2690,12 @@ USkeletalMesh* FResourceManager::LoadSkeletalMesh(const FString& Path)
 USkeletalMesh* FResourceManager::FindSkeletalMesh(const FString& Path) const
 {
     auto It = SkeletalMeshes.find(Path);
+	if (It == SkeletalMeshes.end())
+	{
+		const FString NormalizedPath = FPaths::Normalize(Path);
+		It = SkeletalMeshes.find(NormalizedPath);
+	}
+
     if (It == SkeletalMeshes.end())
     {
         return nullptr;
@@ -2460,6 +2707,58 @@ USkeletalMesh* FResourceManager::FindSkeletalMesh(const FString& Path) const
 TArray<FString> FResourceManager::GetSkeletalMeshPaths() const
 {
     return SkeletalMeshFilePaths;
+}
+
+USkeleton* FResourceManager::LoadSkeleton(const FString& Path)
+{
+	const FString SkeletonPath = FPaths::Normalize(Path);
+	if (USkeleton* FoundSkeleton = FindSkeleton(SkeletonPath))
+	{
+		return FoundSkeleton;
+	}
+
+	if (!IsStaticMeshAssetPath(SkeletonPath))
+	{
+		UE_LOG("[SkeletonLoad] Runtime skeleton path must be .asset: %s", SkeletonPath.c_str());
+		return nullptr;
+	}
+
+	FSkeleton* LoadedSkeletonData = new FSkeleton();
+	if (!BinarySerializer.LoadSkeleton(SkeletonPath, *LoadedSkeletonData))
+	{
+		delete LoadedSkeletonData;
+		UE_LOG("[SkeletonLoad] Failed to load asset: %s", SkeletonPath.c_str());
+		return nullptr;
+	}
+
+	LoadedSkeletonData->PathFileName = SkeletonPath;
+
+	USkeleton* LoadedSkeleton = UObjectManager::Get().CreateObject<USkeleton>();
+	LoadedSkeleton->SetSkeletonData(LoadedSkeletonData);
+	Skeletons.insert({ SkeletonPath, LoadedSkeleton });
+
+	UE_LOG("[SkeletonLoad] Loaded | Path=%s | Bones=%d",
+		SkeletonPath.c_str(),
+		static_cast<int32>(LoadedSkeletonData->Bones.size()));
+
+	return LoadedSkeleton;
+}
+
+USkeleton* FResourceManager::FindSkeleton(const FString& Path) const
+{
+	auto It = Skeletons.find(Path);
+	if (It == Skeletons.end())
+	{
+		const FString NormalizedPath = FPaths::Normalize(Path);
+		It = Skeletons.find(NormalizedPath);
+	}
+
+	return It != Skeletons.end() ? It->second : nullptr;
+}
+
+TArray<FString> FResourceManager::GetSkeletonPaths() const
+{
+	return SkeletonFilePaths;
 }
 
 const TArray<FString>& FResourceManager::GetTextureFilePath() const

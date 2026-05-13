@@ -41,7 +41,7 @@ private:
 	FAABB BuildLocalBounds(FStaticMesh* InStaticMesh) const;
 	void ComputeNormals(FObjRawData& RawData);
 	bool EnsureMaterialAssets(FResourceManager& ResourceManager, const FString& SourcePath, TMap<FString, FString>& OutMaterialAssetPaths, TArray<FString>* OutMaterialPaths);
-	bool IsStaticMeshBinaryValid(const FString& SourcePath, const FString& BinaryPath) const;
+	bool IsStaticMeshAssetValid(const FString& SourcePath, const FString& AssetPath) const;
 
 private:
 	TArray<FString> BuiltMaterialSlotName;

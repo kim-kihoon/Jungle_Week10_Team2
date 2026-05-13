@@ -26,8 +26,8 @@
 
 namespace
 {
-	// FBX 화면 출력 테스트용 하드코딩 경로.
-	constexpr const char* GTestSkeletalMeshPath = "Asset/Fbx/Hip_Hop_Dancing/Hip_Hop_Dancing.fbx";
+	// SkeletalMesh actor test asset.
+	constexpr const char* GTestSkeletalMeshPath = "Asset/Fbx/Hip_Hop_Dancing/Hip_Hop_Dancing.asset";
 	constexpr float GTestSkeletalMeshScale = 1.0f;
 }
 

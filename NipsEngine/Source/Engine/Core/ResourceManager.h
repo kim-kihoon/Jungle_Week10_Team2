@@ -4,7 +4,6 @@
 #include "Asset/FontAtlasLoader.h"
 #include "Asset/ParticleAtlasLoader.h"
 #include "Asset/StaticMesh.h"
-#include "Asset/FbxLoader.h"
 #include "Core/CoreTypes.h"
 #include "Core/Singleton.h"
 #include "Core/ResourceTypes.h"
@@ -14,6 +13,9 @@
 #include "Render/Resource/Texture.h"
 #include "Render/Resource/RenderResources.h"
 #include <d3d11.h>
+
+class USkeleton;
+class USkeletalMesh;
 
 // 리소스를 관리하는 싱글턴.
 // Resource.ini에서 리소스 경로/그리드 정보를 읽고, GPU 리소스를 로드/캐싱합니다.
@@ -138,12 +140,19 @@ public:
 	UStaticMesh* LoadStaticMesh(const FString& Path, bool bNormalizeToUnitCube);
 	UStaticMesh* FindStaticMesh(const FString& Path) const;
 	TArray<FString> GetStaticMeshPaths() const;
-	FString MakeStaticMeshBinaryPath(const FString& SourcePath) const;
-	bool RegisterStaticMeshBinary(const FString& BinaryPath);
+	FString MakeStaticMeshAssetPath(const FString& SourcePath) const;
+	bool RegisterStaticMeshAsset(const FString& AssetPath);
 
 	USkeletalMesh* LoadSkeletalMesh(const FString& Path);
     USkeletalMesh* FindSkeletalMesh(const FString& Path) const;
     TArray<FString> GetSkeletalMeshPaths() const;
+	FString MakeSkeletalMeshAssetPath(const FString& SourcePath) const;
+	FString MakeSkeletonAssetPath(const FString& SourcePath) const;
+	bool RegisterSkeletalMeshAsset(const FString& AssetPath);
+	bool RegisterSkeletonAsset(const FString& AssetPath);
+	USkeleton* LoadSkeleton(const FString& Path);
+	USkeleton* FindSkeleton(const FString& Path) const;
+	TArray<FString> GetSkeletonPaths() const;
 	bool LoadSkeletalMeshMaterialOverrides(const FString& Path, USkeletalMesh* Mesh);
 	bool SaveSkeletalMeshMaterialOverrides(const FString& Path, const USkeletalMesh* Mesh) const;
 
@@ -206,7 +215,8 @@ private:
 	TArray<FString> FontFilePaths;
 	TArray<FString> TextureFilePaths;
 
-	FFbxLoader FbxLoader;
     TMap<FString, USkeletalMesh*> SkeletalMeshes;
+	TMap<FString, USkeleton*> Skeletons;
     TArray<FString> SkeletalMeshFilePaths;
+	TArray<FString> SkeletonFilePaths;
 };

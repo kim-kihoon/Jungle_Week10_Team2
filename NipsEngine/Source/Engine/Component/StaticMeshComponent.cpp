@@ -12,7 +12,7 @@ REGISTER_FACTORY(UStaticMeshComponent)
 UStaticMeshComponent::UStaticMeshComponent()
 {
     //	기본 도형은 Cube로 설정
-    SetStaticMesh(FResourceManager::Get().LoadStaticMesh("Asset/Mesh/Bin/Dice/Dice.bin"));
+    SetStaticMesh(FResourceManager::Get().LoadStaticMesh("Asset/Mesh/Dice/Dice.asset"));
 }
 
 // 프로퍼티 시스템에 노출되지 않은 필드를 직접 복사합니다.
@@ -62,7 +62,7 @@ void UStaticMeshComponent::Serialize(FArchive& Ar)
 			Ar << "ObjStaticMeshAsset" << StaticMeshAssetPath;
 			if (!StaticMeshAssetPath.empty())
 			{
-				StaticMeshAssetPath = FResourceManager::Get().MakeStaticMeshBinaryPath(StaticMeshAssetPath);
+				StaticMeshAssetPath = FResourceManager::Get().MakeStaticMeshAssetPath(StaticMeshAssetPath);
 			}
 		}
 	}

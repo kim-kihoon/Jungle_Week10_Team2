@@ -15,7 +15,7 @@
 namespace
 {
 int32 GPreviewWorldCounter = 0;
-constexpr const char* DefaultSkeletalMeshPath = "Asset/Fbx/Quinn_UE5/SKM_Quinn_Simple.FBX";
+constexpr const char* DefaultSkeletalMeshPath = "Asset/Fbx/Quinn_UE5/SKM_Quinn_Simple.asset";
 }
 
 FSkeletalMeshPreviewScene::~FSkeletalMeshPreviewScene()

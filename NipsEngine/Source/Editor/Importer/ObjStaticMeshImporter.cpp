@@ -351,8 +351,8 @@ bool FObjStaticMeshImporter::ImportIfNeeded(FResourceManager& ResourceManager, c
 	TMap<FString, FString> MaterialAssetPaths;
 	EnsureMaterialAssets(ResourceManager, SourcePath, MaterialAssetPaths, OutMaterialPaths);
 
-	const FString BinaryPath = ResourceManager.MakeStaticMeshBinaryPath(SourcePath);
-	if (!IsStaticMeshBinaryValid(SourcePath, BinaryPath))
+	const FString AssetPath = ResourceManager.MakeStaticMeshAssetPath(SourcePath);
+	if (!IsStaticMeshAssetValid(SourcePath, AssetPath))
 	{
 		const auto ObjStart = std::chrono::steady_clock::now();
 		FStaticMeshLoadOptions LoadOptions;
@@ -367,29 +367,29 @@ bool FObjStaticMeshImporter::ImportIfNeeded(FResourceManager& ResourceManager, c
 			return false;
 		}
 
-		MeshData->PathFileName = BinaryPath;
+		MeshData->PathFileName = AssetPath;
 		for (FStaticMeshMaterialSlot& Slot : MeshData->Slots)
 		{
 			auto It = MaterialAssetPaths.find(Slot.SlotName);
 			Slot.MaterialAssetPath = (It != MaterialAssetPaths.end()) ? It->second : FString("DefaultWhite");
 		}
 
-		const bool bSaveBinaryOk = BinarySerializer.SaveStaticMesh(BinaryPath, SourcePath, *MeshData);
-		UE_LOG("[ObjStaticMeshImporter] Source=%s | Binary=%s | ObjSec=%.6f | BinarySave=%s",
+		const bool bSaveAssetOk = BinarySerializer.SaveStaticMesh(AssetPath, SourcePath, *MeshData);
+		UE_LOG("[ObjStaticMeshImporter] Source=%s | Asset=%s | ObjSec=%.6f | AssetSave=%s",
 			SourcePath.c_str(),
-			BinaryPath.c_str(),
+			AssetPath.c_str(),
 			ObjLoadSec,
-			bSaveBinaryOk ? "OK" : "FAIL");
+			bSaveAssetOk ? "OK" : "FAIL");
 
 		delete MeshData;
 
-		if (!bSaveBinaryOk)
+		if (!bSaveAssetOk)
 		{
 			return false;
 		}
 	}
 
-	return ResourceManager.RegisterStaticMeshBinary(BinaryPath);
+	return ResourceManager.RegisterStaticMeshAsset(AssetPath);
 }
 
 bool FObjStaticMeshImporter::EnsureMaterialAssets(FResourceManager& ResourceManager, const FString& SourcePath, TMap<FString, FString>& OutMaterialAssetPaths, TArray<FString>* OutMaterialPaths)
@@ -444,10 +444,10 @@ bool FObjStaticMeshImporter::EnsureMaterialAssets(FResourceManager& ResourceMana
 	return !OutMaterialAssetPaths.empty();
 }
 
-bool FObjStaticMeshImporter::IsStaticMeshBinaryValid(const FString& SourcePath, const FString& BinaryPath) const
+bool FObjStaticMeshImporter::IsStaticMeshAssetValid(const FString& SourcePath, const FString& AssetPath) const
 {
 	FStaticMeshBinaryHeader Header;
-	if (!BinarySerializer.ReadStaticMeshHeader(BinaryPath, Header))
+	if (!BinarySerializer.ReadStaticMeshHeader(AssetPath, Header))
 	{
 		return false;
 	}
