@@ -1,4 +1,4 @@
-#include "Editor/UI/EditorToolbarWidget.h"
+﻿#include "Editor/UI/EditorToolbarWidget.h"
 
 #include "Editor/UI/EditorContentDrawerWidget.h"
 #include "Editor/UI/EditorSceneWidget.h"
@@ -619,6 +619,8 @@ void FEditorToolbarWidget::RenderGizmoTools()
 		Gizmo->SetScaleMode();
 	}
 	ImGui::SameLine();
+    ImGui::TextDisabled("|");
+    ImGui::SameLine();
 
 	const bool bWorldSpace = Gizmo->IsWorldSpace();
 	UTexture* CurrentSpaceIconTexture = bWorldSpace ? WorldSpaceIconTexture : LocalSpaceIconTexture;
@@ -636,7 +638,8 @@ void FEditorToolbarWidget::RenderGizmoTools()
 		Gizmo->SetWorldSpace(!bWorldSpace);
 	}
 	ImGui::SameLine();
-
+    ImGui::TextDisabled("|");
+    ImGui::SameLine();
 	constexpr ImVec2 SnapButtonSize(28.0f, 22.0f);
 	constexpr ImVec2 SnapIconSize(18.0f, 18.0f);
 	constexpr float DegToRad = 0.017453292519943295f;
