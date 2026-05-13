@@ -1,4 +1,4 @@
-#include "Buffer.h"
+﻿#include "Buffer.h"
 
 #pragma region __FMESHBUFFER__
 
@@ -17,7 +17,7 @@ void FVertexBuffer::SetRaw(ID3D11Buffer* InBuffer, uint32 InVertexCount, uint32 
 	Release();
 	Buffer.Attach(InBuffer);
 	VertexCount = InVertexCount;
-	Stride      = InStride;
+	Stride = InStride;
 }
 
 void FVertexBuffer::Release()
@@ -30,6 +30,25 @@ ID3D11Buffer* FVertexBuffer::GetBuffer() const
 	return Buffer.Get();
 }
 
+void FDynamicVertexBuffer::SetRaw(ID3D11Buffer* InBuffer, uint32 InVertexCount, uint32 InStride)
+{
+	Release();
+	Buffer.Attach(InBuffer);
+	VertexCount = InVertexCount;
+	MaxVertexCount = InVertexCount;
+	Stride = InStride;
+}
+
+void FDynamicVertexBuffer::Release()
+{
+	Buffer.Reset();
+}
+
+ID3D11Buffer* FDynamicVertexBuffer::GetBuffer() const
+{
+	return Buffer.Get();
+}
+
 #pragma endregion
 
 #pragma region __FCONSTANTBUFFER__
@@ -38,9 +57,9 @@ ID3D11Buffer* FVertexBuffer::GetBuffer() const
 void FConstantBuffer::Create(ID3D11Device* InDevice, uint32 InByteWidth)
 {
 	D3D11_BUFFER_DESC Desc = {};
-	Desc.ByteWidth      = (InByteWidth + 0xf) & 0xfffffff0;
-	Desc.Usage          = D3D11_USAGE_DYNAMIC;
-	Desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+	Desc.ByteWidth = (InByteWidth + 0xf) & 0xfffffff0;
+	Desc.Usage = D3D11_USAGE_DYNAMIC;
+	Desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	Desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
 	InDevice->CreateBuffer(&Desc, nullptr, Buffer.ReleaseAndGetAddressOf());
@@ -81,7 +100,7 @@ void FIndexBuffer::Create(ID3D11Device* InDevice, const TArray<uint32>& InData)
 	}
 
 	D3D11_BUFFER_DESC Desc = {};
-	Desc.Usage     = D3D11_USAGE_IMMUTABLE;
+	Desc.Usage = D3D11_USAGE_IMMUTABLE;
 	Desc.ByteWidth = static_cast<uint32>(sizeof(uint32) * InData.size());
 	Desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
 
@@ -106,6 +125,12 @@ void FIndexBuffer::Release()
 ID3D11Buffer* FIndexBuffer::GetBuffer() const
 {
 	return Buffer.Get();
+}
+
+void FDynamicMeshBuffer::Release()
+{
+	DynamicVertexBuffer.Release();
+	IndexBuffer.Release();
 }
 
 void FStructuredBuffer::Create(ID3D11Device* InDevice, uint32 InElementSize, uint32 InMaxElements)
@@ -133,7 +158,7 @@ void FStructuredBuffer::Create(ID3D11Device* InDevice, uint32 InElementSize, uin
 	SRVDesc.Format = DXGI_FORMAT_UNKNOWN;
 	SRVDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
 	SRVDesc.Buffer.FirstElement = 0;
-	SRVDesc.Buffer.NumElements  = InMaxElements;
+	SRVDesc.Buffer.NumElements = InMaxElements;
 	InDevice->CreateShaderResourceView(Buffer.Get(), &SRVDesc, SRV.ReleaseAndGetAddressOf());
 }
 
@@ -141,7 +166,7 @@ void FStructuredBuffer::Release()
 {
 	Buffer.Reset();
 	SRV.Reset();
-	Count       = 0;
+	Count = 0;
 	ElementSize = 0;
 	MaxElements = 0;
 }

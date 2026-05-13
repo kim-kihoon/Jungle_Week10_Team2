@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 /*
 	Vertex Buffer와 Constant Buffer를 관리하는 Class 입니다.
@@ -18,24 +18,58 @@ struct ID3D11DeviceContext;
 struct ID3D11Buffer;
 struct ID3D11ShaderResourceView;
 
-class FVertexBuffer
+class FVertexBufferBase
+{
+public:
+    virtual ~FVertexBufferBase() = default;
+    virtual void Release() = 0;
+    virtual uint32 GetVertexCount() const = 0;
+    virtual uint32 GetStride() const = 0;
+    virtual ID3D11Buffer* GetBuffer() const = 0;
+};
+
+class FVertexBuffer : public FVertexBufferBase
 {
 public:
     template<typename TVertex>
     void Create(ID3D11Device* InDevice, const TArray<TVertex>& InData);
 
-	void SetRaw(ID3D11Buffer* InBuffer, uint32 InVertexCount, uint32 InStride);
-	void Release();
+    void SetRaw(ID3D11Buffer* InBuffer, uint32 InVertexCount, uint32 InStride);
+    void Release() override;
 
-	uint32 GetVertexCount() const { return VertexCount; }
-	uint32 GetStride() const { return Stride; }
+    uint32 GetVertexCount() const override { return VertexCount; }
+    uint32 GetStride() const override { return Stride; }
 
-	ID3D11Buffer* GetBuffer() const;
+    ID3D11Buffer* GetBuffer() const override;
 
 private:
-	TComPtr<ID3D11Buffer> Buffer;
-	uint32 VertexCount = 0;
-	uint32 Stride = 0;
+    TComPtr<ID3D11Buffer> Buffer;
+    uint32 VertexCount = 0;
+    uint32 Stride = 0;
+};
+
+class FDynamicVertexBuffer : public FVertexBufferBase
+{
+public:
+    template<typename TVertex>
+    void Create(ID3D11Device* InDevice, const TArray<TVertex>& InData);
+
+    template<typename TVertex>
+    void Update(ID3D11DeviceContext* InContext, const TArray<TVertex>& InData);
+
+    void SetRaw(ID3D11Buffer* InBuffer, uint32 InVertexCount, uint32 InStride);
+    void Release() override;
+
+    uint32 GetVertexCount() const override { return VertexCount; }
+    uint32 GetStride() const override { return Stride; }
+
+    ID3D11Buffer* GetBuffer() const override;
+
+private:
+    TComPtr<ID3D11Buffer> Buffer;
+    uint32 VertexCount = 0;
+    uint32 Stride = 0;
+    uint32 MaxVertexCount = 0;
 };
 
 class FConstantBuffer
@@ -70,20 +104,41 @@ private:
 class FMeshBuffer
 {
 public:
+    virtual ~FMeshBuffer() = default;
+
     template<typename TVertex>
     void Create(ID3D11Device* InDevice, const TArray<TVertex>& InVertices, const TArray<uint32>& InIndices);
 
-	void Release();
+    virtual void Release();
 
-	FVertexBuffer& GetVertexBuffer() { return VertexBuffer; }
-	FIndexBuffer& GetIndexBuffer() { return IndexBuffer; }
-	const FVertexBuffer& GetVertexBuffer() const { return VertexBuffer; }
-	const FIndexBuffer& GetIndexBuffer() const { return IndexBuffer; }
-	bool IsValid() const { return VertexBuffer.GetBuffer() != nullptr && VertexBuffer.GetVertexCount() > 0; }
+    virtual FVertexBufferBase& GetVertexBuffer() { return VertexBuffer; }
+    virtual FIndexBuffer& GetIndexBuffer() { return IndexBuffer; }
+    virtual const FVertexBufferBase& GetVertexBuffer() const { return VertexBuffer; }
+    virtual const FIndexBuffer& GetIndexBuffer() const { return IndexBuffer; }
+    virtual bool IsValid() const { return GetVertexBuffer().GetBuffer() != nullptr && GetVertexBuffer().GetVertexCount() > 0; }
+
+protected:
+    FVertexBuffer VertexBuffer;
+    FIndexBuffer IndexBuffer;
+};
+
+class FDynamicMeshBuffer : public FMeshBuffer
+{
+public:
+    template<typename TVertex>
+    void Create(ID3D11Device* InDevice, const TArray<TVertex>& InVertices, const TArray<uint32>& InIndices);
+
+    template<typename TVertex>
+    void Update(ID3D11DeviceContext* InContext, const TArray<TVertex>& InVertices);
+
+    void Release() override;
+
+    FVertexBufferBase& GetVertexBuffer() override { return DynamicVertexBuffer; }
+    const FVertexBufferBase& GetVertexBuffer() const override { return DynamicVertexBuffer; }
+    bool IsValid() const override { return DynamicVertexBuffer.GetBuffer() != nullptr && DynamicVertexBuffer.GetVertexCount() > 0; }
 
 private:
-	FVertexBuffer VertexBuffer;
-	FIndexBuffer IndexBuffer;
+    FDynamicVertexBuffer DynamicVertexBuffer;
 };
 
 class FStructuredBuffer
@@ -138,6 +193,62 @@ void FVertexBuffer::Create(ID3D11Device* InDevice, const TArray<TVertex>& InData
     VertexCount = static_cast<uint32>(InData.size());
     Stride = InStride;
 }
+template <typename TVertex>
+void FDynamicVertexBuffer::Create(ID3D11Device* InDevice, const TArray<TVertex>& InData)
+{
+    if (InData.empty() || !InDevice)
+    {
+        Release();
+        VertexCount = static_cast<uint32>(InData.size());
+        MaxVertexCount = VertexCount;
+        Stride = sizeof(TVertex);
+        return;
+    }
+
+    const uint32 InStride = sizeof(TVertex);
+    const uint32 InByteWidth = static_cast<uint32>(InStride * InData.size());
+
+    D3D11_BUFFER_DESC Desc = {};
+    Desc.ByteWidth = InByteWidth;
+    Desc.Usage = D3D11_USAGE_DYNAMIC;
+    Desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    Desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+    D3D11_SUBRESOURCE_DATA SRD = { InData.data() };
+
+    HRESULT hr = InDevice->CreateBuffer(&Desc, &SRD, Buffer.ReleaseAndGetAddressOf());
+    if (FAILED(hr))
+    {
+        Release();
+        VertexCount = 0;
+        Stride = InStride;
+        return;
+    }
+
+    VertexCount = static_cast<uint32>(InData.size());
+    MaxVertexCount = VertexCount;
+    Stride = InStride;
+}
+
+template <typename TVertex>
+void FDynamicVertexBuffer::Update(ID3D11DeviceContext* InContext, const TArray<TVertex>& InData)
+{
+    if (!Buffer || InData.empty()) return;
+
+    uint32 NewVertexCount = static_cast<uint32>(InData.size());
+
+    if (NewVertexCount > MaxVertexCount) { return; }
+
+    D3D11_MAPPED_SUBRESOURCE MappedResource;
+    HRESULT hr = InContext->Map(Buffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &MappedResource);
+    if (SUCCEEDED(hr))
+    {
+        const uint32 InByteWidth = static_cast<uint32>(sizeof(TVertex) * InData.size());
+        memcpy(MappedResource.pData, InData.data(), InByteWidth);
+        InContext->Unmap(Buffer.Get(), 0);
+        VertexCount = NewVertexCount;
+    }
+}
 
 template <typename TVertex>
 void FMeshBuffer::Create(ID3D11Device* InDevice, const TArray<TVertex>& InVertices, const TArray<uint32>& InIndices)
@@ -153,4 +264,26 @@ void FMeshBuffer::Create(ID3D11Device* InDevice, const TArray<TVertex>& InVertic
     {
         IndexBuffer.Create(InDevice, InIndices);
     }
+}
+
+template <typename TVertex>
+void FDynamicMeshBuffer::Create(ID3D11Device* InDevice, const TArray<TVertex>& InVertices, const TArray<uint32>& InIndices)
+{
+    if (InVertices.empty() || !InDevice)
+    {
+        DynamicVertexBuffer.Release();
+        IndexBuffer.Release();
+        return;
+    }
+    DynamicVertexBuffer.Create(InDevice, InVertices);
+    if (!InIndices.empty())
+    {
+        IndexBuffer.Create(InDevice, InIndices);
+    }
+}
+
+template <typename TVertex>
+void FDynamicMeshBuffer::Update(ID3D11DeviceContext* InContext, const TArray<TVertex>& InVertices)
+{
+    DynamicVertexBuffer.Update(InContext, InVertices);
 }

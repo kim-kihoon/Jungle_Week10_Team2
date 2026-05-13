@@ -8,7 +8,6 @@
 #include "Render/Mesh/MeshManager.h"
 
 class UStaticMesh;
-class USkinnedMeshComponent;
 
 /*
 	Mesh Manager에서 넘겨 받은 MeshData를 바탕으로 MeshBuffer를 생성하고 소유합니다.
@@ -24,7 +23,6 @@ private:
 	ID3D11Device* Device = nullptr;
 	TMap<EPrimitiveType, FMeshBuffer> MeshBufferMap;
 	TMap<const UStaticMesh*, FMeshBuffer> StaticMeshBufferMap[MAX_LOD];
-	TMap<const USkinnedMeshComponent*, FMeshBuffer> SkeletalMeshBufferMap;
 
 public:
 
@@ -36,5 +34,4 @@ public:
 
 	FMeshBuffer& GetMeshBuffer(EPrimitiveType InPrimitiveType);
 	FMeshBuffer* GetStaticMeshBuffer(const UStaticMesh* StaticMeshAsset, int32 LODLevel = 0);
-	FMeshBuffer* GetSkeletalMeshBuffer(USkinnedMeshComponent* SkinnedMeshComponent);
 };
