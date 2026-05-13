@@ -15,6 +15,7 @@ struct FStaticMeshSection
 struct FStaticMeshMaterialSlot
 {
 	FString SlotName;
+	FString MaterialAssetPath;
 	UMaterialInterface* Material = nullptr;
 };
 

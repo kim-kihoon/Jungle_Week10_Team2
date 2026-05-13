@@ -202,7 +202,7 @@ void FSceneSaveManager::CollectComponentsFlat(USceneComponent* Comp, uint32 Pare
     for (const auto& Prop : Descriptors)
     {
         FString OutKey = Prop.Name;
-        if (strcmp(Prop.Name, "StaticMesh") == 0) OutKey = "ObjStaticMeshAsset";
+        if (strcmp(Prop.Name, "StaticMesh") == 0) OutKey = "StaticMeshAsset";
         PrimObj[OutKey] = SerializePropertyValue(Prop);
     }
 
@@ -1070,10 +1070,22 @@ void FSceneSaveManager::DeserializeProperties(UActorComponent* Comp, json::JSON&
 	for (auto& Prop : Descriptors) {
 		FString JsonKey = Prop.Name;
 		if (strcmp(Prop.Name, "StaticMesh") == 0)
-			JsonKey = "ObjStaticMeshAsset";
+		{
+			JsonKey = PropsJSON.hasKey("StaticMeshAsset") ? "StaticMeshAsset" : "ObjStaticMeshAsset";
+		}
 		if (!PropsJSON.hasKey(JsonKey)) continue;
 
 		auto Value = PropsJSON[JsonKey];
+		if (strcmp(Prop.Name, "StaticMesh") == 0 && JsonKey == "ObjStaticMeshAsset")
+		{
+			FString MeshPath = Value.ToString();
+			if (!MeshPath.empty())
+			{
+				*static_cast<FString*>(Prop.ValuePtr) = FResourceManager::Get().MakeStaticMeshAssetPath(MeshPath);
+				Comp->PostEditProperty(Prop.Name);
+				continue;
+			}
+		}
 		DeserializePropertyValue(Prop, Value, UUIDToSceneComp);
 		Comp->PostEditProperty(Prop.Name);
 	}

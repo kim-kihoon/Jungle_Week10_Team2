@@ -45,6 +45,7 @@ struct FSkeletalMeshSection
 struct FSkeletalMeshMaterialSlot
 {
     FString SlotName;
+    FString MaterialAssetPath;
     UMaterialInterface* Material = nullptr;
     FString ExtractedDiffusePath;
     FString ExtractedNormalPath;
@@ -66,6 +67,7 @@ struct FSkeletalBone
 struct FSkeletalMesh
 {
     FString PathFileName;
+    FString SkeletonAssetPath;
 
     TArray<FSkeletalMeshVertex> Vertices;
     TArray<uint32> Indices;
