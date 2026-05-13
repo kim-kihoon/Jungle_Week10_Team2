@@ -27,20 +27,20 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v145</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v145</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Game|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v145</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -151,6 +151,7 @@ if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" xcopy /Y /D
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="HighPerformanceGpuHint.cpp" />
     <ClCompile Include="Source\Editor\EditorEngine.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Game|x64'">true</ExcludedFromBuild>
@@ -270,22 +271,54 @@ if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" xcopy /Y /D
     <ClCompile Include="Source\Engine\Asset\BinarySerializer.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
-    <ClCompile Include="Source\Engine\Asset\FbxLoader.cpp">
-      <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
-    </ClCompile>
     <ClCompile Include="Source\Engine\Asset\FileUtils.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
     <ClCompile Include="Source\Engine\Asset\FontAtlasLoader.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
-    <ClCompile Include="Source\Engine\Asset\ObjLoader.cpp">
+    <ClCompile Include="Source\Editor\Importer\Fbx\FbxAssetImporter.cpp">
+      <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Game|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="Source\Editor\Importer\Fbx\FbxMaterialExtractor.cpp">
+      <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Game|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="Source\Editor\Importer\Fbx\FbxSceneDocument.cpp">
+      <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Game|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="Source\Editor\Importer\Fbx\FbxSceneInspector.cpp">
+      <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Game|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="Source\Editor\Importer\Fbx\FbxSceneUtils.cpp">
+      <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Game|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="Source\Editor\Importer\Fbx\FbxSkeletalMeshExtractor.cpp">
+      <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Game|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="Source\Editor\Importer\Fbx\FbxSkeletonExtractor.cpp">
+      <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Game|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="Source\Editor\Importer\Fbx\FbxStaticMeshExtractor.cpp">
+      <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Game|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="Source\Editor\Importer\ObjStaticMeshImporter.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
     <ClCompile Include="Source\Engine\Asset\ParticleAtlasLoader.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
     <ClCompile Include="Source\Engine\Asset\SkeletalMesh.cpp">
+      <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Asset\Skeleton.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
     <ClCompile Include="Source\Engine\Asset\StaticMesh.cpp">
@@ -681,7 +714,7 @@ if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" xcopy /Y /D
     <ClCompile Include="Source\Engine\Render\Resource\MeshBufferManager.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
-    <ClCompile Include="Source\Engine\Render\Resource\ObjMtlLoader.cpp">
+    <ClCompile Include="Source\Editor\Importer\ObjMtlImporter.cpp">
       <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
     <ClCompile Include="Source\Engine\Render\Resource\Shader.cpp">
@@ -890,15 +923,24 @@ if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" xcopy /Y /D
     <ClInclude Include="Source\Editor\Viewport\SkeletalMeshPreviewViewportClient.h" />
     <ClInclude Include="Source\Editor\Viewport\ViewportLayout.h" />
     <ClInclude Include="Source\Engine\Asset\BinarySerializer.h" />
-    <ClInclude Include="Source\Engine\Asset\FbxLoader.h" />
     <ClInclude Include="Source\Engine\Asset\FileUtils.h" />
     <ClInclude Include="Source\Engine\Asset\FontAtlasLoader.h" />
     <ClInclude Include="Source\Engine\Asset\IAssetLoader.h" />
-    <ClInclude Include="Source\Engine\Asset\ObjLoader.h" />
-    <ClInclude Include="Source\Engine\Asset\ObjRawTypes.h" />
+    <ClInclude Include="Source\Editor\Importer\Fbx\FbxAssetImporter.h" />
+    <ClInclude Include="Source\Editor\Importer\Fbx\FbxImportTypes.h" />
+    <ClInclude Include="Source\Editor\Importer\Fbx\FbxMaterialExtractor.h" />
+    <ClInclude Include="Source\Editor\Importer\Fbx\FbxSceneDocument.h" />
+    <ClInclude Include="Source\Editor\Importer\Fbx\FbxSceneInspector.h" />
+    <ClInclude Include="Source\Editor\Importer\Fbx\FbxSceneUtils.h" />
+    <ClInclude Include="Source\Editor\Importer\Fbx\FbxSkeletalMeshExtractor.h" />
+    <ClInclude Include="Source\Editor\Importer\Fbx\FbxSkeletonExtractor.h" />
+    <ClInclude Include="Source\Editor\Importer\Fbx\FbxStaticMeshExtractor.h" />
+    <ClInclude Include="Source\Editor\Importer\ObjStaticMeshImporter.h" />
+    <ClInclude Include="Source\Editor\Importer\ObjRawTypes.h" />
     <ClInclude Include="Source\Engine\Asset\ParticleAtlasLoader.h" />
     <ClInclude Include="Source\Engine\Asset\SkeletalMesh.h" />
     <ClInclude Include="Source\Engine\Asset\SkeletalMeshTypes.h" />
+    <ClInclude Include="Source\Engine\Asset\Skeleton.h" />
     <ClInclude Include="Source\Engine\Asset\StaticMesh.h" />
     <ClInclude Include="Source\Engine\Asset\StaticMeshSimplifier.h" />
     <ClInclude Include="Source\Engine\Asset\StaticMeshTypes.h" />
@@ -1068,7 +1110,7 @@ if exist "$(ProjectDir)ThirdParty\FBX SDK\lib\release\libfbxsdk.dll" xcopy /Y /D
     <ClInclude Include="Source\Engine\Render\Resource\Buffer.h" />
     <ClInclude Include="Source\Engine\Render\Resource\Material.h" />
     <ClInclude Include="Source\Engine\Render\Resource\MeshBufferManager.h" />
-    <ClInclude Include="Source\Engine\Render\Resource\ObjMtlLoader.h" />
+    <ClInclude Include="Source\Editor\Importer\ObjMtlImporter.h" />
     <ClInclude Include="Source\Engine\Render\Resource\RenderResources.h" />
     <ClInclude Include="Source\Engine\Render\Resource\Shader.h" />
     <ClInclude Include="Source\Engine\Render\Resource\Texture.h" />

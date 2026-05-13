@@ -33,9 +33,8 @@ struct FTextureAtlasResource
 	bool IsLoaded() const { return Texture != nullptr && Texture->GetSRV() != nullptr; }
 };
 
-//	StaticMesh 리소스 정보 구조체 (ResourceManager에서 관리, ObjLoader로 전달)
+//	StaticMesh 리소스 정보 구조체 (ResourceManager에서 관리)
 //	ResourceManager는 Resource.ini에서 경로/옵션 정보를 로드하여 이 구조체에 담아 가지고 있습니다.
-//	사용 계층은 ResourceManager 임 (ObjLoader는 다른 구조체로 옵션을 받아 사용)
 struct FStaticMeshResource
 {
 	FString Name;
@@ -44,7 +43,7 @@ struct FStaticMeshResource
 	bool bNormalizeToUnitCube = false;
 };
 
-//	ResourceManager -> ObjLoader로 전달되는 옵션 구조체
+//	StaticMesh import/load 옵션 구조체
 struct FStaticMeshLoadOptions
 {
 	bool bNormalizeToUnitCube = false;

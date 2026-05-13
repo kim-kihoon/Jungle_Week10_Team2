@@ -5,6 +5,7 @@
 #include "SimpleJSON/json.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cstring>
 #include <cstdio>
@@ -22,13 +23,18 @@
 #include "DDSTextureLoader.h"
 #include "WICTextureLoader.h"
 #include "Core/Logger.h"
+#include "Core/StringUtils.h"
 #include "Settings/EngineSettings.h"
 #include "Asset/BinarySerializer.h"
+#include "Asset/Skeleton.h"
 #include "Asset/StaticMeshTypes.h"
 #include "Asset\SkeletalMesh.h"
 #include "Asset/StaticMeshSimplifier.h"
 #include "Render/Scene/RenderCommand.h"
-#include "Render/Resource/ObjMtlLoader.h"
+#if WITH_EDITOR
+#include "Editor/Importer/Fbx/FbxAssetImporter.h"
+#include "Editor/Importer/ObjStaticMeshImporter.h"
+#endif
 namespace
 {
 	constexpr const char* DefaultUberLitShaderPath = "Shaders/UberLit.hlsl";
@@ -71,6 +77,55 @@ namespace
 			return static_cast<wchar_t>(std::towlower(Ch));
 		});
 		return Value;
+	}
+
+	FString ToLowerAscii(FString Value)
+	{
+		std::transform(Value.begin(), Value.end(), Value.begin(), [](unsigned char Ch)
+		{
+			return static_cast<char>(std::tolower(Ch));
+		});
+		return Value;
+	}
+
+	bool IsStaticMeshAssetPath(const FString& Path)
+	{
+		return ToLowerAscii(std::filesystem::path(FPaths::ToWide(Path)).extension().string()) == ".asset";
+	}
+
+	bool RegisterCompiledAssetPath(FResourceManager& ResourceManager, const FString& AssetPath)
+	{
+		FBinarySerializer Serializer;
+		FStaticMeshBinaryHeader Header;
+		if (!Serializer.ReadAssetHeader(AssetPath, Header))
+		{
+			return false;
+		}
+
+		switch (Header.AssetType)
+		{
+		case ECompiledAssetType::StaticMesh:
+			return ResourceManager.RegisterStaticMeshAsset(AssetPath);
+		case ECompiledAssetType::SkeletalMesh:
+			return ResourceManager.RegisterSkeletalMeshAsset(AssetPath);
+		case ECompiledAssetType::Skeleton:
+			return ResourceManager.RegisterSkeletonAsset(AssetPath);
+		default:
+			return false;
+		}
+	}
+
+	bool IsManagedCompiledAssetType(ECompiledAssetType AssetType)
+	{
+		return AssetType == ECompiledAssetType::StaticMesh ||
+			AssetType == ECompiledAssetType::SkeletalMesh ||
+			AssetType == ECompiledAssetType::Skeleton;
+	}
+
+	bool IsPathUnder(const std::filesystem::path& Path, const std::filesystem::path& RootPath)
+	{
+		const std::filesystem::path RelativePath = Path.lexically_relative(RootPath);
+		return !RelativePath.empty() && *RelativePath.begin() != std::filesystem::path(L"..");
 	}
 
 	TArray<FShaderMacro> NormalizeShaderMacros(TArray<FShaderMacro> Macros)
@@ -396,47 +451,55 @@ namespace
 
 #pragma region __BINARY__
 
-uint64 FResourceManager::GetFileWriteTimeTicks(const FString& Path) const
+FString FResourceManager::MakeStaticMeshAssetPath(const FString& SourcePath) const
 {
 	namespace fs = std::filesystem;
 
-	fs::path FilePath(FPaths::ToAbsolute(FPaths::ToWide(Path)));
-	if (!fs::exists(FilePath))
+	fs::path SourceFsPath(FPaths::ToWide(FPaths::Normalize(SourcePath)));
+	if (SourceFsPath.is_absolute())
 	{
-		return 0;
+		const fs::path RootPath(FPaths::RootDir());
+		const fs::path RelativeToRoot = SourceFsPath.lexically_relative(RootPath);
+		if (!RelativeToRoot.empty() && *RelativeToRoot.begin() != fs::path(L".."))
+		{
+			SourceFsPath = RelativeToRoot;
+		}
 	}
 
-	auto WriteTime = fs::last_write_time(FilePath);
-	auto Duration = WriteTime.time_since_epoch();
+	fs::path RelativeAssetPath = SourceFsPath;
+	RelativeAssetPath.replace_extension(L".asset");
 
-	return static_cast<uint64>(
-		std::chrono::duration_cast<std::chrono::seconds>(Duration).count());
+	fs::path AbsoluteAssetPath(FPaths::ToAbsolute(RelativeAssetPath.generic_wstring()));
+	fs::create_directories(AbsoluteAssetPath.parent_path());
+
+	return FPaths::ToUtf8(RelativeAssetPath.generic_wstring());
 }
 
-FString FResourceManager::MakeStaticMeshBinaryPath(const FString& SourcePath, bool bNormalized) const
+FString FResourceManager::MakeSkeletalMeshAssetPath(const FString& SourcePath) const
+{
+	return MakeStaticMeshAssetPath(SourcePath);
+}
+
+FString FResourceManager::MakeSkeletonAssetPath(const FString& SourcePath) const
 {
 	namespace fs = std::filesystem;
 
-	fs::path SourceFsPath(FPaths::ToWide(SourcePath));
-
-	//	Root/Asset/Mesh/Bin
-	fs::path BinDir = fs::path(FPaths::RootDir()) / "Asset" / "Mesh" / "Bin";
-
-	if (!fs::exists(BinDir))
+	fs::path SourceFsPath(FPaths::ToWide(FPaths::Normalize(SourcePath)));
+	if (SourceFsPath.is_absolute())
 	{
-		fs::create_directories(BinDir);
+		const fs::path RootPath(FPaths::RootDir());
+		const fs::path RelativeToRoot = SourceFsPath.lexically_relative(RootPath);
+		if (!RelativeToRoot.empty() && *RelativeToRoot.begin() != fs::path(L".."))
+		{
+			SourceFsPath = RelativeToRoot;
+		}
 	}
 
-	//	파일명만 따와서 .bin 으로 저장 (normalized 버전은 _norm 접미사 추가)
-	fs::path BinaryFileName = SourceFsPath.stem();
-	if (bNormalized)
-	{
-		BinaryFileName += "_norm";
-	}
-	BinaryFileName += ".bin";
+	fs::path RelativeAssetPath = SourceFsPath.parent_path() / (SourceFsPath.stem().wstring() + L"_Skeleton.asset");
+	fs::path AbsoluteAssetPath(FPaths::ToAbsolute(RelativeAssetPath.generic_wstring()));
+	fs::create_directories(AbsoluteAssetPath.parent_path());
 
-	fs::path BinaryPath = BinDir / BinaryFileName;
-	return FPaths::ToString(BinaryPath.wstring());
+	return FPaths::ToUtf8(RelativeAssetPath.generic_wstring());
 }
 
 FString FResourceManager::MakeSkeletalMeshMaterialOverridePath(const FString& SourcePath) const
@@ -444,21 +507,77 @@ FString FResourceManager::MakeSkeletalMeshMaterialOverridePath(const FString& So
 	return SourcePath + ".skelmat.json";
 }
 
-bool FResourceManager::IsStaticMeshBinaryValid(const FString& SourcePath, const FString& BinaryPath) const
+bool FResourceManager::RegisterStaticMeshAsset(const FString& AssetPath)
 {
+	const FString NormalizedPath = FPaths::Normalize(AssetPath);
+	if (!IsStaticMeshAssetPath(NormalizedPath))
+	{
+		return false;
+	}
+
 	FStaticMeshBinaryHeader Header;
-	if (!BinarySerializer.ReadStaticMeshHeader(BinaryPath, Header))
+	if (!BinarySerializer.ReadStaticMeshHeader(NormalizedPath, Header))
 	{
 		return false;
 	}
 
-	const uint64 SourceWriteTime = GetFileWriteTimeTicks(SourcePath);
-	if (SourceWriteTime == 0)
+	FStaticMeshResource Resource;
+	Resource.Name = NormalizedPath;
+	Resource.Path = NormalizedPath;
+	Resource.bPreload = false;
+	Resource.bNormalizeToUnitCube = false;
+	StaticMeshRegistry[Resource.Name] = Resource;
+
+	if (std::find(ObjFilePaths.begin(), ObjFilePaths.end(), NormalizedPath) == ObjFilePaths.end())
+	{
+		ObjFilePaths.push_back(NormalizedPath);
+	}
+
+	return true;
+}
+
+bool FResourceManager::RegisterSkeletalMeshAsset(const FString& AssetPath)
+{
+	const FString NormalizedPath = FPaths::Normalize(AssetPath);
+	if (!IsStaticMeshAssetPath(NormalizedPath))
 	{
 		return false;
 	}
 
-	return Header.SourceFileWriteTime == SourceWriteTime;
+	FStaticMeshBinaryHeader Header;
+	if (!BinarySerializer.ReadSkeletalMeshHeader(NormalizedPath, Header))
+	{
+		return false;
+	}
+
+	if (std::find(SkeletalMeshFilePaths.begin(), SkeletalMeshFilePaths.end(), NormalizedPath) == SkeletalMeshFilePaths.end())
+	{
+		SkeletalMeshFilePaths.push_back(NormalizedPath);
+	}
+
+	return true;
+}
+
+bool FResourceManager::RegisterSkeletonAsset(const FString& AssetPath)
+{
+	const FString NormalizedPath = FPaths::Normalize(AssetPath);
+	if (!IsStaticMeshAssetPath(NormalizedPath))
+	{
+		return false;
+	}
+
+	FStaticMeshBinaryHeader Header;
+	if (!BinarySerializer.ReadSkeletonHeader(NormalizedPath, Header))
+	{
+		return false;
+	}
+
+	if (std::find(SkeletonFilePaths.begin(), SkeletonFilePaths.end(), NormalizedPath) == SkeletonFilePaths.end())
+	{
+		SkeletonFilePaths.push_back(NormalizedPath);
+	}
+
+	return true;
 }
 
 void FResourceManager::PreloadStaticMeshes()
@@ -504,6 +623,7 @@ void FResourceManager::LoadFromAssetDirectory(const FString& Path)
 	MaterialFilePaths.clear();
 	ParticleFilePaths.clear();
 	SkeletalMeshFilePaths.clear();
+	SkeletonFilePaths.clear();
 	StaticMeshRegistry.clear();
 
 	InitializeDefaultResources(CachedDevice.Get());
@@ -522,6 +642,10 @@ void FResourceManager::LoadFromAssetDirectory(const FString& Path)
 
 	TArray<FString> MaterialFiles;
 	TArray<FString> MaterialInstanceFiles;
+#if WITH_EDITOR
+	TArray<FString> ObjSourceFiles;
+	TArray<FString> FbxSourceFiles;
+#endif
 
 	for (const auto& Entry : fs::recursive_directory_iterator(RootPath))
 	{
@@ -542,20 +666,17 @@ void FResourceManager::LoadFromAssetDirectory(const FString& Path)
 
 		if (Extension == L".obj")
 		{
-			ObjFilePaths.push_back(RelativePath);
-
-			FStaticMeshResource Resource;
-			Resource.Name = RelativePath;
-			Resource.Path = RelativePath;
-			Resource.bPreload = false;
-			Resource.bNormalizeToUnitCube = false;
-			StaticMeshRegistry[Resource.Name] = Resource;
+#if WITH_EDITOR
+			ObjSourceFiles.push_back(RelativePath);
+#endif
+		}
+		else if (Extension == L".asset")
+		{
+			RegisterCompiledAssetPath(*this, RelativePath);
 		}
 		else if (Extension == L".mtl")
 		{
-			// TODO: 현재는 UberLit을 기본 static mesh shader로 사용
-			MaterialFilePaths.push_back(RelativePath);
-			LoadMaterial(RelativePath, DefaultUberLitShaderPath, CachedDevice.Get());
+			// OBJ MTL files are import sources. Runtime materials are .mat/.matinst assets.
 		}
 		else if (Extension == L".mat")
 		{
@@ -592,12 +713,37 @@ void FResourceManager::LoadFromAssetDirectory(const FString& Path)
 		}
         else if (Extension == L".fbx")
         {
-            SkeletalMeshFilePaths.push_back(RelativePath);
+#if WITH_EDITOR
+            FbxSourceFiles.push_back(RelativePath);
+#endif
         }
 	}
 
+#if WITH_EDITOR
+	FObjStaticMeshImporter ObjImporter;
+	for (const FString& ObjSourcePath : ObjSourceFiles)
+	{
+		ObjImporter.ImportIfNeeded(*this, ObjSourcePath, &MaterialFiles);
+	}
+
+	FFbxAssetImporter FbxAssetImporter;
+	for (const FString& FbxSourcePath : FbxSourceFiles)
+	{
+		const EFbxAssetImportResult ImportResult =
+			FbxAssetImporter.ImportIfNeeded(*this, FbxSourcePath, &MaterialFiles);
+		if (ImportResult == EFbxAssetImportResult::Failed)
+		{
+			UE_LOG("[ResourceManager] FBX import failed: %s", FbxSourcePath.c_str());
+		}
+	}
+#endif
+
 	for (const FString& MaterialPath : MaterialFiles)
 	{
+		if (std::find(MaterialFilePaths.begin(), MaterialFilePaths.end(), MaterialPath) == MaterialFilePaths.end())
+		{
+			MaterialFilePaths.push_back(MaterialPath);
+		}
 		DeserializeMaterial(MaterialPath);
 	}
 
@@ -629,12 +775,20 @@ void FResourceManager::RefreshFromAssetDirectory(const FString& Path)
 	MaterialFilePaths.clear();
 	ParticleFilePaths.clear();
 	SkeletalMeshFilePaths.clear();
+	SkeletonFilePaths.clear();
 	StaticMeshRegistry.clear();
 	FontResources.clear();
 	ParticleResources.clear();
 
 	const fs::path RootPath = fs::path(FPaths::RootDir()) / FPaths::ToWide(Path);
 	const fs::path ProjectRootPath = fs::path(FPaths::RootDir());
+
+	TArray<FString> MaterialFiles;
+	TArray<FString> MaterialInstanceFiles;
+#if WITH_EDITOR
+	TArray<FString> ObjSourceFiles;
+	TArray<FString> FbxSourceFiles;
+#endif
 
 	if (!fs::exists(RootPath) || !fs::is_directory(RootPath))
 	{
@@ -654,7 +808,7 @@ void FResourceManager::RefreshFromAssetDirectory(const FString& Path)
 			const fs::path& FilePath = Entry.path();
 			const std::wstring Extension = ToLowerPathToken(FilePath.extension().wstring());
 
-			if (Extension == L".meta" || Extension == L".bin")
+			if (Extension == L".meta")
 			{
 				continue;
 			}
@@ -663,28 +817,26 @@ void FResourceManager::RefreshFromAssetDirectory(const FString& Path)
 
 			if (Extension == L".obj")
 			{
-				ObjFilePaths.push_back(RelativePath);
-
-				FStaticMeshResource Resource;
-				Resource.Name = RelativePath;
-				Resource.Path = RelativePath;
-				Resource.bPreload = false;
-				Resource.bNormalizeToUnitCube = false;
-				StaticMeshRegistry[Resource.Name] = Resource;
+#if WITH_EDITOR
+				ObjSourceFiles.push_back(RelativePath);
+#endif
+			}
+			else if (Extension == L".asset")
+			{
+				RegisterCompiledAssetPath(*this, RelativePath);
 			}
 			else if (Extension == L".mtl")
 			{
-				MaterialFilePaths.push_back(RelativePath);
-				LoadMaterial(RelativePath, DefaultUberLitShaderPath, CachedDevice.Get());
+				// OBJ MTL files are import sources. Runtime materials are .mat/.matinst assets.
 			}
 			else if (Extension == L".mat")
 			{
 				MaterialFilePaths.push_back(RelativePath);
-				DeserializeMaterial(RelativePath);
+				MaterialFiles.push_back(RelativePath);
 			}
 			else if (Extension == L".matinst")
 			{
-				DeserializeMaterial(RelativePath);
+				MaterialInstanceFiles.push_back(RelativePath);
 			}
 			else if (
 				Extension == L".png" ||
@@ -716,13 +868,48 @@ void FResourceManager::RefreshFromAssetDirectory(const FString& Path)
 			}
 			else if (Extension == L".fbx")
 			{
-				SkeletalMeshFilePaths.push_back(RelativePath);
+#if WITH_EDITOR
+				FbxSourceFiles.push_back(RelativePath);
+#endif
 			}
 		}
 	}
 	catch (const std::exception& Ex)
 	{
 		UE_LOG("[ResourceManager] Refresh Exception: %s", Ex.what());
+	}
+
+#if WITH_EDITOR
+	FObjStaticMeshImporter ObjImporter;
+	for (const FString& ObjSourcePath : ObjSourceFiles)
+	{
+		ObjImporter.ImportIfNeeded(*this, ObjSourcePath, &MaterialFiles);
+	}
+
+	FFbxAssetImporter FbxAssetImporter;
+	for (const FString& FbxSourcePath : FbxSourceFiles)
+	{
+		const EFbxAssetImportResult ImportResult =
+			FbxAssetImporter.ImportIfNeeded(*this, FbxSourcePath, &MaterialFiles);
+		if (ImportResult == EFbxAssetImportResult::Failed)
+		{
+			UE_LOG("[ResourceManager] FBX import failed: %s", FbxSourcePath.c_str());
+		}
+	}
+#endif
+
+	for (const FString& MaterialPath : MaterialFiles)
+	{
+		if (std::find(MaterialFilePaths.begin(), MaterialFilePaths.end(), MaterialPath) == MaterialFilePaths.end())
+		{
+			MaterialFilePaths.push_back(MaterialPath);
+		}
+		DeserializeMaterial(MaterialPath);
+	}
+
+	for (const FString& MaterialInstancePath : MaterialInstanceFiles)
+	{
+		DeserializeMaterial(MaterialInstancePath);
 	}
 
 	if (CachedDevice && !LoadGPUResources(CachedDevice.Get()))
@@ -737,37 +924,74 @@ void FResourceManager::DeleteAllCacheFiles()
 {
 	namespace fs = std::filesystem;
 
-	const fs::path BinRootPath = fs::path(FPaths::RootDir()) / "Asset" / "Mesh" / "Bin";
+	const fs::path ProjectRootPath(FPaths::RootDir());
+	const TArray<fs::path> CacheRootPaths = {
+		ProjectRootPath / "Asset" / "Mesh",
+		ProjectRootPath / "Asset" / "Fbx",
+	};
 
-	if (!fs::exists(BinRootPath) || !fs::is_directory(BinRootPath))
+	TArray<fs::path> CandidateDirectories;
+	for (const fs::path& CacheRootPath : CacheRootPaths)
 	{
-		return;
-	}
-
-	for (const auto& Entry : fs::recursive_directory_iterator(BinRootPath))
-	{
-		if (!Entry.is_regular_file())
+		if (!fs::exists(CacheRootPath) || !fs::is_directory(CacheRootPath))
 		{
 			continue;
 		}
 
-		const fs::path& FilePath = Entry.path();
-		if (FilePath.extension() == L".bin")
+		for (const auto& Entry : fs::recursive_directory_iterator(CacheRootPath))
 		{
+			if (!Entry.is_regular_file())
+			{
+				continue;
+			}
+
+			const fs::path& FilePath = Entry.path();
+			if (ToLowerPathToken(FilePath.extension().wstring()) != L".asset")
+			{
+				continue;
+			}
+
+			const FString RelativePath = FPaths::ToRelativeString(FilePath.generic_wstring());
+			FStaticMeshBinaryHeader Header;
+			if (!BinarySerializer.ReadAssetHeader(RelativePath, Header) ||
+				!IsManagedCompiledAssetType(Header.AssetType))
+			{
+				continue;
+			}
+
 			std::error_code Ec;
 			fs::remove(FilePath, Ec);
+			fs::path DirectoryPath = FilePath.parent_path();
+			while (!DirectoryPath.empty() && IsPathUnder(DirectoryPath, CacheRootPath))
+			{
+				CandidateDirectories.push_back(DirectoryPath);
+				if (DirectoryPath == CacheRootPath)
+				{
+					break;
+				}
+				DirectoryPath = DirectoryPath.parent_path();
+			}
 		}
 	}
 
-	// 빈 디렉토리 정리
-	for (auto It = fs::recursive_directory_iterator(BinRootPath);
-		 It != fs::recursive_directory_iterator();
-		 ++It)
+	std::sort(CandidateDirectories.begin(), CandidateDirectories.end(), [](const fs::path& Left, const fs::path& Right)
+	{
+		const std::wstring LeftPath = Left.generic_wstring();
+		const std::wstring RightPath = Right.generic_wstring();
+		if (LeftPath.size() != RightPath.size())
+		{
+			return LeftPath.size() > RightPath.size();
+		}
+		return LeftPath > RightPath;
+	});
+	CandidateDirectories.erase(std::unique(CandidateDirectories.begin(), CandidateDirectories.end()), CandidateDirectories.end());
+
+	for (const fs::path& DirectoryPath : CandidateDirectories)
 	{
 		std::error_code Ec;
-		if (It->is_directory(Ec) && fs::is_empty(It->path(), Ec))
+		if (fs::exists(DirectoryPath, Ec) && fs::is_directory(DirectoryPath, Ec) && fs::is_empty(DirectoryPath, Ec))
 		{
-			fs::remove(It->path(), Ec);
+			fs::remove(DirectoryPath, Ec);
 		}
 	}
 
@@ -1034,18 +1258,20 @@ void FResourceManager::ReleaseGPUResources()
 	DefaultWhiteTexture.Reset();
 	DefaultNormalTexture.Reset();
 
+	std::unordered_set<UMaterial*> UniqueMaterials;
 	for (auto& [Key, Material] : Materials)
 	{
-		if (Material)
+		if (Material && UniqueMaterials.insert(Material).second)
 		{
 			UObjectManager::Get().DestroyObject(Material);
 		}
 	}
 	Materials.clear();
 
+	std::unordered_set<UMaterialInstance*> UniqueMaterialInstances;
 	for (auto& [Key, MaterialInst] : MaterialInstances)
 	{
-		if (MaterialInst)
+		if (MaterialInst && UniqueMaterialInstances.insert(MaterialInst).second)
 		{
 			UObjectManager::Get().DestroyObject(MaterialInst);
 		}
@@ -1100,6 +1326,18 @@ void FResourceManager::ReleaseGPUResources()
 	}
 	StaticMeshes.clear();
 	StaticMeshRegistry.clear();
+
+	for (auto& [Path, SkeletalMeshAsset] : SkeletalMeshes)
+	{
+		UObjectManager::Get().DestroyObject(SkeletalMeshAsset);
+	}
+	SkeletalMeshes.clear();
+
+	for (auto& [Path, SkeletonAsset] : Skeletons)
+	{
+		UObjectManager::Get().DestroyObject(SkeletonAsset);
+	}
+	Skeletons.clear();
 
 	// D3D state object caches
 	SamplerStates.clear();
@@ -1396,13 +1634,55 @@ UShader* FResourceManager::GetShaderVariant(const FShaderCompileKey& CompileKey)
 	return (It != ShaderVariants.end()) ? It->second : nullptr;
 }
 
+void FResourceManager::RegisterMaterialAliases(UMaterial* Material, const FString& FilePath, const FString& LegacyName)
+{
+	if (Material == nullptr)
+	{
+		return;
+	}
+
+	const FString NormalizedFilePath = FPaths::Normalize(FilePath);
+	if (!NormalizedFilePath.empty())
+	{
+		Materials[NormalizedFilePath] = Material;
+	}
+
+	if (!LegacyName.empty() && Materials.find(LegacyName) == Materials.end())
+	{
+		Materials[LegacyName] = Material;
+	}
+}
+
+void FResourceManager::RegisterMaterialInstanceAliases(UMaterialInstance* MaterialInstance, const FString& FilePath, const FString& LegacyName)
+{
+	if (MaterialInstance == nullptr)
+	{
+		return;
+	}
+
+	const FString NormalizedFilePath = FPaths::Normalize(FilePath);
+	if (!NormalizedFilePath.empty())
+	{
+		MaterialInstances[NormalizedFilePath] = MaterialInstance;
+	}
+
+	if (!LegacyName.empty() && MaterialInstances.find(LegacyName) == MaterialInstances.end())
+	{
+		MaterialInstances[LegacyName] = MaterialInstance;
+	}
+}
+
 TArray<FString> FResourceManager::GetMaterialNames() const
 {
 	TArray<FString> Names;
+	std::unordered_set<UMaterial*> SeenMaterials;
 	Names.reserve(Materials.size());
 	for (const auto& [Name, Mat] : Materials)
 	{
-		Names.push_back(Name);
+		if (Mat && SeenMaterials.insert(Mat).second)
+		{
+			Names.push_back(Mat->GetFilePath().empty() ? Name : Mat->GetFilePath());
+		}
 	}
 	return Names;
 }
@@ -1411,20 +1691,21 @@ TArray<FString> FResourceManager::GetMaterialInterfaceNames() const
 {
 	TArray<FString> Names;
 	Names.reserve(Materials.size() + MaterialInstances.size());
+	std::unordered_set<UMaterialInterface*> SeenMaterials;
 
 	for (const auto& [Name, Mat] : Materials)
 	{
-		if (Mat)
+		if (Mat && SeenMaterials.insert(Mat).second)
 		{
-			Names.push_back(Name);
+			Names.push_back(Mat->GetFilePath().empty() ? Name : Mat->GetFilePath());
 		}
 	}
 
 	for (const auto& [Name, MatInst] : MaterialInstances)
 	{
-		if (MatInst)
+		if (MatInst && SeenMaterials.insert(MatInst).second)
 		{
-			Names.push_back(Name);
+			Names.push_back(MatInst->GetFilePath().empty() ? Name : MatInst->GetFilePath());
 		}
 	}
 
@@ -1434,6 +1715,13 @@ TArray<FString> FResourceManager::GetMaterialInterfaceNames() const
 UMaterial* FResourceManager::GetMaterial(const FString& MaterialName) const
 {
 	auto It = Materials.find(MaterialName);
+	if (It != Materials.end())
+	{
+		return It->second;
+	}
+
+	const FString NormalizedPath = FPaths::Normalize(MaterialName);
+	It = Materials.find(NormalizedPath);
 	return (It != Materials.end()) ? It->second : nullptr;
 }
 
@@ -1453,7 +1741,7 @@ UMaterial* FResourceManager::GetOrCreateMaterial(const FString& Path, const FStr
 	UShader* Shader = GetOrTryLoadMaterialShader(*this, ShaderName);
 	Material->SetShader(Shader);
 
-	Materials[Path] = Material;
+	RegisterMaterialAliases(Material, Path, Path);
 
 	return Material;
 }
@@ -1473,7 +1761,7 @@ UMaterial* FResourceManager::GetOrCreateMaterial(const FString& Name, const FStr
 	UShader* Shader = GetOrTryLoadMaterialShader(*this, ShaderName);
 	Material->SetShader(Shader);
 
-	Materials[Name] = Material;
+	RegisterMaterialAliases(Material, Path, Name);
 
 	return Material;
 }
@@ -1485,53 +1773,14 @@ bool FResourceManager::LoadMaterial(const FString& MtlFilePath, const FString& S
 		return false;
 	}
 
-	UShader* Shader = GetOrTryLoadMaterialShader(*this, ShaderName);
-	if (!Shader)
+	const FString Extension = ToLowerAscii(std::filesystem::path(FPaths::ToWide(MtlFilePath)).extension().string());
+	if (Extension == ".mat" || Extension == ".matinst")
 	{
-		UE_LOG("Shader not found for material: %s, using default shader", ShaderName.c_str());
-		return false;
+		return DeserializeMaterial(MtlFilePath);
 	}
 
-	TMap<FString, UMaterial*> Parsed;
-	if (!FObjMtlLoader::Load(MtlFilePath, Parsed, CachedDevice.Get()))
-	{
-		UE_LOG("Failed to load MTL: %s", MtlFilePath.c_str());
-		return false;
-	}
-
-	if (Parsed.empty())
-	{
-		Parsed["DefaultWhite"] = GetMaterial("DefaultWhite");
-	}
-
-	for (auto& [Name, Mat] : Parsed)
-	{
-		Mat->FilePath = MtlFilePath;
-		Mat->SetShader(Shader);
-
-		if (Materials.find(Name) != Materials.end())
-		{
-			UE_LOG("Warning: Material with name '%s' already exists. Overwriting.", Name.c_str());
-		}
-		else
-		{
-			Materials[Name] = Mat;
-		}
-	}
-
-	// TODO: 개선 필요해보임
-	for (auto& [Name, Mat] : Parsed)
-	{
-		FMaterial& MaterialData = Mat->MaterialData;
-
-		if (MaterialData.bHasDiffuseTexture && !MaterialData.DiffuseTexPath.empty())  LoadTexture(MaterialData.DiffuseTexPath, CachedDevice.Get());
-		if (MaterialData.bHasSpecularTexture && !MaterialData.SpecularTexPath.empty()) LoadTexture(MaterialData.SpecularTexPath, CachedDevice.Get());
-		if (MaterialData.bHasNormalTexture && !MaterialData.NormalTexPath.empty())     LoadTexture(MaterialData.NormalTexPath, CachedDevice.Get());
-		if (MaterialData.bHasBumpTexture && !MaterialData.BumpTexPath.empty())     LoadTexture(MaterialData.BumpTexPath, CachedDevice.Get());
-	}
-
-	UE_LOG("Loaded MTL: %s", MtlFilePath.c_str());
-	return true;
+	UE_LOG("[ResourceManager] Runtime LoadMaterial only accepts .mat/.matinst assets. MTL is editor import-only: %s", MtlFilePath.c_str());
+	return false;
 }
 
 UMaterialInstance* FResourceManager::CreateMaterialInstance(const FString& Path, UMaterial* Parent)
@@ -1551,13 +1800,20 @@ UMaterialInstance* FResourceManager::CreateMaterialInstance(const FString& Path,
 	Instance->Name = Path;
 	Instance->FilePath = Path;
 	Instance->SetOwnership(EMaterialInstanceOwnership::ResourceManaged);
-	MaterialInstances[Path] = Instance;
+	RegisterMaterialInstanceAliases(Instance, Path, Path);
 	return Instance;
 }
 
 UMaterialInstance* FResourceManager::GetMaterialInstance(const FString& Path) const
 {
 	auto It = MaterialInstances.find(Path);
+	if (It != MaterialInstances.end())
+	{
+		return It->second;
+	}
+
+	const FString NormalizedPath = FPaths::Normalize(Path);
+	It = MaterialInstances.find(NormalizedPath);
 	return (It != MaterialInstances.end()) ? It->second : nullptr;
 }
 
@@ -1670,7 +1926,9 @@ bool FResourceManager::SerializeMaterial(const FString& MatFilePath, const UMate
 		Params.append(Param);
 	}
 	Root["Params"] = Params;
-	std::ofstream OutFile(FPaths::ToWide(MatFilePath));
+	const std::filesystem::path AbsoluteMatPath(FPaths::ToAbsolute(FPaths::ToWide(MatFilePath)));
+	std::filesystem::create_directories(AbsoluteMatPath.parent_path());
+	std::ofstream OutFile(AbsoluteMatPath);
 	if (!OutFile.is_open())
 	{
 		UE_LOG("Failed to open material file for writing: %s", MatFilePath.c_str());
@@ -1685,8 +1943,10 @@ bool FResourceManager::SerializeMaterialInstance(const FString& MatInstFilePath,
 	using json::JSON;
 	JSON Root = JSON::Make(JSON::Class::Object);
 	const EMaterialDomain MaterialDomain = MaterialInstance->GetEffectiveMaterialDomain();
-	Root["Name"] = MaterialInstance->GetName();
-	Root["Parent"] = MaterialInstance->Parent->Name;
+	Root["Name"] = MaterialInstance->GetFilePath().empty() ? MaterialInstance->GetName() : MaterialInstance->GetFilePath();
+	Root["Parent"] = MaterialInstance->Parent->GetFilePath().empty()
+		? MaterialInstance->Parent->GetName()
+		: MaterialInstance->Parent->GetFilePath();
 	if (MaterialDomain == EMaterialDomain::Surface && MaterialInstance->HasLightingModelOverride())
 	{
 		Root["LightingModel"] = ToLightingModelString(MaterialInstance->GetLightingModelOverride());
@@ -1774,7 +2034,9 @@ bool FResourceManager::SerializeMaterialInstance(const FString& MatInstFilePath,
 		Params.append(Param);
 	}
 	Root["OverridedParams"] = Params;
-	std::ofstream OutFile(FPaths::ToWide(MatInstFilePath));
+	const std::filesystem::path AbsoluteMatInstPath(FPaths::ToAbsolute(FPaths::ToWide(MatInstFilePath)));
+	std::filesystem::create_directories(AbsoluteMatInstPath.parent_path());
+	std::ofstream OutFile(AbsoluteMatInstPath);
 	if (!OutFile.is_open())
 	{
 		UE_LOG("Failed to open material instance file for writing: %s", MatInstFilePath.c_str());
@@ -1788,7 +2050,8 @@ bool FResourceManager::DeserializeMaterial(const FString& MatFilePath)
 {
 	using json::JSON;
 
-	std::ifstream MatFile(FPaths::ToWide(MatFilePath));
+	const FString NormalizedMatFilePath = FPaths::Normalize(MatFilePath);
+	std::ifstream MatFile(std::filesystem::path(FPaths::ToAbsolute(FPaths::ToWide(NormalizedMatFilePath))));
 	if (!MatFile.is_open())
 	{
 		UE_LOG("Failed to open material file: %s", MatFilePath.c_str());
@@ -1800,8 +2063,9 @@ bool FResourceManager::DeserializeMaterial(const FString& MatFilePath)
 
 	if (Root.hasKey("Parent"))
 	{
-		FString MatName = Root["Name"].ToString();
-		UMaterial* ParentMat = GetMaterial(FPaths::Normalize(Root["Parent"].ToString()));
+		const FString MatName = Root["Name"].ToString();
+		const FString ParentKey = Root["Parent"].ToString();
+		UMaterial* ParentMat = GetMaterial(ParentKey);
 
 		if (!ParentMat)
 		{
@@ -1809,7 +2073,9 @@ bool FResourceManager::DeserializeMaterial(const FString& MatFilePath)
 			return false;
 		}
 
-		UMaterialInstance* MatInstance = CreateMaterialInstance(MatName, ParentMat);
+		UMaterialInstance* MatInstance = CreateMaterialInstance(NormalizedMatFilePath, ParentMat);
+		MatInstance->Name = MatName.empty() ? NormalizedMatFilePath : MatName;
+		MatInstance->FilePath = NormalizedMatFilePath;
 		if (ParentMat->GetEffectiveMaterialDomain() == EMaterialDomain::Surface && Root.hasKey("LightingModel"))
 		{
 			ELightingModel LightingModel = ELightingModel::Phong;
@@ -1899,15 +2165,25 @@ bool FResourceManager::DeserializeMaterial(const FString& MatFilePath)
 			}
 		}
 
-		MaterialInstances[MatName] = MatInstance;
+		RegisterMaterialInstanceAliases(MatInstance, NormalizedMatFilePath, MatName);
 		return true;
 	}
 
 	FString MatName = Root["Name"].ToString();
 	FString ShaderPath = Root["Shader"].ToString();
-	UMaterial* Material = GetOrCreateMaterial(MatName, MatFilePath, ShaderPath);
-	Material->FilePath = MatFilePath;
-	Material->SetShader(GetShader(ShaderPath));
+	UMaterial* Material = GetMaterial(NormalizedMatFilePath);
+	if (Material == nullptr && !MatName.empty())
+	{
+		Material = GetMaterial(MatName);
+	}
+	if (Material == nullptr)
+	{
+		Material = UObjectManager::Get().CreateObject<UMaterial>();
+	}
+
+	Material->Name = MatName.empty() ? NormalizedMatFilePath : MatName;
+	Material->FilePath = NormalizedMatFilePath;
+	Material->SetShader(GetOrTryLoadMaterialShader(*this, ShaderPath.empty() ? DefaultUberLitShaderPath : ShaderPath));
 	Material->MaterialParams.clear();
 	EMaterialDomain MaterialDomain = EMaterialDomain::Surface;
 	if (Root.hasKey("MaterialDomain"))
@@ -2002,7 +2278,7 @@ bool FResourceManager::DeserializeMaterial(const FString& MatFilePath)
 
 	ApplyMaterialDefaults(Material);
 
-	Materials[MatName] = Material;
+	RegisterMaterialAliases(Material, NormalizedMatFilePath, MatName);
 
 	return true;
 }
@@ -2117,97 +2393,68 @@ TArray<FString> FResourceManager::GetParticleNames() const
 
 UStaticMesh* FResourceManager::LoadStaticMesh(const FString& Path)
 {
-	FStaticMeshLoadOptions LoadOptions = {};
-
-	for (const auto& [Key, Resource] : StaticMeshRegistry)
-	{
-		if (Resource.Path == Path)
-		{
-			LoadOptions.bNormalizeToUnitCube = Resource.bNormalizeToUnitCube;
-			break;
-		}
-	}
-
+	FStaticMeshLoadOptions LoadOptions;
 	return LoadStaticMeshWithOptions(Path, LoadOptions);
 }
 
 UStaticMesh* FResourceManager::LoadStaticMesh(const FString& Path, bool bNormalizeToUnitCube)
 {
+	(void)bNormalizeToUnitCube;
 	FStaticMeshLoadOptions LoadOptions;
-	LoadOptions.bNormalizeToUnitCube = bNormalizeToUnitCube;
+	LoadOptions.bNormalizeToUnitCube = false;
 	return LoadStaticMeshWithOptions(Path, LoadOptions);
 }
 
 UStaticMesh* FResourceManager::LoadStaticMeshWithOptions(const FString& Path, const FStaticMeshLoadOptions& LoadOptions)
 {
-	// 캐시 키: normalize 여부에 따라 구분
-	const FString CacheKey = LoadOptions.bNormalizeToUnitCube ? (Path + "|norm") : Path;
+	(void)LoadOptions;
+	FString MeshPath = FPaths::Normalize(Path);
 
 	// 메모리 캐시 확인
-	if (UStaticMesh* FoundMesh = FindStaticMesh(CacheKey))
+	if (UStaticMesh* FoundMesh = FindStaticMesh(MeshPath))
 	{
 		return FoundMesh;
 	}
 
-	const FString BinaryPath = MakeStaticMeshBinaryPath(Path, LoadOptions.bNormalizeToUnitCube);
-
-	FStaticMesh* LoadedMeshData = nullptr;
-	double BinaryLoadSec = 0.0;
-	double ObjLoadSec = 0.0;
-
-	//	2. Binary Load 시도
-	if (IsStaticMeshBinaryValid(Path, BinaryPath))
+	if (!IsStaticMeshAssetPath(MeshPath))
 	{
-		const auto BinaryStart = std::chrono::steady_clock::now();
+		UE_LOG("[StaticMeshLoad] Runtime static mesh path must be .asset: %s", MeshPath.c_str());
+		return nullptr;
+	}
 
-		LoadedMeshData = new FStaticMesh();
-		if (!BinarySerializer.LoadStaticMesh(BinaryPath, *LoadedMeshData))
-		{
-			delete LoadedMeshData;
-			LoadedMeshData = nullptr;
-		}
+	double BinaryLoadSec = 0.0;
 
+	const auto BinaryStart = std::chrono::steady_clock::now();
+	FStaticMesh* LoadedMeshData = new FStaticMesh();
+	if (!BinarySerializer.LoadStaticMesh(MeshPath, *LoadedMeshData))
+	{
+		delete LoadedMeshData;
 		const auto BinaryEnd = std::chrono::steady_clock::now();
 		BinaryLoadSec = std::chrono::duration<double>(BinaryEnd - BinaryStart).count();
+		UE_LOG("[StaticMeshLoad] Failed | Path=%s | BinarySec=%.6f", MeshPath.c_str(), BinaryLoadSec);
+		return nullptr;
 	}
 
-	//	3. Binary 실패 시 OBJ Load
-	if (LoadedMeshData == nullptr)
-	{
-		const auto ObjStart = std::chrono::steady_clock::now();
-		LoadedMeshData = ObjLoader.Load(Path, LoadOptions);
-		const auto ObjEnd = std::chrono::steady_clock::now();
-		ObjLoadSec = std::chrono::duration<double>(ObjEnd - ObjStart).count();
+	const auto BinaryEnd = std::chrono::steady_clock::now();
+	BinaryLoadSec = std::chrono::duration<double>(BinaryEnd - BinaryStart).count();
+	LoadedMeshData->PathFileName = MeshPath;
 
-		if (LoadedMeshData == nullptr)
-		{
-			UE_LOG("[StaticMeshLoad] Failed | Path=%s | BinarySec=%.6f | ObjSec=%.6f", Path.c_str(), BinaryLoadSec,
-				   ObjLoadSec);
-			return nullptr;
-		}
-
-		//	4. OBJ 로드 성공 시 Binary 저장
-		const bool bSaveBinaryOk = BinarySerializer.SaveStaticMesh(BinaryPath, Path, *LoadedMeshData);
-		UE_LOG(
-			"[StaticMeshLoad] Source=OBJ | Path=%s | ObjSec=%.6f | BinarySave=%s | BinaryPath=%s",
-			Path.c_str(),
-			ObjLoadSec,
-			bSaveBinaryOk ? "OK" : "FAIL",
-			BinaryPath.c_str());
-	}
-	else
-	{
-		UE_LOG(
-			"[StaticMeshLoad] Source=Binary | Path=%s | BinarySec=%.6f | BinaryPath=%s",
-			Path.c_str(),
-			BinaryLoadSec,
-			BinaryPath.c_str());
-	}
+	UE_LOG(
+		"[StaticMeshLoad] Source=Binary | Path=%s | BinarySec=%.6f",
+		MeshPath.c_str(),
+		BinaryLoadSec);
 
 	// Material 연결
 	for (FStaticMeshMaterialSlot& Slot : LoadedMeshData->Slots)
 	{
-		Slot.Material = GetMaterial(Slot.SlotName);
+		Slot.Material = !Slot.MaterialAssetPath.empty()
+			? GetMaterialInterface(Slot.MaterialAssetPath)
+			: nullptr;
+
+		if (Slot.Material == nullptr)
+		{
+			Slot.Material = GetMaterialInterface(Slot.SlotName);
+		}
 
 		if (Slot.Material == nullptr)
 		{
@@ -2225,14 +2472,14 @@ UStaticMesh* FResourceManager::LoadStaticMeshWithOptions(const FString& Path, co
 		const auto LodEnd = std::chrono::steady_clock::now();
 		double LodSec = std::chrono::duration<double>(LodEnd - LodStart).count();
 		UE_LOG("[StaticMeshLoad] Generated %d LODs for %s in %.3f sec",
-			   LoadedMesh->GetValidLODCount(), Path.c_str(), LodSec);
+			   LoadedMesh->GetValidLODCount(), MeshPath.c_str(), LodSec);
 	}
 	else
 	{
-		UE_LOG("[StaticMeshLoad] LOD generation skipped for %s (LOD is off)", Path.c_str());
+		UE_LOG("[StaticMeshLoad] LOD generation skipped for %s (LOD is off)", MeshPath.c_str());
 	}
 
-	StaticMeshes.insert({CacheKey, LoadedMesh});
+	StaticMeshes.insert({ MeshPath, LoadedMesh });
 
 	return LoadedMesh;
 }
@@ -2331,7 +2578,9 @@ bool FResourceManager::SaveSkeletalMeshMaterialOverrides(const FString& Path, co
 	{
 		JSON SlotNode = JSON::Make(JSON::Class::Object);
 		SlotNode["SlotName"] = Slot.SlotName;
-		SlotNode["Material"] = Slot.Material ? Slot.Material->GetName() : "";
+		SlotNode["Material"] = Slot.Material
+			? (Slot.Material->GetFilePath().empty() ? Slot.Material->GetName() : Slot.Material->GetFilePath())
+			: "";
 		Slots.append(SlotNode);
 	}
 	Root["Slots"] = Slots;
@@ -2350,23 +2599,57 @@ bool FResourceManager::SaveSkeletalMeshMaterialOverrides(const FString& Path, co
 
 USkeletalMesh* FResourceManager::LoadSkeletalMesh(const FString& Path)
 {
-    if (USkeletalMesh* FoundMesh = FindSkeletalMesh(Path))
+	const FString MeshPath = FPaths::Normalize(Path);
+    if (USkeletalMesh* FoundMesh = FindSkeletalMesh(MeshPath))
     {
         return FoundMesh;
     }
 
-    USkeletalMesh* LoadedMesh = FbxLoader.Load(Path);
+	if (!IsStaticMeshAssetPath(MeshPath))
+	{
+		UE_LOG("[SkeletalMeshLoad] Runtime skeletal mesh path must be .asset: %s", MeshPath.c_str());
+		return nullptr;
+	}
 
-    if (LoadedMesh == nullptr)
-    {
-        UE_LOG("[SkeletalMeshLoad] Failed | Path=%s", Path.c_str());
-        return nullptr;
-    }
+	FSkeletalMesh* LoadedMeshData = new FSkeletalMesh();
+	if (!BinarySerializer.LoadSkeletalMesh(MeshPath, *LoadedMeshData))
+	{
+		delete LoadedMeshData;
+		UE_LOG("[SkeletalMeshLoad] Failed to load asset: %s", MeshPath.c_str());
+		return nullptr;
+	}
 
-    LoadSkeletalMeshMaterialOverrides(Path, LoadedMesh);
+	LoadedMeshData->PathFileName = MeshPath;
+	if (LoadedMeshData->SkeletonAssetPath.empty())
+	{
+		delete LoadedMeshData;
+		UE_LOG("[SkeletalMeshLoad] Missing skeleton asset path: %s", MeshPath.c_str());
+		return nullptr;
+	}
+
+	USkeleton* LoadedSkeleton = LoadSkeleton(LoadedMeshData->SkeletonAssetPath);
+	if (LoadedSkeleton == nullptr)
+	{
+		delete LoadedMeshData;
+		UE_LOG("[SkeletalMeshLoad] Failed to load skeleton %s for %s",
+			LoadedMeshData->SkeletonAssetPath.c_str(),
+			MeshPath.c_str());
+		return nullptr;
+	}
+
+	USkeletalMesh* LoadedMesh = UObjectManager::Get().CreateObject<USkeletalMesh>();
+	LoadedMesh->SetMeshData(LoadedMeshData);
+	LoadedMesh->SetSkeleton(LoadedSkeleton);
+
+    LoadSkeletalMeshMaterialOverrides(MeshPath, LoadedMesh);
 
     for (FSkeletalMeshMaterialSlot& Slot : LoadedMesh->GetMeshData()->MaterialSlots)
     {
+		if (Slot.Material == nullptr && !Slot.MaterialAssetPath.empty())
+		{
+			Slot.Material = GetMaterialInterface(Slot.MaterialAssetPath);
+		}
+
         if (Slot.Material == nullptr)
         {
             Slot.Material = GetMaterialInterface(Slot.SlotName);
@@ -2378,9 +2661,11 @@ USkeletalMesh* FResourceManager::LoadSkeletalMesh(const FString& Path)
         }
     }
 
-    SkeletalMeshes.insert({ Path, LoadedMesh });
+    SkeletalMeshes.insert({ MeshPath, LoadedMesh });
 
-    UE_LOG("[SkeletalMeshLoad] Loaded | Path=%s", Path.c_str());
+    UE_LOG("[SkeletalMeshLoad] Loaded | Path=%s | Skeleton=%s",
+		MeshPath.c_str(),
+		LoadedMeshData->SkeletonAssetPath.c_str());
 
     return LoadedMesh;
 }
@@ -2388,6 +2673,12 @@ USkeletalMesh* FResourceManager::LoadSkeletalMesh(const FString& Path)
 USkeletalMesh* FResourceManager::FindSkeletalMesh(const FString& Path) const
 {
     auto It = SkeletalMeshes.find(Path);
+	if (It == SkeletalMeshes.end())
+	{
+		const FString NormalizedPath = FPaths::Normalize(Path);
+		It = SkeletalMeshes.find(NormalizedPath);
+	}
+
     if (It == SkeletalMeshes.end())
     {
         return nullptr;
@@ -2399,6 +2690,58 @@ USkeletalMesh* FResourceManager::FindSkeletalMesh(const FString& Path) const
 TArray<FString> FResourceManager::GetSkeletalMeshPaths() const
 {
     return SkeletalMeshFilePaths;
+}
+
+USkeleton* FResourceManager::LoadSkeleton(const FString& Path)
+{
+	const FString SkeletonPath = FPaths::Normalize(Path);
+	if (USkeleton* FoundSkeleton = FindSkeleton(SkeletonPath))
+	{
+		return FoundSkeleton;
+	}
+
+	if (!IsStaticMeshAssetPath(SkeletonPath))
+	{
+		UE_LOG("[SkeletonLoad] Runtime skeleton path must be .asset: %s", SkeletonPath.c_str());
+		return nullptr;
+	}
+
+	FSkeleton* LoadedSkeletonData = new FSkeleton();
+	if (!BinarySerializer.LoadSkeleton(SkeletonPath, *LoadedSkeletonData))
+	{
+		delete LoadedSkeletonData;
+		UE_LOG("[SkeletonLoad] Failed to load asset: %s", SkeletonPath.c_str());
+		return nullptr;
+	}
+
+	LoadedSkeletonData->PathFileName = SkeletonPath;
+
+	USkeleton* LoadedSkeleton = UObjectManager::Get().CreateObject<USkeleton>();
+	LoadedSkeleton->SetSkeletonData(LoadedSkeletonData);
+	Skeletons.insert({ SkeletonPath, LoadedSkeleton });
+
+	UE_LOG("[SkeletonLoad] Loaded | Path=%s | Bones=%d",
+		SkeletonPath.c_str(),
+		static_cast<int32>(LoadedSkeletonData->Bones.size()));
+
+	return LoadedSkeleton;
+}
+
+USkeleton* FResourceManager::FindSkeleton(const FString& Path) const
+{
+	auto It = Skeletons.find(Path);
+	if (It == Skeletons.end())
+	{
+		const FString NormalizedPath = FPaths::Normalize(Path);
+		It = Skeletons.find(NormalizedPath);
+	}
+
+	return It != Skeletons.end() ? It->second : nullptr;
+}
+
+TArray<FString> FResourceManager::GetSkeletonPaths() const
+{
+	return SkeletonFilePaths;
 }
 
 const TArray<FString>& FResourceManager::GetTextureFilePath() const

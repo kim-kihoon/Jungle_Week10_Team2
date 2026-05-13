@@ -54,7 +54,9 @@ void UDecalComponent::Serialize(FArchive& Ar)
 {
 	UPrimitiveComponent::Serialize(Ar);
 
-	FString MaterialName = (Materials[0] != nullptr) ? Materials[0]->GetName() : FString();
+	FString MaterialName = (Materials[0] != nullptr)
+		? (Materials[0]->GetFilePath().empty() ? Materials[0]->GetName() : Materials[0]->GetFilePath())
+		: FString();
 	Ar << "Material" << MaterialName;
 	Ar << "Size" << DecalSize;
 	Ar << "Color" << DecalColor;

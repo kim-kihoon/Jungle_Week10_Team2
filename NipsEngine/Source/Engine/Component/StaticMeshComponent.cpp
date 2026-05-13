@@ -12,7 +12,7 @@ REGISTER_FACTORY(UStaticMeshComponent)
 UStaticMeshComponent::UStaticMeshComponent()
 {
     //	기본 도형은 Cube로 설정
-    SetStaticMesh(FResourceManager::Get().LoadStaticMesh("Asset\\Mesh\\Dice\\Dice.obj"));
+    SetStaticMesh(FResourceManager::Get().LoadStaticMesh("Asset/Mesh/Dice/Dice.asset"));
 }
 
 // 프로퍼티 시스템에 노출되지 않은 필드를 직접 복사합니다.
@@ -23,7 +23,6 @@ void UStaticMeshComponent::PostDuplicate(UObject* Original)
 
     const UStaticMeshComponent* Orig = Cast<UStaticMeshComponent>(Original);
     StaticMeshAsset = Orig->StaticMeshAsset;
-    bNormalizeOnImport = Orig->bNormalizeOnImport;
     bBoundsDirty = true;
     bRenderStateDirty = true;
 
@@ -54,8 +53,23 @@ void UStaticMeshComponent::PostDuplicate(UObject* Original)
 void UStaticMeshComponent::Serialize(FArchive& Ar)
 {
 	UMeshComponent::Serialize(Ar);
-	Ar << "ObjStaticMeshAsset" << StaticMeshAssetPath;
-	Ar << "NormalizeOnImport" << bNormalizeOnImport;
+
+	if (Ar.IsLoading())
+	{
+		Ar << "StaticMeshAsset" << StaticMeshAssetPath;
+		if (StaticMeshAssetPath.empty())
+		{
+			Ar << "ObjStaticMeshAsset" << StaticMeshAssetPath;
+			if (!StaticMeshAssetPath.empty())
+			{
+				StaticMeshAssetPath = FResourceManager::Get().MakeStaticMeshAssetPath(StaticMeshAssetPath);
+			}
+		}
+	}
+	else
+	{
+		Ar << "StaticMeshAsset" << StaticMeshAssetPath;
+	}
 
 	if (Ar.IsLoading())
 	{
@@ -63,7 +77,7 @@ void UStaticMeshComponent::Serialize(FArchive& Ar)
 
 		if (!StaticMeshAssetPath.empty())
 		{
-			SetStaticMesh(FResourceManager::Get().LoadStaticMesh(StaticMeshAssetPath, bNormalizeOnImport));
+			SetStaticMesh(FResourceManager::Get().LoadStaticMesh(StaticMeshAssetPath));
 		}
 		else
 		{
@@ -133,7 +147,6 @@ void UStaticMeshComponent::GetEditableProperties(TArray<FPropertyDescriptor>& Ou
 {
     UMeshComponent::GetEditableProperties(OutProps);
     OutProps.push_back({ "StaticMesh", EPropertyType::String, &StaticMeshAssetPath });
-    OutProps.push_back({ "Normalize On Import", EPropertyType::Bool, &bNormalizeOnImport });
 }
 
 void UStaticMeshComponent::PostEditProperty(const char* PropertyName)
@@ -149,17 +162,9 @@ void UStaticMeshComponent::PostEditProperty(const char* PropertyName)
 			return;
 		}
 
-		UStaticMesh* Mesh = FResourceManager::Get().LoadStaticMesh(StaticMeshAssetPath, bNormalizeOnImport);
+		UStaticMesh* Mesh = FResourceManager::Get().LoadStaticMesh(StaticMeshAssetPath);
 		SetStaticMesh(Mesh);
     }
-	else if (std::strcmp(PropertyName, "Normalize On Import") == 0)
-	{
-		if (!StaticMeshAssetPath.empty())
-		{
-			UStaticMesh* Mesh = FResourceManager::Get().LoadStaticMesh(StaticMeshAssetPath, bNormalizeOnImport);
-			SetStaticMesh(Mesh);
-		}
-	}
 	else if (std::strcmp(PropertyName, "Materials") == 0)
 	{
 		for (int32 i = 0; i < static_cast<int32>(Materials.size()); ++i)

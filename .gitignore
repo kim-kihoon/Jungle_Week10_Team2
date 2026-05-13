@@ -464,7 +464,10 @@ vcpkg_installed/
 !NipsEngine/Asset/Mesh/I_*/*.matinst
 NipsEngine/Asset/Mesh/I_*/
 
-NipsEngine/Asset/Mesh/Bin/**
+NipsEngine/Asset/Mesh/**/*.bin
+NipsEngine/Asset/Fbx/**/*.bin
+NipsEngine/Asset/Mesh/**/*.asset
+NipsEngine/Asset/Fbx/**/*.asset
 
 # Keep the vendored FBX SDK, including lib/debug and lib/release.
 !NipsEngine/ThirdParty/
