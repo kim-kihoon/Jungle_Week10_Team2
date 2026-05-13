@@ -13,10 +13,12 @@
 #include "Editor/UI/EditorPlayStreamWidget.h"
 #include "Editor/UI/EditorCameraShakeWidget.h"
 #include "Editor/UI/EditorSkeletalMeshViewerWidget.h"
+#include "Math/Vector.h"
 
 #include <memory>
 #include <vector>
 
+class AActor;
 class FRenderer;
 class UEditorEngine;
 class FWindowsWindow;
@@ -56,6 +58,8 @@ public:
 private:
 	void RenderViewportHostWindow();
 	void RenderViewportMenuBarForIndex(int32 ViewportIndex);
+	void RenderEditorDebugPanel();
+	void ProcessPendingDebugActions();
 	void EnsureDefaultDockLayout(ImGuiID DockspaceId);
 	bool ShouldResetDefaultDockLayout(ImGuiID DockspaceId) const;
 	void DockPendingSkeletalMeshViewers();
@@ -88,5 +92,23 @@ private:
 	bool bShowMaterialEditor = true;
 	bool bShowStatProfiler = true;
 	bool bShowPlayStream = true;
+	bool bShowEditorDebug = true;
 	bool bDefaultDockLayoutChecked = false;
+
+	int32 DebugPlaceActorTypeIndex = 0;
+	int32 DebugGridRows = 10;
+	int32 DebugGridCols = 10;
+	int32 DebugGridLayers = 1;
+	float DebugGridSpacing = 2.0f;
+	bool bDebugGridCenter = true;
+	bool bDebugUseCameraOrigin = true;
+	float DebugCameraForwardDistance = 30.0f;
+	FVector DebugManualGridOrigin = FVector(0.0f, 0.0f, 0.0f);
+	bool bDebugRandomYaw = false;
+	float DebugRandomYawRange = 180.0f;
+	bool bDebugApplyJitter = false;
+	float DebugJitterXY = 0.0f;
+	float DebugJitterZ = 0.0f;
+	std::vector<AActor*> DebugLastSpawnedActors;
+	bool bPendingClearLastBatch = false;
 };

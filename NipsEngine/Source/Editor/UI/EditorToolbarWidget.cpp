@@ -326,7 +326,8 @@ void FEditorToolbarWidget::SetPanelVisibilityRefs(
 	bool* InShowMaterialEditor,
 	bool* InShowStatProfiler,
 	bool* InShowCameraShake,
-	bool* InShowSkeletalMeshViewer)
+	bool* InShowSkeletalMeshViewer,
+	bool* InShowEditorDebug)
 {
 	bShowConsole = InShowConsole;
 	bShowControl = InShowControl;
@@ -336,6 +337,7 @@ void FEditorToolbarWidget::SetPanelVisibilityRefs(
 	bShowStatProfiler = InShowStatProfiler;
 	bShowCameraShake = InShowCameraShake;
 	bShowSkeletalMeshViewer = InShowSkeletalMeshViewer;
+	bShowEditorDebug = InShowEditorDebug;
 }
 
 void FEditorToolbarWidget::Render(float DeltaTime)
@@ -838,6 +840,7 @@ void FEditorToolbarWidget::RenderWindowMenu()
 	if (bShowStatProfiler) ImGui::MenuItem("Stat Profiler", nullptr, bShowStatProfiler);
 	if (bShowCameraShake) ImGui::MenuItem("Camera Shake", nullptr, bShowCameraShake);
 	if (bShowSkeletalMeshViewer) ImGui::MenuItem("SkeletalMesh Viewer", nullptr, bShowSkeletalMeshViewer);
+	if (bShowEditorDebug) ImGui::MenuItem("Editor Debug", nullptr, bShowEditorDebug);
 
 	if (ContentDrawerWidget)
 	{

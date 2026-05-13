@@ -23,7 +23,8 @@ public:
 		bool* InShowMaterialEditor,
 		bool* InShowStatProfiler,
 		bool* InShowCameraShake,
-		bool* InShowSkeletalMeshViewer);
+		bool* InShowSkeletalMeshViewer,
+		bool* InShowEditorDebug = nullptr);
 	virtual void Initialize(UEditorEngine* InEditorEngine) override;
 	virtual void Render(float DeltaTime) override;
 	float GetReservedTopHeight() const { return ReservedTopHeight; }
@@ -66,4 +67,5 @@ private:
 	bool* bShowStatProfiler = nullptr;
 	bool* bShowCameraShake = nullptr;
 	bool* bShowSkeletalMeshViewer = nullptr;
+	bool* bShowEditorDebug = nullptr;
 };
