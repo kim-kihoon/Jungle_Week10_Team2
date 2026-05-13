@@ -41,6 +41,7 @@ public:
 	void StartConsoleTakeover();
 	bool ConsumeConsoleTakeover(float& OutDrawerHeight);
 	void RefreshAssetTree();
+	float GetReservedBottomHeight() const;
 
 private:
 	void RenderResizeHandle(float WorkAreaHeight);

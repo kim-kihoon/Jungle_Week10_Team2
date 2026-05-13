@@ -21,6 +21,7 @@
 namespace
 {
 	constexpr float ContentDrawerAnimationSpeed = 12.0f;
+	constexpr float ContentDrawerBottomBarHeight = 28.0f;
 
 	constexpr const char* AssetKindLabels[] = {
 		"All",
@@ -391,6 +392,22 @@ void FEditorContentDrawerWidget::RefreshAssetTree()
 	bAssetTreeDirty = false;
 }
 
+float FEditorContentDrawerWidget::GetReservedBottomHeight() const
+{
+	float ReservedDrawerHeight = DrawerHeight;
+	if (ReservedDrawerHeight <= 0.0f)
+	{
+		if (const ImGuiViewport* Viewport = ImGui::GetMainViewport())
+		{
+			const float AvailableHeight = std::max(120.0f, Viewport->WorkSize.y - ContentDrawerBottomBarHeight);
+			ReservedDrawerHeight = AvailableHeight * 0.35f;
+		}
+	}
+
+	const float EasedAlpha = EaseOutCubic(DrawerAnimationAlpha);
+	return ContentDrawerBottomBarHeight + ReservedDrawerHeight * EasedAlpha;
+}
+
 void FEditorContentDrawerWidget::Render(float DeltaTime)
 {
 	(void)DeltaTime;
@@ -398,7 +415,7 @@ void FEditorContentDrawerWidget::Render(float DeltaTime)
 	const ImGuiViewport* Viewport = ImGui::GetMainViewport();
 	const ImVec2 WorkPos = Viewport->WorkPos;
 	const ImVec2 WorkSize = Viewport->WorkSize;
-	const float BottomBarHeight = 28.0f;
+	const float BottomBarHeight = ContentDrawerBottomBarHeight;
 	const float TargetAlpha = bOpen ? 1.0f : 0.0f;
 	const float AlphaStep = std::clamp(DeltaTime * ContentDrawerAnimationSpeed, 0.0f, 1.0f);
 	DrawerAnimationAlpha += (TargetAlpha - DrawerAnimationAlpha) * AlphaStep;
