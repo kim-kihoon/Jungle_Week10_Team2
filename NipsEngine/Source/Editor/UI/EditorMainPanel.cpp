@@ -329,7 +329,11 @@ void FEditorMainPanel::Render(float DeltaTime)
 	if (bShowStatProfiler)
 		StatWidget.Render(DeltaTime);
 	if (bShowCameraShake)
+	{
+		CameraShakeWidget.SetOpen(true);
 		CameraShakeWidget.Render(DeltaTime);
+		bShowCameraShake = CameraShakeWidget.IsOpen();
+	}
 	FEditorSkeletalMeshViewerWidget* FocusedViewerThisFrame = nullptr;
 	bool bFocusedViewerStillOpen = false;
 	for (auto It = SkeletalMeshViewers.begin(); It != SkeletalMeshViewers.end(); )
