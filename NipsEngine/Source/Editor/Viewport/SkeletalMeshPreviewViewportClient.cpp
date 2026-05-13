@@ -30,7 +30,7 @@ FSkeletalMeshPreviewViewportClient::FSkeletalMeshPreviewViewportClient()
 {
 	Camera.SetProjectionType(EViewportProjectionType::Perspective);
 	Camera.SetFOV(MathUtil::DegreesToRadians(90.0f));
-	Camera.SetNearPlane(1.0f);
+	Camera.SetNearPlane(0.1f);
 	Camera.SetFarPlane(1000.0f);
 
 	ResetCamera();
