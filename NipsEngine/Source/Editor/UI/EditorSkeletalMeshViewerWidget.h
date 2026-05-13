@@ -12,7 +12,9 @@ public:
 
 	void SetInstanceId(int32 InInstanceId);
 	int32 GetInstanceId() const { return InstanceId; }
+	const FString& GetWindowName() const { return WindowName; }
 	void OpenMesh(const FString& MeshPath);
+	void RequestFocus() { bFocusNextFrame = true; }
 
 	void SetOpen(bool bInOpen) { bIsOpen = bInOpen; }
 	bool IsOpen() const { return bIsOpen; }
@@ -36,6 +38,7 @@ private:
 
 	bool bIsOpen = false;
 	bool bWindowFocused = false;
+	bool bFocusNextFrame = false;
 	int32 InstanceId = 0;
 	FString WindowName;
 

@@ -58,6 +58,7 @@ private:
 	void RenderViewportMenuBarForIndex(int32 ViewportIndex);
 	void EnsureDefaultDockLayout(ImGuiID DockspaceId);
 	bool ShouldResetDefaultDockLayout(ImGuiID DockspaceId) const;
+	void DockPendingSkeletalMeshViewers();
 private:
 	FWindowsWindow* Window = nullptr;
 	UEditorEngine* EditorEngine = nullptr;
@@ -76,6 +77,7 @@ private:
 	FEditorCameraShakeWidget CameraShakeWidget;
 	FEditorSkeletalMeshViewerWidget* FocusedSkeletalMeshViewer = nullptr;
 	std::vector<std::shared_ptr<FEditorSkeletalMeshViewerWidget>> SkeletalMeshViewers;
+	std::vector<FString> PendingSkeletalMeshViewerDockWindows;
 	int32 NextViewerInstanceId = 1;
 
 	bool bShowConsole = false;

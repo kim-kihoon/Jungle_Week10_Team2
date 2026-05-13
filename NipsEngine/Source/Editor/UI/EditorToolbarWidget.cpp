@@ -121,6 +121,14 @@ namespace
 		return bClicked;
 	}
 
+	void ShowLastItemTooltip(const char* Text)
+	{
+		if (Text && ImGui::IsItemHovered())
+		{
+			ImGui::SetTooltip("%s", Text);
+		}
+	}
+
 	bool DrawSnapPopup(const char* PopupId, const float* Values, int32 ValueCount, float CurrentValue, bool bEnabled, bool bDegrees, bool& bOutEnabled, float& OutValue)
 	{
 		bool bChanged = false;
@@ -430,6 +438,7 @@ void FEditorToolbarWidget::RenderEditorToolBar(float MenuBarHeight, float ToolBa
 		const bool bShowSettingsClicked = ShowFlagIconTexture && ShowFlagIconTexture->GetSRV()
 			? RenderToolbarIconButton("##ShowSettings", ShowFlagIconTexture, SettingsButtonSize, SettingsIconSize, SettingsIconTint)
 			: ImGui::Button("Show", ImVec2(58.0f, 22.0f));
+		ShowLastItemTooltip("Show settings");
 		if (bShowSettingsClicked)
 		{
 			ImGui::OpenPopup("ShowSettingsPopup");
@@ -439,6 +448,7 @@ void FEditorToolbarWidget::RenderEditorToolBar(float MenuBarHeight, float ToolBa
 		const bool bCameraSettingsClicked = CameraIconTexture && CameraIconTexture->GetSRV()
 			? RenderToolbarIconButton("##CameraSettings", CameraIconTexture, SettingsButtonSize, SettingsIconSize, SettingsIconTint)
 			: ImGui::Button("Camera", ImVec2(68.0f, 22.0f));
+		ShowLastItemTooltip("Camera settings");
 		if (bCameraSettingsClicked)
 		{
 			ImGui::OpenPopup("CameraSettingsPopup");
@@ -585,6 +595,7 @@ void FEditorToolbarWidget::RenderGizmoTools()
 	const bool bTranslateClicked = bHasTranslateIcon
 		? RenderToolbarIconButton("##GizmoTranslate", TranslateIconTexture, GizmoModeButtonSize, GizmoModeIconSize, TranslateTint)
 		: ImGui::Selectable("Move", Gizmo->IsTranslateMode(), 0, ImVec2(58.0f, 22.0f));
+	ShowLastItemTooltip("Location");
 	if (bTranslateClicked)
 	{
 		Gizmo->SetTranslateMode();
@@ -593,6 +604,7 @@ void FEditorToolbarWidget::RenderGizmoTools()
 	const bool bRotateClicked = bHasRotateIcon
 		? RenderToolbarIconButton("##GizmoRotate", RotateIconTexture, GizmoModeButtonSize, GizmoModeIconSize, RotateTint)
 		: ImGui::Selectable("Rotate", Gizmo->IsRotateMode(), 0, ImVec2(58.0f, 22.0f));
+	ShowLastItemTooltip("Rotation");
 	if (bRotateClicked)
 	{
 		Gizmo->SetRotateMode();
@@ -601,6 +613,7 @@ void FEditorToolbarWidget::RenderGizmoTools()
 	const bool bScaleClicked = bHasScaleIcon
 		? RenderToolbarIconButton("##GizmoScale", ScaleIconTexture, GizmoModeButtonSize, GizmoModeIconSize, ScaleTint)
 		: ImGui::Selectable("Scale", Gizmo->IsScaleMode(), 0, ImVec2(58.0f, 22.0f));
+	ShowLastItemTooltip("Scale");
 	if (bScaleClicked)
 	{
 		Gizmo->SetScaleMode();
@@ -616,6 +629,7 @@ void FEditorToolbarWidget::RenderGizmoTools()
 	const bool bSpaceClicked = bHasSpaceIcon
 		? RenderToolbarIconButton("##GizmoSpace", CurrentSpaceIconTexture, SpaceButtonSize, SpaceIconSize, InactiveTint)
 		: ImGui::Selectable(bWorldSpace ? "World" : "Local", false, 0, ImVec2(58.0f, 22.0f));
+	ShowLastItemTooltip(bWorldSpace ? "World space" : "Local space");
 
 	if (bSpaceClicked)
 	{
@@ -638,6 +652,7 @@ void FEditorToolbarWidget::RenderGizmoTools()
 	const bool bTranslateSnapClicked = bHasTranslateSnapIcon
 		? RenderToolbarIconButton("##TranslateSnap", TranslateSnapIconTexture, SnapButtonSize, SnapIconSize, Gizmo->IsTranslateSnapEnabled() ? ActiveTint : InactiveTint)
 		: ImGui::Button("T Snap", ImVec2(62.0f, 22.0f));
+	ShowLastItemTooltip("Location snap");
 	if (bTranslateSnapClicked)
 	{
 		ImGui::OpenPopup("TranslateSnapPopup");
@@ -653,6 +668,7 @@ void FEditorToolbarWidget::RenderGizmoTools()
 	const bool bRotateSnapClicked = bHasRotateSnapIcon
 		? RenderToolbarIconButton("##RotateSnap", RotateSnapIconTexture, SnapButtonSize, SnapIconSize, Gizmo->IsRotateSnapEnabled() ? ActiveTint : InactiveTint)
 		: ImGui::Button("R Snap", ImVec2(62.0f, 22.0f));
+	ShowLastItemTooltip("Rotation snap");
 	if (bRotateSnapClicked)
 	{
 		ImGui::OpenPopup("RotateSnapPopup");
@@ -668,6 +684,7 @@ void FEditorToolbarWidget::RenderGizmoTools()
 	const bool bScaleSnapClicked = bHasScaleSnapIcon
 		? RenderToolbarIconButton("##ScaleSnap", ScaleSnapIconTexture, SnapButtonSize, SnapIconSize, Gizmo->IsScaleSnapEnabled() ? ActiveTint : InactiveTint)
 		: ImGui::Button("S Snap", ImVec2(62.0f, 22.0f));
+	ShowLastItemTooltip("Scale snap");
 	if (bScaleSnapClicked)
 	{
 		ImGui::OpenPopup("ScaleSnapPopup");
