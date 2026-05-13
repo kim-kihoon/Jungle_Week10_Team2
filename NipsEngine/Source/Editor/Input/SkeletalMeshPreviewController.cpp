@@ -17,6 +17,11 @@ constexpr int VK_E = 'E';
 FRay MakeCameraOriginRay(FViewportCamera* Camera, float X, float Y, float ViewportWidth, float ViewportHeight)
 {
 	FRay Ray = Camera->DeprojectScreenToWorld(X, Y, ViewportWidth, ViewportHeight);
+	if (Camera->IsOrthographic())
+	{
+		return Ray;
+	}
+
 	const FVector NearPoint = Ray.Origin;
 	Ray.Origin = Camera->GetLocation();
 	Ray.Direction = (NearPoint - Ray.Origin).GetSafeNormal();
@@ -225,7 +230,7 @@ void FSkeletalMeshPreviewController::OnLeftMouseButtonUp(float X, float Y)
 { 
 	if (PreviewScene && PreviewScene->GetPreviewGizmo())
 	{
-		PreviewScene->GetPreviewGizmo()->SetPressedOnHandle(false);
+		PreviewScene->GetPreviewGizmo()->DragEnd();
 	}
 }
 

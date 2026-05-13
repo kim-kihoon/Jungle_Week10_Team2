@@ -311,6 +311,7 @@ FVector UGizmoComponent::GetVectorForAxis(int32 Axis)
 
 void UGizmoComponent::SetTransformTarget(std::unique_ptr<IGizmoTransformTarget> InTarget)
 {
+    DragEnd();
     TransformTarget = std::move(InTarget);
 
     if (HasTarget())
@@ -439,45 +440,160 @@ void UGizmoComponent::SetTargetBone(USkeletalMeshComponent* MeshComponent, int32
     SetTransformTarget(std::make_unique<FBoneGizmoTarget>(MeshComponent, BoneIndex));
 }
 
-void UGizmoComponent::UpdateLinearDrag(const FRay& Ray)
+bool UGizmoComponent::BeginLinearDrag(const FRay& Ray)
 {
-    FVector AxisVector = GetVectorForAxis(SelectedAxis);
+    DragAxisVector = GetVectorForAxis(SelectedAxis).GetSafeNormal();
+    if (DragAxisVector.IsNearlyZero())
+    {
+        return false;
+    }
 
     FVector ViewDir = (GetWorldLocation() - Ray.Origin);
     ViewDir.NormalizeSafe();
+    if (ViewDir.IsNearlyZero())
+    {
+        return false;
+    }
 
-    // 고정된 뷰 벡터와 축을 외적하여 마우스를 아무리 움직여도 뒤집히지 않는 고정 평면을 만든다.
-    FVector PlaneNormal = AxisVector.CrossProduct(ViewDir);
+    DragPlaneOrigin = GetWorldLocation();
+    DragStartWorldTransform = TransformTarget->GetWorldTransform();
+
+    FVector PlaneNormal = DragAxisVector.CrossProduct(ViewDir);
 
     // 시선과 기즈모 축이 완벽하게 일직선이 되어 외적 결과가 영벡터가 되는 특수 경우 예외 처리
     if (PlaneNormal.SizeSquared() < 1e-6f)
     {
-        PlaneNormal = AxisVector.CrossProduct(FVector::UpVector);
+        PlaneNormal = DragAxisVector.CrossProduct(FVector::UpVector);
+        if (PlaneNormal.SizeSquared() < 1e-6f)
+        {
+            PlaneNormal = DragAxisVector.CrossProduct(FVector::RightVector);
+        }
     }
     PlaneNormal.NormalizeSafe();
 
-    FVector ProjectDir = PlaneNormal.CrossProduct(AxisVector);
-
-    float Denom = Ray.Direction.DotProduct(ProjectDir);
-    if (std::abs(Denom) < 1e-6f) return;
-
-    float DistanceToPlane = (GetWorldLocation() - Ray.Origin).DotProduct(ProjectDir) / Denom;
-    FVector CurrentIntersectionLocation = Ray.Origin + (Ray.Direction * DistanceToPlane);
-
-    if (bIsFirstFrameOfDrag)
+    DragProjectDir = PlaneNormal.CrossProduct(DragAxisVector).GetSafeNormal();
+    if (DragProjectDir.IsNearlyZero())
     {
-        LastIntersectionLocation = CurrentIntersectionLocation;
-        bIsFirstFrameOfDrag = false;
+        return false;
+    }
+
+    return GetLinearDragIntersection(Ray, DragStartIntersectionLocation);
+}
+
+bool UGizmoComponent::GetLinearDragIntersection(const FRay& Ray, FVector& OutIntersection) const
+{
+    const float Denom = Ray.Direction.DotProduct(DragProjectDir);
+    if (std::abs(Denom) < 1e-4f)
+    {
+        return false;
+    }
+
+    const float DistanceToPlane = (DragPlaneOrigin - Ray.Origin).DotProduct(DragProjectDir) / Denom;
+    if (!std::isfinite(DistanceToPlane))
+    {
+        return false;
+    }
+
+    OutIntersection = Ray.Origin + (Ray.Direction * DistanceToPlane);
+    return std::isfinite(OutIntersection.X) &&
+        std::isfinite(OutIntersection.Y) &&
+        std::isfinite(OutIntersection.Z);
+}
+
+float UGizmoComponent::ApplySnapToTotalDrag(float DragAmount) const
+{
+    bool bSnapEnabled = false;
+    float SnapValue = 0.0f;
+    switch (CurMode)
+    {
+    case EGizmoMode::Translate:
+        bSnapEnabled = bTranslateSnapEnabled;
+        SnapValue = TranslateSnapValue;
+        break;
+    case EGizmoMode::Scale:
+        bSnapEnabled = bScaleSnapEnabled;
+        SnapValue = ScaleSnapValue;
+        break;
+    default:
+        break;
+    }
+
+    if (!bSnapEnabled || SnapValue <= 0.0f)
+    {
+        return DragAmount;
+    }
+
+    return std::trunc(DragAmount / SnapValue) * SnapValue;
+}
+
+void UGizmoComponent::ApplyLinearDragFromStart(float DragAmount)
+{
+    if (!HasTarget())
+    {
         return;
     }
 
-    FVector FullDelta = CurrentIntersectionLocation - LastIntersectionLocation;
+    FTransform NewTransform = DragStartWorldTransform;
 
-    float DragAmount = FullDelta.DotProduct(AxisVector);
+    switch (CurMode)
+    {
+    case EGizmoMode::Translate:
+        if (!TransformTarget->SupportsTranslate()) return;
+        NewTransform.SetLocation(DragStartWorldTransform.GetTranslation() + DragAxisVector * DragAmount);
+        break;
+    case EGizmoMode::Scale:
+    {
+        if (!TransformTarget->SupportsScale()) return;
 
-    HandleDrag(DragAmount);
+        FVector NewScale = DragStartWorldTransform.GetScale3D();
+        const float ScaleDelta = DragAmount * ScaleSensitivity;
+        switch (SelectedAxis)
+        {
+        case 0: NewScale.X += ScaleDelta; break;
+        case 1: NewScale.Y += ScaleDelta; break;
+        case 2: NewScale.Z += ScaleDelta; break;
+        default: return;
+        }
 
-    LastIntersectionLocation = CurrentIntersectionLocation;
+        NewScale.X = std::max(0.001f, NewScale.X);
+        NewScale.Y = std::max(0.001f, NewScale.Y);
+        NewScale.Z = std::max(0.001f, NewScale.Z);
+        NewTransform.SetScale3D(NewScale);
+        break;
+    }
+    default:
+        return;
+    }
+
+    TransformTarget->SetWorldTransform(NewTransform);
+    UpdateGizmoTransform();
+}
+
+void UGizmoComponent::UpdateLinearDrag(const FRay& Ray)
+{
+    if (bIsFirstFrameOfDrag)
+    {
+        if (BeginLinearDrag(Ray))
+        {
+            bIsFirstFrameOfDrag = false;
+        }
+        return;
+    }
+
+    FVector CurrentIntersectionLocation;
+    if (!GetLinearDragIntersection(Ray, CurrentIntersectionLocation))
+    {
+        return;
+    }
+
+    const FVector FullDelta = CurrentIntersectionLocation - DragStartIntersectionLocation;
+    float DragAmount = FullDelta.DotProduct(DragAxisVector);
+    if (!std::isfinite(DragAmount))
+    {
+        return;
+    }
+
+    ApplyLinearDragFromStart(ApplySnapToTotalDrag(DragAmount));
 }
 
 void UGizmoComponent::UpdateAngularDrag(const FRay& Ray)
@@ -558,6 +674,11 @@ void UGizmoComponent::UpdateDrag(const FRay& Ray)
 void UGizmoComponent::DragEnd()
 {
     bIsFirstFrameOfDrag = true;
+    DragPlaneOrigin = FVector::ZeroVector;
+    DragStartIntersectionLocation = FVector::ZeroVector;
+    DragAxisVector = FVector::ZeroVector;
+    DragProjectDir = FVector::ZeroVector;
+    DragStartWorldTransform = FTransform::Identity;
     SnapAccumulatedDrag = 0.0f;
     SetHolding(false);
     SetPressedOnHandle(false);
@@ -572,6 +693,7 @@ void UGizmoComponent::SetNextMode()
 
 void UGizmoComponent::UpdateGizmoMode(EGizmoMode NewMode)
 {
+    DragEnd();
     CurMode = NewMode;
     SnapAccumulatedDrag = 0.0f;
     UpdateGizmoTransform();
