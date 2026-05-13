@@ -15,6 +15,7 @@
 #include <windows.h>
 
 #include "Component/GizmoComponent.h"
+#include "Component/Light/AmbientLightComponent.h"
 
 namespace
 {
@@ -90,11 +91,13 @@ void FSkeletalMeshPreviewScene::Initialize(UEditorEngine* InEditor)
 		PreviewGizmo->Deactivate();
 	}
 
+	// World
 	FWorldContext& Context = Editor->CreateWorldContext(EWorldType::ViewerPreview, WorldHandle, ContextName);
 	PreviewWorld = Context.World;
 	PreviewWorld->SetWorldType(EWorldType::ViewerPreview);
 	PreviewWorld->SetActiveCamera(ViewportClient.GetCamera());
 
+	// Actor
 	PreviewActor = PreviewWorld->SpawnActor<ASkeletalMeshActor>();
 	PreviewActor->InitDefaultComponents();
 
@@ -106,6 +109,8 @@ void FSkeletalMeshPreviewScene::Initialize(UEditorEngine* InEditor)
 
 	AAmbientLightActor* AmbientLightActor = PreviewWorld->SpawnActor<AAmbientLightActor>();
 	AmbientLightActor->InitDefaultComponents();
+	UAmbientLightComponent* AmbientLightComponent = static_cast<UAmbientLightComponent*>(AmbientLightActor->GetRootComponent());
+	AmbientLightComponent->SetIntensity(2.0f);
 }
 
 void FSkeletalMeshPreviewScene::Shutdown()

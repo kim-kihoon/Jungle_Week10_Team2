@@ -28,6 +28,7 @@
 
 #include "ImGui/imgui.h"
 #include <cstdio>
+#include <cstring>
 #include <initializer_list>
 #include <utility>
 #include <algorithm>
@@ -96,33 +97,29 @@ namespace
 
 	struct FPlacementActorEntry
 	{
+		const char* Category;
 		const char* Label;
 		void (*Spawn)(UWorld*, FSelectionManager&, const FVector&);
 	};
 
-	static const FPlacementActorEntry CommonPlacementActorTypes[] = {
-		{ "Scene", SpawnActorAt<ASceneActor> },
-		{ "StaticMesh", SpawnActorAt<AStaticMeshActor> },
-		{ "SkeletalMesh", SpawnActorAt<ASkeletalMeshActor> },
-		{ "TextRender", SpawnActorAt<ATextRenderActor> },
-		{ "SubUV", SpawnActorAt<ASubUVActor> },
-		{ "Billboard", SpawnActorAt<ABillboardActor> },
-		{ "Decal", SpawnActorAt<ADecalActor> },
-		{ "Audio Zone", SpawnActorAt<AAudioZoneActor> },
-	};
-
-	static const FPlacementActorEntry LightPlacementActorTypes[] = {
-		{ "Directional Light", SpawnActorAt<ADirectionalLightActor> },
-		{ "Ambient Light", SpawnActorAt<AAmbientLightActor> },
-		{ "Point Light", SpawnActorAt<APointLightActor> },
-		{ "Spot Light", SpawnActorAt<ASpotLightActor> },
-		{ "Sky Atmosphere", SpawnActorAt<ASkyAtmosphereActor> },
-		{ "Height Fog", SpawnActorAt<AHeightFogActor> },
-	};
-
-	static const FPlacementActorEntry GamePlacementActorTypes[] = {
-		{ "Pawn", SpawnActorAt<APawnActor> },
-		{ "Player Start", SpawnActorAt<APlayerStartActor> },
+	// Place Actor에서 생성 가능한 에디터 Actor 타입 목록입니다.
+	static const FPlacementActorEntry PlacementActorTypes[] = {
+		{ "Basic", "Pawn", SpawnActorAt<APawnActor> },
+		{ "Basic", "Scene", SpawnActorAt<ASceneActor> },
+		{ "Rendering", "StaticMesh", SpawnActorAt<AStaticMeshActor> },
+		{ "Rendering", "SkeletalMesh", SpawnActorAt<ASkeletalMeshActor> },
+		{ "Rendering", "TextRender", SpawnActorAt<ATextRenderActor> },
+		{ "Rendering", "SubUV", SpawnActorAt<ASubUVActor> },
+		{ "Rendering", "Billboard", SpawnActorAt<ABillboardActor> },
+		{ "Rendering", "Decal", SpawnActorAt<ADecalActor> },
+		{ "Light", "Directional Light", SpawnActorAt<ADirectionalLightActor> },
+		{ "Light", "Ambient Light", SpawnActorAt<AAmbientLightActor> },
+		{ "Light", "Point Light", SpawnActorAt<APointLightActor> },
+		{ "Light", "Spot Light", SpawnActorAt<ASpotLightActor> },
+		{ "Environment", "Sky Atmosphere", SpawnActorAt<ASkyAtmosphereActor> },
+		{ "Environment", "Height Fog", SpawnActorAt<AHeightFogActor> },
+		{ "Audio", "Audio Zone", SpawnActorAt<AAudioZoneActor> },
+		{ "Gameplay", "Player Start", SpawnActorAt<APlayerStartActor> },
 	};
 }
 
@@ -490,51 +487,22 @@ void FEditorViewportOverlayWidget::RenderActorPlacementPopup()
 		ImGui::TextColored(ColorMint, "Place Actor");
 		ImGui::Separator();
 
-		auto TryPlaceActor = [this, Client](const FPlacementActorEntry& Entry) -> bool
+		const char* CurrentCategory = nullptr;
+		for (const FPlacementActorEntry& Entry : PlacementActorTypes)
 		{
+			if (CurrentCategory == nullptr || strcmp(CurrentCategory, Entry.Category) != 0)
+			{
+				CurrentCategory = Entry.Category;
+				ImGui::SeparatorText(CurrentCategory);
+			}
+
 			if (ImGui::Selectable(Entry.Label))
 			{
 				Entry.Spawn(EditorEngine->GetFocusedWorld(), EditorEngine->GetSelectionManager(), Client->GetPendingActorPlacementLocation());
 				Client->ClearPendingActorPlacement();
 				bActorPlacementPopupOpened = false;
 				ImGui::CloseCurrentPopup();
-				return true;
-			}
-			return false;
-		};
-
-		bool bPlacedActor = false;
-		for (const FPlacementActorEntry& Entry : CommonPlacementActorTypes)
-		{
-			if (TryPlaceActor(Entry))
-			{
-				bPlacedActor = true;
 				break;
-			}
-		}
-
-		if (!bPlacedActor)
-		{
-			ImGui::SeparatorText("Light");
-			for (const FPlacementActorEntry& Entry : LightPlacementActorTypes)
-			{
-				if (TryPlaceActor(Entry))
-				{
-					bPlacedActor = true;
-					break;
-				}
-			}
-		}
-
-		if (!bPlacedActor)
-		{
-			ImGui::SeparatorText("Game");
-			for (const FPlacementActorEntry& Entry : GamePlacementActorTypes)
-			{
-				if (TryPlaceActor(Entry))
-				{
-					break;
-				}
 			}
 		}
 
