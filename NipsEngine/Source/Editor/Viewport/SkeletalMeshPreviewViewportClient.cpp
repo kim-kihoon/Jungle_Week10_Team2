@@ -166,7 +166,7 @@ void FSkeletalMeshPreviewViewportClient::AdjustMoveSpeedScale(float Notch)
 void FSkeletalMeshPreviewViewportClient::ResetCamera()
 {
 	OrbitPitch = 15.0f;
-	OrbitYaw = -45.0f;
+	OrbitYaw = 135.0f;
 	OrbitDistance = 3.0f;
 	ViewTarget = FVector(0.0f, 0.0f, 1.0f);
 	Camera.SetOrthoHeight(10.0f);

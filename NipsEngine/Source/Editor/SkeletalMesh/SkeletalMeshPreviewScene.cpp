@@ -16,6 +16,7 @@
 
 #include "Component/GizmoComponent.h"
 #include "Component/Light/AmbientLightComponent.h"
+#include "Component/Light/DirectionalLightComponent.h"
 
 namespace
 {
@@ -106,6 +107,7 @@ void FSkeletalMeshPreviewScene::Initialize(UEditorEngine* InEditor)
 
 	ADirectionalLightActor* LightActor = PreviewWorld->SpawnActor<ADirectionalLightActor>();
 	LightActor->InitDefaultComponents();
+	LightActor->SetActorRotation(FVector(0.0f, -45.0f, 180.0f));
 
 	AAmbientLightActor* AmbientLightActor = PreviewWorld->SpawnActor<AAmbientLightActor>();
 	AmbientLightActor->InitDefaultComponents();
