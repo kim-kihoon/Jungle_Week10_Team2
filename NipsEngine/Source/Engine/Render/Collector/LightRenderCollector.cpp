@@ -18,6 +18,10 @@
 #include <cctype>
 #include <cmath>
 
+#include "Asset/SkeletalMesh.h"
+#include "Asset/SkeletalMeshTypes.h"
+#include "Component/SkinnedMeshComponent.h"
+
 namespace
 {
 	constexpr float SpotShadowNearPlane = 0.1f;
@@ -918,34 +922,81 @@ void FLightRenderCollector::CollectShadowCasters(UWorld* World, FRenderBus& Rend
 	std::unordered_set<UPrimitiveComponent*> AddedPrimitives;
 
 	auto AddShadowCaster = [&](UPrimitiveComponent* Primitive)
-	{
-		if (Primitive == nullptr || !Primitive->IsVisible()) return;
-		if (Primitive->IsEditorOnly() && WorldType != EWorldType::Editor) return;
-		if (Primitive->GetPrimitiveType() != EPrimitiveType::EPT_StaticMesh) return;
-		if (!AddedPrimitives.insert(Primitive).second) return;
-
-		UStaticMeshComponent* StaticMeshComp = static_cast<UStaticMeshComponent*>(Primitive);
-		const UStaticMesh* StaticMesh = StaticMeshComp->GetStaticMesh();
-		if (StaticMesh == nullptr || !StaticMesh->HasValidMeshData()) return;
-
-		FMeshBuffer* MeshBuffer = MeshBufferManager->GetStaticMeshBuffer(StaticMesh, 0);
-		if (MeshBuffer == nullptr || !MeshBuffer->IsValid()) return;
-
-		const FStaticMesh* MeshData = StaticMesh->GetMeshData(0);
-		if (MeshData == nullptr) return;
-
-		for (const FStaticMeshSection& Section : MeshData->Sections)
 		{
-			FRenderCommand Cmd = {};
-			Cmd.PerObjectConstants = FPerObjectConstants{ Primitive->GetWorldMatrix(), FColor::White().ToVector4() };
-			Cmd.Type = ERenderCommandType::StaticMesh;
-			Cmd.MeshBuffer = MeshBuffer;
-			Cmd.SectionIndexStart = Section.StartIndex;
-			Cmd.SectionIndexCount = Section.IndexCount;
+			if (Primitive == nullptr || !Primitive->IsVisible()) return;
+			if (Primitive->IsEditorOnly() && WorldType != EWorldType::Editor) return;
 
-			RenderBus.AddCommand(ERenderPass::ShadowCasters, Cmd);
-		}
-	};
+			const EPrimitiveType PrimType = Primitive->GetPrimitiveType();
+			if (PrimType != EPrimitiveType::EPT_StaticMesh && PrimType != EPrimitiveType::EPT_SkeletalMesh) return;
+
+			if (!AddedPrimitives.insert(Primitive).second) return;
+
+			if (PrimType == EPrimitiveType::EPT_StaticMesh)
+			{
+				UStaticMeshComponent* StaticMeshComp = static_cast<UStaticMeshComponent*>(Primitive);
+				const UStaticMesh* StaticMesh = StaticMeshComp->GetStaticMesh();
+				if (StaticMesh == nullptr || !StaticMesh->HasValidMeshData()) return;
+
+				// 섀도우 패스는 보통 제일 높은 퀄리티(LOD 0) 또는 지정된 섀도우 전용 LOD를 사용합니다.
+				FMeshBuffer* MeshBuffer = MeshBufferManager->GetStaticMeshBuffer(StaticMesh, 0);
+				if (MeshBuffer == nullptr || !MeshBuffer->IsValid()) return;
+
+				const FStaticMesh* MeshData = StaticMesh->GetMeshData(0);
+				if (MeshData == nullptr) return;
+
+				for (const FStaticMeshSection& Section : MeshData->Sections)
+				{
+					FRenderCommand Cmd = {};
+					Cmd.PerObjectConstants = FPerObjectConstants{ Primitive->GetWorldMatrix(), FColor::White().ToVector4() };
+					Cmd.Type = ERenderCommandType::StaticMesh;
+					Cmd.MeshBuffer = MeshBuffer;
+					Cmd.SectionIndexStart = Section.StartIndex;
+					Cmd.SectionIndexCount = Section.IndexCount;
+
+					RenderBus.AddCommand(ERenderPass::ShadowCasters, Cmd);
+				}
+			}
+			// Skeletal Mesh
+			else if (PrimType == EPrimitiveType::EPT_SkeletalMesh)
+			{
+				USkinnedMeshComponent* SkinnedMeshComp = static_cast<USkinnedMeshComponent*>(Primitive);
+				USkeletalMesh* SkeletalMesh = SkinnedMeshComp->GetSkeletalMesh();
+				if (SkeletalMesh == nullptr || !SkeletalMesh->HasValidMeshData()) return;
+
+				SkinnedMeshComp->UpdateRenderBuffer();
+				FMeshBuffer* MeshBuffer = SkinnedMeshComp->GetRenderMeshBuffer();
+				if (MeshBuffer == nullptr || !MeshBuffer->IsValid()) return;
+
+				const TArray<FSkeletalMeshSection>& Sections = SkeletalMesh->GetSections();
+				const TArray<uint32>& Indices = SkeletalMesh->GetIndices();
+
+				if (Sections.empty())
+				{
+					FRenderCommand Cmd = {};
+					Cmd.PerObjectConstants = FPerObjectConstants{ Primitive->GetWorldMatrix(), FColor::White().ToVector4() };
+					Cmd.Type = ERenderCommandType::StaticMesh;
+					Cmd.MeshBuffer = MeshBuffer;
+					Cmd.SectionIndexStart = 0;
+					Cmd.SectionIndexCount = static_cast<uint32>(Indices.size());
+
+					RenderBus.AddCommand(ERenderPass::ShadowCasters, Cmd);
+				}
+				else
+				{
+					for (const FSkeletalMeshSection& Section : Sections)
+					{
+						FRenderCommand Cmd = {};
+						Cmd.PerObjectConstants = FPerObjectConstants{ Primitive->GetWorldMatrix(), FColor::White().ToVector4() };
+						Cmd.Type = ERenderCommandType::StaticMesh;
+						Cmd.MeshBuffer = MeshBuffer;
+						Cmd.SectionIndexStart = Section.StartIndex;
+						Cmd.SectionIndexCount = Section.IndexCount;
+
+						RenderBus.AddCommand(ERenderPass::ShadowCasters, Cmd);
+					}
+				}
+			}
+		};
 
 	auto AddQueryResults = [&]()
 	{

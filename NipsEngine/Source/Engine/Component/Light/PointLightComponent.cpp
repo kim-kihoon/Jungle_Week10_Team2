@@ -7,7 +7,7 @@ REGISTER_FACTORY(UPointLightComponent)
 UPointLightComponent::UPointLightComponent()
 {
 	SetLightType(ELightType::LightType_Point);
-	SetCastShadows(false); // Point Light의 그림자 연산은 심각하게 비싸기 때문에 기본값을 false로 설정한다.
+	// SetCastShadows(false); // Point Light의 그림자 연산은 심각하게 비싸기 때문에 기본값을 false로 설정한다.
 }
 
 void UPointLightComponent::GetEditableProperties(TArray<FPropertyDescriptor>& OutProps)
