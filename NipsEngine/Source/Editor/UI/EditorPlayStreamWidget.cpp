@@ -55,6 +55,25 @@ namespace
 
 		return bClicked;
 	}
+
+	void ShowLastItemTooltip(const char* Title, const char* Description)
+	{
+		if (!Title || !ImGui::IsItemHovered())
+		{
+			return;
+		}
+
+		ImGui::BeginTooltip();
+		ImGui::TextUnformatted(Title);
+		if (Description && Description[0] != '\0')
+		{
+			ImGui::Separator();
+			ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);
+			ImGui::TextUnformatted(Description);
+			ImGui::PopTextWrapPos();
+		}
+		ImGui::EndTooltip();
+	}
 }
 
 void FEditorPlayStreamWidget::Initialize(UEditorEngine* InEditorEngine)
@@ -108,6 +127,7 @@ void FEditorPlayStreamWidget::Render(float DeltaTime)
 		bool bPlayPauseClicked = bHasPlayIcon
 			? RenderIconButton("PlayPauseBtn", PlayIconTexture, PlayBtnSize, IconSize, IconTint)
 			: ImGui::Button(CurrentPlayPauseLabel, PlayBtnSize);
+		ShowLastItemTooltip("Pause", "Pause the current play session and keep the simulation state.");
 
 		if (bPlayPauseClicked)
 		{
@@ -126,6 +146,9 @@ void FEditorPlayStreamWidget::Render(float DeltaTime)
 		bool bPlayPauseClicked = bHasPlayIcon
 			? RenderIconButton("PlayPauseBtn", PlayIconTexture, PlayBtnSize, IconSize, IconTint)
 			: ImGui::Button(CurrentPlayPauseLabel, PlayBtnSize);
+		ShowLastItemTooltip(
+			bIsPaused ? "Resume" : "Play",
+			bIsPaused ? "Resume the paused play session." : "Start playing the focused viewport scene.");
 
 		if (bPlayPauseClicked)
 		{
@@ -147,6 +170,7 @@ void FEditorPlayStreamWidget::Render(float DeltaTime)
 	bool bStopClicked = bHasStopIcon
 		? RenderIconButton("StopBtn", StopIconTexture, StopBtnSize, IconSize, StopIconTint)
 		: ImGui::Button(StopLabel, StopBtnSize);
+	ShowLastItemTooltip("Stop", "Stop the current play session and return to editing.");
 
 	if (bStopClicked)
 	{
