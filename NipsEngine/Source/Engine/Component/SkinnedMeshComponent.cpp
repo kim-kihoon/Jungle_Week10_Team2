@@ -20,6 +20,9 @@ void USkinnedMeshComponent::SetSkeletalMesh(USkeletalMesh* InSkeletalMesh)
 
     SkeletalMesh = InSkeletalMesh;
 
+    // Mesh asset을 교체하면 section/material 구성, bone 개수, vertex/index 배열이 모두
+    // 달라질 수 있다. 기존 mesh 기준으로 만든 material instance, CPU skinning cache,
+    // GPU vertex/index buffer는 더 이상 유효하지 않으므로 전부 비운 뒤 새 mesh 기준으로 다시 초기화한다.
     ReleaseOwnedMaterialInstances();
     Materials.clear();
 
@@ -59,9 +62,12 @@ void USkinnedMeshComponent::SetSkeletalMesh(USkeletalMesh* InSkeletalMesh)
 
     if (SkeletalMesh != nullptr && SkeletalMesh->HasValidSkeleton())
     {
+        // Reference pose는 "아무 animation도 적용하지 않은 기본 자세"이다.
+        // component가 처음 mesh를 받았을 때는 이 자세를 현재 local pose로 복사한다.
         InitializePoseFromReference();
     }
 
+    // 이후 Tick 또는 render collection 시점에 필요한 cache만 lazy하게 다시 계산한다.
     MarkBoneTransformsDirty();
     MarkSkinningDirty();
     MarkBoundsDirty();
@@ -101,6 +107,9 @@ void USkinnedMeshComponent::UpdateRenderBuffer()
 
     ComputeSkinnedVertices();
 
+    // 현재 구현은 CPU에서 스키닝한 vertex를 일반 mesh vertex buffer처럼 업로드한다.
+    // 그래서 shader는 bone index/weight를 몰라도 되고, static mesh와 비슷한 렌더 경로를 쓸 수 있다.
+    // 대신 bone pose가 바뀌면 vertex buffer 내용을 다시 갱신해야 한다.
     const TArray<FNormalVertex>& Vertices = GetSkinnedVertices();
     const TArray<uint32>& Indices = SkeletalMesh->GetIndices();
     if (Vertices.empty() || Indices.empty())
@@ -155,7 +164,9 @@ void USkinnedMeshComponent::RefreshBoneTransforms()
         return;
     }
 
-	//Bone들은 결국 FName,Index,FTransform 으로 구성.
+    // Skeletal mesh의 bone 배열은 parent가 child보다 앞에 오도록 구성되어 있다.
+    // 이 전제가 있어야 한 번의 forward loop로 parent의 component-space transform을
+    // 이미 계산된 값으로 참조할 수 있다.
     const TArray<FSkeletalBone>& Bones = SkeletalMesh->GetBones();
     const int32 BoneCount = static_cast<int32>(Bones.size());
 
@@ -170,17 +181,22 @@ void USkinnedMeshComponent::RefreshBoneTransforms()
         FTransform CurrentLocalTransform = Bone.ReferenceLocalTransform;
         if (BoneIndex < static_cast<int32>(LocalBoneTransforms.size()))
         {
+            // LocalBoneTransforms는 현재 component instance의 pose이다.
+            // 값이 있으면 reference pose 대신 현재 편집/animation 결과를 사용한다.
             CurrentLocalTransform = LocalBoneTransforms[BoneIndex];
         }
 
         if (ParentIndex >= 0 && ParentIndex < BoneIndex)
         {
-			//현재 bone에 부모 bone의 transform을 반영.
+            // Bone local transform은 parent 기준이므로 parent의 component-space transform을
+            // 뒤에 곱해 component 기준 transform으로 올린다.
+            // 결과적으로 root -> ... -> parent -> current 순서의 누적 transform이 된다.
             ComponentSpaceBoneTransforms[BoneIndex] = CurrentLocalTransform * ComponentSpaceBoneTransforms[ParentIndex];
         }
         else
         {
-			//루트 이거나 데이터가 잘못 들어와서 현재 본보다 부모의 인덱스가 뒤에 있을 때
+            // Root bone은 parent가 없으므로 local transform이 곧 component-space transform이다.
+            // ParentIndex가 현재 bone보다 뒤에 있는 비정상 데이터도 안전하게 root처럼 처리한다.
             ComponentSpaceBoneTransforms[BoneIndex] = CurrentLocalTransform;
         }
     }
@@ -210,17 +226,27 @@ void USkinnedMeshComponent::ComputeSkinningMatrices()
 
     for (int32 BoneIndex = 0; BoneIndex < BoneCount; ++BoneIndex)
     {
+        // ComponentSpaceBoneTransforms[BoneIndex]는 현재 pose에서의 bone 위치이다.
+        // 하지만 mesh vertex는 import 당시 bind pose 위치로 저장되어 있다.
+        // 따라서 바로 CurrentBoneMatrix를 곱하면 bind pose 기준 오프셋이 중복 적용된다.
         const FMatrix CurrentBoneMatrix =
             ComponentSpaceBoneTransforms[BoneIndex].ToMatrixWithScale();
 
         if (BoneIndex < static_cast<int32>(InverseBindPoseMatrices.size()))
         {
-			// 보통 vertex들이 bind pose 기준으로 저장되니 현재 pose로 변환해줌.
-            // Vertex * InverseBindPose * CurrentBone
+            // InverseBindPose는 bind pose에서 bone 공간으로 되돌리는 행렬이다.
+            // 그 뒤 CurrentBoneMatrix를 곱하면 같은 vertex를 현재 pose의 bone 위치로 보낸다.
+            //
+            // 이 엔진의 FVector/FMatrix helper는 아래 사용 방식처럼
+            // Position * Matrix 순서의 의미로 쓰이고 있으므로 최종 행렬은:
+            //   VertexBindPose * InverseBindPose * CurrentBoneMatrix
+            // 가 되도록 InverseBindPose * CurrentBoneMatrix를 저장한다.
             SkinningMatrices[BoneIndex] = InverseBindPoseMatrices[BoneIndex] * CurrentBoneMatrix;
         }
         else
         {
+            // Skeleton 데이터가 불완전한 경우의 fallback이다.
+            // 올바른 skeletal mesh라면 inverse bind pose 수와 bone 수가 같아야 한다.
             SkinningMatrices[BoneIndex] = CurrentBoneMatrix;
         }
     }
@@ -252,8 +278,15 @@ void USkinnedMeshComponent::ComputeSkinnedVertices()
     {
         const FSkeletalMeshVertex& SourceVertex = SourceVertices[VertexIndex];
 
+        // FSkeletalMeshVertex는 import된 원본 vertex이다.
+        // Position/Normal/Tangent/Bitangent는 bind pose 기준이고,
+        // BoneIndices/BoneWeights가 "어떤 bone들이 이 vertex를 얼마나 움직이는지"를 담는다.
         FNormalVertex OutVertex = SourceVertex.ToNormalVertex();
 
+        // Linear Blend Skinning(LBS):
+        // 각 influence마다 vertex를 해당 bone의 skinning matrix로 변환한 뒤,
+        // weight만큼 더한다. 예를 들어 팔꿈치 주변 vertex는 upper_arm 0.4,
+        // lower_arm 0.6처럼 두 bone의 결과가 섞여 부드럽게 접힌다.
         FVector SkinnedPosition = FVector::ZeroVector;
         FVector SkinnedNormal = FVector::ZeroVector;
         FVector SkinnedTangent = FVector::ZeroVector;
@@ -278,6 +311,9 @@ void USkinnedMeshComponent::ComputeSkinnedVertices()
 
             const FMatrix& SkinningMatrix = SkinningMatrices[BoneIndex];
 
+            // 위치는 translation을 포함해야 하므로 TransformPosition을 사용한다.
+            // 방향 벡터인 normal/tangent/bitangent는 위치 이동의 영향을 받으면 안 되므로
+            // TransformVector로 회전/스케일 성분만 적용한다.
             SkinnedPosition += SkinningMatrix.TransformPosition(SourceVertex.Position) * Weight;
             SkinnedNormal += SkinningMatrix.TransformVector(SourceVertex.Normal) * Weight;
             SkinnedTangent += SkinningMatrix.TransformVector(SourceVertex.Tangent) * Weight;
@@ -288,6 +324,9 @@ void USkinnedMeshComponent::ComputeSkinnedVertices()
 
         if (TotalWeight > 1.0e-6f)
         {
+            // Import 단계에서 weight 합이 1로 정규화되어 있어도,
+            // invalid bone index를 건너뛰면 누적 weight가 1보다 작아질 수 있다.
+            // 남은 영향만 기준으로 다시 나눠 vertex가 의도치 않게 원점 쪽으로 줄어드는 것을 막는다.
             const float InvTotalWeight = 1.0f / TotalWeight;
 
             OutVertex.Position = SkinnedPosition * InvTotalWeight;
@@ -297,11 +336,13 @@ void USkinnedMeshComponent::ComputeSkinnedVertices()
         }
         else
         {
-            // bone weight가 없는 vertex는 원본 그대로 둔다.
+            // Bone weight가 없는 vertex는 skinned mesh 안의 rigid/static 부분일 수 있으므로 원본 그대로 둔다.
             OutVertex = SourceVertex.ToNormalVertex();
         }
 
         SkinnedVertices[VertexIndex] = OutVertex;
+        // Skinned bounds는 현재 pose 기준이어야 한다.
+        // 팔을 뻗거나 다리를 움직이면 reference pose bounds만으로는 culling/raycast가 틀릴 수 있다.
         LocalSkinnedAABB.Expand(OutVertex.Position);
     }
 
@@ -322,6 +363,8 @@ void USkinnedMeshComponent::UpdateWorldAABB() const
 
     if (bSkinningDirty || !LocalSkinnedAABB.IsValid())
     {
+        // Bounds는 skinned vertex 결과에 의존한다.
+        // const 함수지만 cache 갱신이므로 mutable dirty flag와 const_cast를 사용한다.
         const_cast<USkinnedMeshComponent*>(this)->ComputeSkinnedVertices();
     }
 
@@ -344,6 +387,9 @@ void USkinnedMeshComponent::UpdateWorldAABB() const
 
     const FMatrix& WorldMatrix = GetWorldMatrix();
 
+    // LocalSkinnedAABB는 component local space의 축정렬 박스이다.
+    // Component가 회전/스케일되면 단순히 Min/Max만 변환할 수 없으므로,
+    // 8개 corner를 모두 world로 보낸 뒤 world-space AABB를 다시 만든다.
     for (const FVector& Corner : LocalCorners)
     {
         WorldAABB.Expand(WorldMatrix.TransformPosition(Corner));
@@ -361,6 +407,8 @@ bool USkinnedMeshComponent::RaycastMesh(const FRay& Ray, FHitResult& OutHitResul
 
     EnsureBoundsUpdated();
 
+    // 먼저 world-space AABB로 빠르게 탈락시킨다.
+    // Triangle 전체를 검사하는 것은 비싸기 때문에 broad phase 역할을 한다.
     float BoxT = 0.0f;
     if (!WorldAABB.IntersectRay(Ray, BoxT))
     {
@@ -378,6 +426,8 @@ bool USkinnedMeshComponent::RaycastMesh(const FRay& Ray, FHitResult& OutHitResul
 
     const FMatrix InvWorld = GetWorldMatrix().GetInverse();
 
+    // SkinnedVertices는 component local space에 있으므로,
+    // world ray를 component local space로 변환한 뒤 triangle intersection을 수행한다.
     FRay LocalRay = Ray;
     LocalRay.Origin = InvWorld.TransformPosition(LocalRay.Origin);
     LocalRay.Direction = InvWorld.TransformVector(LocalRay.Direction);
@@ -464,6 +514,8 @@ void USkinnedMeshComponent::InitializePoseFromReference()
 
     for (int32 i = 0; i < BoneCount; i++)
     {
+        // ReferenceLocalTransform은 import 시점의 bind/reference pose이다.
+        // 현재 animation system이 없을 때는 이 값을 그대로 현재 local pose로 사용한다.
 		LocalBoneTransforms[i] = Bones[i].ReferenceLocalTransform;
     }
 
@@ -489,6 +541,8 @@ void USkinnedMeshComponent::SetBoneLocalTransform(int32 BoneIndex, const FTransf
     if (BoneIndex >= 0 && BoneIndex < static_cast<int32>(LocalBoneTransforms.size()))
     {
 		LocalBoneTransforms[BoneIndex] = NewLocalTransform;
+        // Local pose가 바뀌면 component-space pose, skinning matrix,
+        // skinned vertex, bounds, render buffer가 모두 연쇄적으로 무효화된다.
         MarkBoneTransformsDirty();
 	}
 }
@@ -528,6 +582,8 @@ void USkinnedMeshComponent::SetBoneWorldTransform(int32 BoneIndex, const FTransf
 
     if (ParentIndex >= 0 && ParentIndex < BoneIndex)
     {
+        // 사용자는 gizmo로 world transform을 조작하지만 저장해야 하는 값은 parent 기준 local transform이다.
+        // 그래서 target component-space transform에서 parent component-space transform을 제거한다.
         FTransform InvParentComponentSpace = GetBoneComponentTransform(ParentIndex).Inverse();
         NewLocalTransform = TargetComponentSpace * InvParentComponentSpace;
     }
