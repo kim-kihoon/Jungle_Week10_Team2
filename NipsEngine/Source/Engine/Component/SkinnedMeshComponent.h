@@ -3,6 +3,7 @@
 #include "MeshComponent.h"
 #include "Render/Resource/VertexTypes.h"
 #include "Render/Common/RenderTypes.h"
+#include "Render/Resource/Buffer.h"
 
 class USkeletalMesh;
 
@@ -28,13 +29,15 @@ public:
 	const TArray<FNormalVertex>& GetSkinnedVertices() const;
 	const TArray<FMatrix>& GetSkinningMatrices() const;
 	const TArray<FTransform>& GetComponentSpaceBoneTransforms() const;
+	void UpdateRenderBuffer();
+	FMeshBuffer* GetRenderMeshBuffer();
+	const FMeshBuffer* GetRenderMeshBuffer() const;
 
 	EPrimitiveType GetPrimitiveType() const override { return EPrimitiveType::EPT_SkeletalMesh; }
+	const FAABB& GetWorldAABB() const override;
 	void UpdateWorldAABB() const override;
 	bool RaycastMesh(const FRay& Ray, FHitResult& OutHitResult) override;
 	bool HasValidMesh() const;
-
-	bool ConsumeRenderStateDirty();
 
 	void InitializePoseFromReference();
 	void ResetPose();
@@ -68,10 +71,11 @@ protected:
 	TArray<FTransform> LocalBoneTransforms;			// 편집 가능한 로컬 트랜스폼 상태.
     TArray<FMatrix> SkinningMatrices;				// 정점의 최종 변환 행렬입니다.
     TArray<FNormalVertex> SkinnedVertices;			// skinning이 끝난 정점 위치입니다. 이걸로 렌더링할 거에요
+	FAABB LocalSkinnedAABB;
+	FDynamicMeshBuffer MeshBuffer;
 
 	mutable bool bBoneTransformsDirty = true;
 	mutable bool bSkinningDirty = true;
 	mutable bool bBoundsDirty = true;
 	bool bRenderStateDirty = true;
-	bool bConsumedRenderStateDirty = false; //렌더 상태 변경 플래그
 };

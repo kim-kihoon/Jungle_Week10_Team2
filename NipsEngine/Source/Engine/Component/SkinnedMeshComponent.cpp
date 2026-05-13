@@ -7,6 +7,7 @@
 
 #include "Asset/SkeletalMesh.h"
 #include "Core/ResourceManager.h"
+#include "Runtime/Engine.h"
 
 DEFINE_CLASS(USkinnedMeshComponent, UMeshComponent)
 
@@ -53,6 +54,8 @@ void USkinnedMeshComponent::SetSkeletalMesh(USkeletalMesh* InSkeletalMesh)
     SkinningMatrices.clear();
     SkinnedVertices.clear();
     LocalBoneTransforms.clear();
+    LocalSkinnedAABB.Reset();
+    MeshBuffer.Release();
 
     if (SkeletalMesh != nullptr && SkeletalMesh->HasValidSkeleton())
     {
@@ -78,6 +81,63 @@ const TArray<FMatrix>& USkinnedMeshComponent::GetSkinningMatrices() const
 const TArray<FTransform>& USkinnedMeshComponent::GetComponentSpaceBoneTransforms() const
 {
     return ComponentSpaceBoneTransforms;
+}
+
+void USkinnedMeshComponent::UpdateRenderBuffer()
+{
+    if (GEngine == nullptr)
+    {
+        return;
+    }
+
+    ID3D11Device* Device = GEngine->GetRenderer().GetFD3DDevice().GetDevice();
+    ID3D11DeviceContext* DeviceContext = GEngine->GetRenderer().GetFD3DDevice().GetDeviceContext();
+    if (Device == nullptr || DeviceContext == nullptr || !HasValidMesh())
+    {
+        MeshBuffer.Release();
+        bRenderStateDirty = false;
+        return;
+    }
+
+    ComputeSkinnedVertices();
+
+    const TArray<FNormalVertex>& Vertices = GetSkinnedVertices();
+    const TArray<uint32>& Indices = SkeletalMesh->GetIndices();
+    if (Vertices.empty() || Indices.empty())
+    {
+        MeshBuffer.Release();
+        bRenderStateDirty = false;
+        return;
+    }
+
+    const uint32 VertexCount = static_cast<uint32>(Vertices.size());
+    const bool bNeedCreate =
+        !MeshBuffer.IsValid() ||
+        MeshBuffer.GetVertexBuffer().GetVertexCount() < VertexCount;
+
+    if (bNeedCreate)
+    {
+        MeshBuffer.Release();
+        MeshBuffer.Create(Device, Vertices, Indices);
+        bRenderStateDirty = false;
+        return;
+    }
+
+    if (bRenderStateDirty)
+    {
+        MeshBuffer.Update(DeviceContext, Vertices);
+        bRenderStateDirty = false;
+    }
+}
+
+FMeshBuffer* USkinnedMeshComponent::GetRenderMeshBuffer()
+{
+    return MeshBuffer.IsValid() ? &MeshBuffer : nullptr;
+}
+
+const FMeshBuffer* USkinnedMeshComponent::GetRenderMeshBuffer() const
+{
+    return MeshBuffer.IsValid() ? &MeshBuffer : nullptr;
 }
 
 bool USkinnedMeshComponent::HasValidMesh() const
@@ -171,6 +231,7 @@ void USkinnedMeshComponent::ComputeSkinnedVertices()
     if (!HasValidMesh())
     {
         SkinnedVertices.clear();
+        LocalSkinnedAABB.Reset();
         bSkinningDirty = false;
         return;
     }
@@ -185,6 +246,7 @@ void USkinnedMeshComponent::ComputeSkinnedVertices()
     const TArray<FSkeletalMeshVertex>& SourceVertices = SkeletalMesh->GetVertices();
     SkinnedVertices.clear();
     SkinnedVertices.resize(SourceVertices.size());
+    LocalSkinnedAABB.Reset();
 
     for (int32 VertexIndex = 0; VertexIndex < static_cast<int32>(SourceVertices.size()); ++VertexIndex)
     {
@@ -240,6 +302,7 @@ void USkinnedMeshComponent::ComputeSkinnedVertices()
         }
 
         SkinnedVertices[VertexIndex] = OutVertex;
+        LocalSkinnedAABB.Expand(OutVertex.Position);
     }
 
     bSkinningDirty = false;
@@ -257,31 +320,26 @@ void USkinnedMeshComponent::UpdateWorldAABB() const
         return;
     }
 
-    const_cast<USkinnedMeshComponent*>(this)->ComputeSkinnedVertices();
-
-    FAABB LocalSkinnedBounds;
-    LocalSkinnedBounds.Reset();
-
-    for (const FNormalVertex& Vertex : SkinnedVertices)
+    if (bSkinningDirty || !LocalSkinnedAABB.IsValid())
     {
-        LocalSkinnedBounds.Expand(Vertex.Position);
+        const_cast<USkinnedMeshComponent*>(this)->ComputeSkinnedVertices();
     }
 
-    if (!LocalSkinnedBounds.IsValid())
+    if (!LocalSkinnedAABB.IsValid())
     {
         bBoundsDirty = false;
         return;
     }
 
     const FVector LocalCorners[8] = {
-        FVector(LocalSkinnedBounds.Min.X, LocalSkinnedBounds.Min.Y, LocalSkinnedBounds.Min.Z),
-        FVector(LocalSkinnedBounds.Max.X, LocalSkinnedBounds.Min.Y, LocalSkinnedBounds.Min.Z),
-        FVector(LocalSkinnedBounds.Min.X, LocalSkinnedBounds.Max.Y, LocalSkinnedBounds.Min.Z),
-        FVector(LocalSkinnedBounds.Max.X, LocalSkinnedBounds.Max.Y, LocalSkinnedBounds.Min.Z),
-        FVector(LocalSkinnedBounds.Min.X, LocalSkinnedBounds.Min.Y, LocalSkinnedBounds.Max.Z),
-        FVector(LocalSkinnedBounds.Max.X, LocalSkinnedBounds.Min.Y, LocalSkinnedBounds.Max.Z),
-        FVector(LocalSkinnedBounds.Min.X, LocalSkinnedBounds.Max.Y, LocalSkinnedBounds.Max.Z),
-        FVector(LocalSkinnedBounds.Max.X, LocalSkinnedBounds.Max.Y, LocalSkinnedBounds.Max.Z)
+        FVector(LocalSkinnedAABB.Min.X, LocalSkinnedAABB.Min.Y, LocalSkinnedAABB.Min.Z),
+        FVector(LocalSkinnedAABB.Max.X, LocalSkinnedAABB.Min.Y, LocalSkinnedAABB.Min.Z),
+        FVector(LocalSkinnedAABB.Min.X, LocalSkinnedAABB.Max.Y, LocalSkinnedAABB.Min.Z),
+        FVector(LocalSkinnedAABB.Max.X, LocalSkinnedAABB.Max.Y, LocalSkinnedAABB.Min.Z),
+        FVector(LocalSkinnedAABB.Min.X, LocalSkinnedAABB.Min.Y, LocalSkinnedAABB.Max.Z),
+        FVector(LocalSkinnedAABB.Max.X, LocalSkinnedAABB.Min.Y, LocalSkinnedAABB.Max.Z),
+        FVector(LocalSkinnedAABB.Min.X, LocalSkinnedAABB.Max.Y, LocalSkinnedAABB.Max.Z),
+        FVector(LocalSkinnedAABB.Max.X, LocalSkinnedAABB.Max.Y, LocalSkinnedAABB.Max.Z)
     };
 
     const FMatrix& WorldMatrix = GetWorldMatrix();
@@ -384,11 +442,10 @@ bool USkinnedMeshComponent::RaycastMesh(const FRay& Ray, FHitResult& OutHitResul
     return true;
 }
 
-bool USkinnedMeshComponent::ConsumeRenderStateDirty()
+const FAABB& USkinnedMeshComponent::GetWorldAABB() const
 {
-    const bool bWasDirty = bRenderStateDirty;
-    bRenderStateDirty = false;
-    return bWasDirty;
+    EnsureBoundsUpdated();
+    return WorldAABB;
 }
 
 void USkinnedMeshComponent::InitializePoseFromReference()
@@ -511,6 +568,7 @@ void USkinnedMeshComponent::EnsureBoundsUpdated() const
     if (bTransformDirty)
     {
         (void)GetWorldMatrix();
+        return;
     }
 
     const_cast<USkinnedMeshComponent*>(this)->UpdateWorldAABB();

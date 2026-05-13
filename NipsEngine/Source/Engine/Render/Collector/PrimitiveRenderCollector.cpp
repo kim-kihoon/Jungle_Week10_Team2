@@ -444,7 +444,7 @@ void FPrimitiveRenderCollector::CollectFromComponent(
 
 	case EPrimitiveType::EPT_SkeletalMesh:
 	{
-        if (!ShowFlags.bPrimitives)
+        if (!ShowFlags.bPrimitives || !ShowFlags.bSkeletalMesh)
             return;
 
         USkinnedMeshComponent* SkinnedMeshComp = static_cast<USkinnedMeshComponent*>(Primitive);
@@ -455,8 +455,9 @@ void FPrimitiveRenderCollector::CollectFromComponent(
             return;
 		}
 		
-		//무엇을 그릴 지 가져왔으니 이제 GPU에 어떻게 올릴 지 버퍼에 담아보기
-        FMeshBuffer* MeshBuffer = MeshBufferManager->GetSkeletalMeshBuffer(SkinnedMeshComp);
+		//무엇을 그릴 지 가져왔으니 이제 component가 소유한 동적 버퍼를 갱신하고 가져온다.
+        SkinnedMeshComp->UpdateRenderBuffer();
+        FMeshBuffer* MeshBuffer = SkinnedMeshComp->GetRenderMeshBuffer();
         if (!MeshBuffer)
         {
 			//담기 실패하면 컷

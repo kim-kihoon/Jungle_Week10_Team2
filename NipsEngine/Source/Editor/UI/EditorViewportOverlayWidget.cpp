@@ -1,4 +1,4 @@
-#include "Editor/UI/EditorViewportOverlayWidget.h"
+﻿#include "Editor/UI/EditorViewportOverlayWidget.h"
 
 #include "Core/ResourceManager.h"
 
@@ -176,6 +176,7 @@ void FEditorViewportOverlayWidget::RenderViewportSettings(float DeltaTime, bool 
 		ImGui::Checkbox("Decals", &Settings.ShowFlags.bDecals);
 		ImGui::Checkbox("Fog", &Settings.ShowFlags.bFog);
 		ImGui::Checkbox("Shadow", &Settings.ShowFlags.bShadow);
+		ImGui::Checkbox("Skeletal Mesh", &Settings.ShowFlags.bSkeletalMesh);
 
 		ImGui::Separator();
 
