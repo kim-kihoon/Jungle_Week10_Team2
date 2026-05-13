@@ -297,6 +297,7 @@ void FEditorMainPanel::Render(float DeltaTime)
 	ImGui::PopStyleVar(3);
 
 	EnsureDefaultDockLayout(DockspaceId);
+	DockPendingSkeletalMeshViewers();
 
 	RenderViewportHostWindow();
 
@@ -524,8 +525,34 @@ void FEditorMainPanel::OpenSkeletalMeshViewer(const FString& MeshPath)
 	NewViewer->SetInstanceId(NextViewerInstanceId++);
 	NewViewer->Initialize(EditorEngine);
 	NewViewer->OpenMesh(MeshPath);
+	NewViewer->RequestFocus();
 
+	PendingSkeletalMeshViewerDockWindows.push_back(NewViewer->GetWindowName());
 	SkeletalMeshViewers.push_back(NewViewer);
+}
+
+void FEditorMainPanel::DockPendingSkeletalMeshViewers()
+{
+	if (PendingSkeletalMeshViewerDockWindows.empty())
+	{
+		return;
+	}
+
+	ImGuiID TargetDockNodeId = 0;
+	if (const ImGuiWindowSettings* ViewportSettings = ImGui::FindWindowSettingsByID(ImHashStr("Viewport")))
+	{
+		TargetDockNodeId = ViewportSettings->DockId;
+	}
+	if (TargetDockNodeId == 0)
+	{
+		return;
+	}
+
+	for (const FString& WindowName : PendingSkeletalMeshViewerDockWindows)
+	{
+		ImGui::DockBuilderDockWindow(WindowName.c_str(), TargetDockNodeId);
+	}
+	PendingSkeletalMeshViewerDockWindows.clear();
 }
 
 // ImGui로 Viewport 가 차지할 영역을 계산하고 만든다.

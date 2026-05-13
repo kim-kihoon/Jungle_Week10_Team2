@@ -68,6 +68,12 @@ void FEditorSkeletalMeshViewerWidget::Render(float DeltaTime)
 		WindowName = "SkeletalMesh Viewer##Viewer_" + std::to_string(InstanceId);
 	}
 
+	if (bFocusNextFrame)
+	{
+		ImGui::SetNextWindowFocus();
+		bFocusNextFrame = false;
+	}
+
 	if (ImGui::Begin(WindowName.c_str(), &bIsOpen, ImGuiWindowFlags_MenuBar))
 	{
 		bWindowFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
