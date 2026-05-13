@@ -140,9 +140,17 @@ namespace
 		ImGui::EndTooltip();
 	}
 
-	bool DrawSnapPopup(const char* PopupId, const float* Values, int32 ValueCount, float CurrentValue, bool bEnabled, bool bDegrees, bool& bOutEnabled, float& OutValue)
+	ImVec2 GetLastItemPopupPos()
+	{
+		const ImVec2 ItemMin = ImGui::GetItemRectMin();
+		const ImVec2 ItemMax = ImGui::GetItemRectMax();
+		return ImVec2(ItemMin.x, ItemMax.y + ImGui::GetStyle().ItemSpacing.y);
+	}
+
+	bool DrawSnapPopup(const char* PopupId, const ImVec2& PopupPos, const float* Values, int32 ValueCount, float CurrentValue, bool bEnabled, bool bDegrees, bool& bOutEnabled, float& OutValue)
 	{
 		bool bChanged = false;
+		ImGui::SetNextWindowPos(PopupPos, ImGuiCond_Always);
 		if (!ImGui::BeginPopup(PopupId))
 		{
 			return false;
@@ -449,6 +457,7 @@ void FEditorToolbarWidget::RenderEditorToolBar(float MenuBarHeight, float ToolBa
 		const bool bShowSettingsClicked = ShowFlagIconTexture && ShowFlagIconTexture->GetSRV()
 			? RenderToolbarIconButton("##ShowSettings", ShowFlagIconTexture, SettingsButtonSize, SettingsIconSize, SettingsIconTint)
 			: ImGui::Button("Show", ImVec2(58.0f, 22.0f));
+		const ImVec2 ShowSettingsPopupPos = GetLastItemPopupPos();
 		ShowLastItemTooltip("Show settings", "Open viewport visibility and overlay display options.");
 		if (bShowSettingsClicked)
 		{
@@ -459,12 +468,14 @@ void FEditorToolbarWidget::RenderEditorToolBar(float MenuBarHeight, float ToolBa
 		const bool bCameraSettingsClicked = CameraIconTexture && CameraIconTexture->GetSRV()
 			? RenderToolbarIconButton("##CameraSettings", CameraIconTexture, SettingsButtonSize, SettingsIconSize, SettingsIconTint)
 			: ImGui::Button("Camera", ImVec2(68.0f, 22.0f));
+		const ImVec2 CameraSettingsPopupPos = GetLastItemPopupPos();
 		ShowLastItemTooltip("Camera settings", "Open camera movement and viewport camera options.");
 		if (bCameraSettingsClicked)
 		{
 			ImGui::OpenPopup("CameraSettingsPopup");
 		}
 
+		ImGui::SetNextWindowPos(ShowSettingsPopupPos, ImGuiCond_Always);
 		ImGui::SetNextWindowSize(ImVec2(360.0f, 430.0f), ImGuiCond_Appearing);
 		if (ImGui::BeginPopup("ShowSettingsPopup"))
 		{
@@ -479,6 +490,7 @@ void FEditorToolbarWidget::RenderEditorToolBar(float MenuBarHeight, float ToolBa
 			ImGui::EndPopup();
 		}
 
+		ImGui::SetNextWindowPos(CameraSettingsPopupPos, ImGuiCond_Always);
 		ImGui::SetNextWindowSize(ImVec2(360.0f, 240.0f), ImGuiCond_Appearing);
 		if (ImGui::BeginPopup("CameraSettingsPopup"))
 		{
@@ -515,6 +527,7 @@ void FEditorToolbarWidget::RenderAddActorMenu(int32 ViewportIndex)
 	{
 		ImGui::OpenPopup("AddActorMenu");
 	}
+	const ImVec2 AddActorPopupPos = GetLastItemPopupPos();
 	ShowLastItemTooltip("Add actor", "Open the actor creation menu for the focused viewport.");
 	ImGui::SameLine();
 	ImGui::SetNextItemWidth(CountWidth);
@@ -524,6 +537,7 @@ void FEditorToolbarWidget::RenderAddActorMenu(int32 ViewportIndex)
 	}
 	ShowLastItemTooltip("Spawn count", "Set how many actors to create from the Add menu.");
 
+	ImGui::SetNextWindowPos(AddActorPopupPos, ImGuiCond_Always);
 	if (!ImGui::BeginPopup("AddActorMenu"))
 	{
 		ImGui::PopID();
@@ -666,6 +680,7 @@ void FEditorToolbarWidget::RenderGizmoTools()
 	const bool bTranslateSnapClicked = bHasTranslateSnapIcon
 		? RenderToolbarIconButton("##TranslateSnap", TranslateSnapIconTexture, SnapButtonSize, SnapIconSize, Gizmo->IsTranslateSnapEnabled() ? ActiveTint : InactiveTint)
 		: ImGui::Button("T Snap", ImVec2(62.0f, 22.0f));
+	const ImVec2 TranslateSnapPopupPos = GetLastItemPopupPos();
 	ShowLastItemTooltip("Location snap", "Choose fixed distance increments for translate gizmo movement.");
 	if (bTranslateSnapClicked)
 	{
@@ -673,7 +688,7 @@ void FEditorToolbarWidget::RenderGizmoTools()
 	}
 	bool bSnapEnabled = Gizmo->IsTranslateSnapEnabled();
 	float SnapValue = Gizmo->GetTranslateSnapValue();
-	if (DrawSnapPopup("TranslateSnapPopup", TranslateSnapValues, IM_ARRAYSIZE(TranslateSnapValues), SnapValue, bSnapEnabled, false, bSnapEnabled, SnapValue))
+	if (DrawSnapPopup("TranslateSnapPopup", TranslateSnapPopupPos, TranslateSnapValues, IM_ARRAYSIZE(TranslateSnapValues), SnapValue, bSnapEnabled, false, bSnapEnabled, SnapValue))
 	{
 		Gizmo->SetTranslateSnap(bSnapEnabled, SnapValue);
 	}
@@ -682,6 +697,7 @@ void FEditorToolbarWidget::RenderGizmoTools()
 	const bool bRotateSnapClicked = bHasRotateSnapIcon
 		? RenderToolbarIconButton("##RotateSnap", RotateSnapIconTexture, SnapButtonSize, SnapIconSize, Gizmo->IsRotateSnapEnabled() ? ActiveTint : InactiveTint)
 		: ImGui::Button("R Snap", ImVec2(62.0f, 22.0f));
+	const ImVec2 RotateSnapPopupPos = GetLastItemPopupPos();
 	ShowLastItemTooltip("Rotation snap", "Choose fixed angle increments for rotate gizmo movement.");
 	if (bRotateSnapClicked)
 	{
@@ -689,7 +705,7 @@ void FEditorToolbarWidget::RenderGizmoTools()
 	}
 	bSnapEnabled = Gizmo->IsRotateSnapEnabled();
 	SnapValue = Gizmo->GetRotateSnapValue() * RadToDeg;
-	if (DrawSnapPopup("RotateSnapPopup", RotateSnapValuesDeg, IM_ARRAYSIZE(RotateSnapValuesDeg), SnapValue, bSnapEnabled, true, bSnapEnabled, SnapValue))
+	if (DrawSnapPopup("RotateSnapPopup", RotateSnapPopupPos, RotateSnapValuesDeg, IM_ARRAYSIZE(RotateSnapValuesDeg), SnapValue, bSnapEnabled, true, bSnapEnabled, SnapValue))
 	{
 		Gizmo->SetRotateSnap(bSnapEnabled, SnapValue * DegToRad);
 	}
@@ -698,6 +714,7 @@ void FEditorToolbarWidget::RenderGizmoTools()
 	const bool bScaleSnapClicked = bHasScaleSnapIcon
 		? RenderToolbarIconButton("##ScaleSnap", ScaleSnapIconTexture, SnapButtonSize, SnapIconSize, Gizmo->IsScaleSnapEnabled() ? ActiveTint : InactiveTint)
 		: ImGui::Button("S Snap", ImVec2(62.0f, 22.0f));
+	const ImVec2 ScaleSnapPopupPos = GetLastItemPopupPos();
 	ShowLastItemTooltip("Scale snap", "Choose fixed size increments for scale gizmo changes.");
 	if (bScaleSnapClicked)
 	{
@@ -705,7 +722,7 @@ void FEditorToolbarWidget::RenderGizmoTools()
 	}
 	bSnapEnabled = Gizmo->IsScaleSnapEnabled();
 	SnapValue = Gizmo->GetScaleSnapValue();
-	if (DrawSnapPopup("ScaleSnapPopup", ScaleSnapValues, IM_ARRAYSIZE(ScaleSnapValues), SnapValue, bSnapEnabled, false, bSnapEnabled, SnapValue))
+	if (DrawSnapPopup("ScaleSnapPopup", ScaleSnapPopupPos, ScaleSnapValues, IM_ARRAYSIZE(ScaleSnapValues), SnapValue, bSnapEnabled, false, bSnapEnabled, SnapValue))
 	{
 		Gizmo->SetScaleSnap(bSnapEnabled, SnapValue);
 	}
