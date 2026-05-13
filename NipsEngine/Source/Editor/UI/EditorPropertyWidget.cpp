@@ -10,6 +10,7 @@
 #include "Object/FName.h"
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstring>
 #include <cstdio>
 #include <functional>
@@ -105,6 +106,8 @@ namespace
 	bool OpenAudioFileDialog(FString& OutFilePath);
 	bool DoesRelativeAssetFileExist(const FString& RelativePath);
 	FString FormatAudioTime(float Seconds);
+	bool IsTransformVectorProperty(const char* Name);
+	bool DrawAxisColoredDragFloat3(const char* Label, float Values[3], float Speed, float Min = 0.0f, float Max = 0.0f);
 
 	UObject* PreviewAudioObject = nullptr;
 	float PendingAudioPreviewStartTime = 0.0f;
@@ -623,7 +626,7 @@ void FEditorPropertyWidget::RenderActorProperties(AActor* PrimaryActor, const TA
 		auto DrawTransformField = [&](const char* Label, FVector CurrentValue, auto ApplyFunc)
 		{
 			float Arr[3] = { CurrentValue.X, CurrentValue.Y, CurrentValue.Z };
-			if (ImGui::DragFloat3(Label, Arr, 0.1f))
+			if (DrawAxisColoredDragFloat3(Label, Arr, 0.1f))
 			{
 				FVector Delta = FVector(Arr[0], Arr[1], Arr[2]) - CurrentValue;
 				for (AActor* Actor : SelectedActors)
@@ -1217,7 +1220,14 @@ bool FEditorPropertyWidget::RenderPropertyWidget(FPropertyDescriptor& Prop)
 	case EPropertyType::Vec3:
 	{
 		float* Val = static_cast<float*>(Prop.ValuePtr);
-		bChanged = ImGui::DragFloat3(Prop.Name, Val, Prop.Speed);
+		if (IsTransformVectorProperty(Prop.Name))
+		{
+			bChanged = DrawAxisColoredDragFloat3(Prop.Name, Val, Prop.Speed, Prop.Min, Prop.Max);
+		}
+		else
+		{
+			bChanged = ImGui::DragFloat3(Prop.Name, Val, Prop.Speed);
+		}
 		break;
 	}
 	case EPropertyType::Vec4:
@@ -1585,6 +1595,72 @@ namespace
 		Camera->ClearCustomLookDir();
 		Camera->SetProjectionType(EViewportProjectionType::Perspective);
 		Client->SyncCameraTarget();
+	}
+
+	bool IsTransformVectorProperty(const char* Name)
+	{
+		return strcmp(Name, "Location") == 0 ||
+			strcmp(Name, "Rotation") == 0 ||
+			strcmp(Name, "Scale") == 0;
+	}
+
+	bool DrawAxisColoredDragFloat3(const char* Label, float Values[3], float Speed, float Min, float Max)
+	{
+		const ImGuiStyle& Style = ImGui::GetStyle();
+		const ImU32 AxisColors[3] =
+		{
+			IM_COL32(230, 72, 72, 210),
+			IM_COL32(80, 190, 92, 210),
+			IM_COL32(74, 132, 235, 210),
+		};
+		const char* AxisIds[3] = { "##X", "##Y", "##Z" };
+
+		const float MarkerWidth = 3.0f;
+		const float MarkerGap = 3.0f;
+		const float AxisSpacing = Style.ItemInnerSpacing.x;
+		const float LabelColumnWidth = 64.0f;
+		const float AvailableWidth = ImGui::GetContentRegionAvail().x;
+		const float ReservedWidth = LabelColumnWidth + (MarkerWidth + MarkerGap) * 3.0f + AxisSpacing * 2.0f;
+		const float FieldWidth = std::max(42.0f, std::floor((AvailableWidth - ReservedWidth) / 3.0f));
+		const float FrameHeight = ImGui::GetFrameHeight();
+		const bool bHasRange = Min != 0.0f || Max != 0.0f;
+
+		bool bChanged = false;
+		ImGui::PushID(Label);
+		ImGui::PushItemWidth(FieldWidth);
+
+		for (int32 AxisIndex = 0; AxisIndex < 3; ++AxisIndex)
+		{
+			if (AxisIndex > 0)
+			{
+				ImGui::SameLine(0.0f, AxisSpacing);
+			}
+
+			const ImVec2 MarkerPos = ImGui::GetCursorScreenPos();
+			ImGui::GetWindowDrawList()->AddRectFilled(
+				ImVec2(MarkerPos.x, MarkerPos.y + 2.0f),
+				ImVec2(MarkerPos.x + MarkerWidth, MarkerPos.y + FrameHeight - 2.0f),
+				AxisColors[AxisIndex],
+				1.5f);
+
+			ImGui::Dummy(ImVec2(MarkerWidth, FrameHeight));
+			ImGui::SameLine(0.0f, MarkerGap);
+			if (bHasRange)
+			{
+				bChanged |= ImGui::DragFloat(AxisIds[AxisIndex], &Values[AxisIndex], Speed, Min, Max, "%.3f");
+			}
+			else
+			{
+				bChanged |= ImGui::DragFloat(AxisIds[AxisIndex], &Values[AxisIndex], Speed, 0.0f, 0.0f, "%.3f");
+			}
+		}
+
+		ImGui::SameLine(0.0f, 4.0f);
+		ImGui::TextUnformatted(Label);
+		ImGui::PopItemWidth();
+		ImGui::PopID();
+
+		return bChanged;
 	}
 
 	// 선택된 light를 소유한 actor ID 추출
