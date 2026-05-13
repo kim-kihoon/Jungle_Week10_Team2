@@ -32,8 +32,7 @@
 #include "Asset/StaticMeshSimplifier.h"
 #include "Render/Scene/RenderCommand.h"
 #if WITH_EDITOR
-#include "Editor/Importer/FbxSkeletalMeshImporter.h"
-#include "Editor/Importer/FbxStaticMeshImporter.h"
+#include "Editor/Importer/Fbx/FbxAssetImporter.h"
 #include "Editor/Importer/ObjStaticMeshImporter.h"
 #endif
 namespace
@@ -727,22 +726,14 @@ void FResourceManager::LoadFromAssetDirectory(const FString& Path)
 		ObjImporter.ImportIfNeeded(*this, ObjSourcePath, &MaterialFiles);
 	}
 
-	FFbxStaticMeshImporter FbxStaticMeshImporter;
-	FFbxSkeletalMeshImporter FbxSkeletalMeshImporter;
+	FFbxAssetImporter FbxAssetImporter;
 	for (const FString& FbxSourcePath : FbxSourceFiles)
 	{
-		const EFbxStaticMeshImportResult ImportResult =
-			FbxStaticMeshImporter.ImportIfStaticMeshNeeded(*this, FbxSourcePath, &MaterialFiles);
-		if (ImportResult == EFbxStaticMeshImportResult::ImportedStaticMesh)
+		const EFbxAssetImportResult ImportResult =
+			FbxAssetImporter.ImportIfNeeded(*this, FbxSourcePath, &MaterialFiles);
+		if (ImportResult == EFbxAssetImportResult::Failed)
 		{
-			continue;
-		}
-
-		const EFbxSkeletalMeshImportResult SkeletalImportResult =
-			FbxSkeletalMeshImporter.ImportIfSkeletalMeshNeeded(*this, FbxSourcePath, &MaterialFiles);
-		if (SkeletalImportResult == EFbxSkeletalMeshImportResult::Failed)
-		{
-			UE_LOG("[ResourceManager] FBX skeletal import failed: %s", FbxSourcePath.c_str());
+			UE_LOG("[ResourceManager] FBX import failed: %s", FbxSourcePath.c_str());
 		}
 	}
 #endif
@@ -895,22 +886,14 @@ void FResourceManager::RefreshFromAssetDirectory(const FString& Path)
 		ObjImporter.ImportIfNeeded(*this, ObjSourcePath, &MaterialFiles);
 	}
 
-	FFbxStaticMeshImporter FbxStaticMeshImporter;
-	FFbxSkeletalMeshImporter FbxSkeletalMeshImporter;
+	FFbxAssetImporter FbxAssetImporter;
 	for (const FString& FbxSourcePath : FbxSourceFiles)
 	{
-		const EFbxStaticMeshImportResult ImportResult =
-			FbxStaticMeshImporter.ImportIfStaticMeshNeeded(*this, FbxSourcePath, &MaterialFiles);
-		if (ImportResult == EFbxStaticMeshImportResult::ImportedStaticMesh)
+		const EFbxAssetImportResult ImportResult =
+			FbxAssetImporter.ImportIfNeeded(*this, FbxSourcePath, &MaterialFiles);
+		if (ImportResult == EFbxAssetImportResult::Failed)
 		{
-			continue;
-		}
-
-		const EFbxSkeletalMeshImportResult SkeletalImportResult =
-			FbxSkeletalMeshImporter.ImportIfSkeletalMeshNeeded(*this, FbxSourcePath, &MaterialFiles);
-		if (SkeletalImportResult == EFbxSkeletalMeshImportResult::Failed)
-		{
-			UE_LOG("[ResourceManager] FBX skeletal import failed: %s", FbxSourcePath.c_str());
+			UE_LOG("[ResourceManager] FBX import failed: %s", FbxSourcePath.c_str());
 		}
 	}
 #endif

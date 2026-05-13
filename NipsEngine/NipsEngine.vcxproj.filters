@@ -389,13 +389,28 @@
     <ClCompile Include="Source\Editor\Importer\ObjStaticMeshImporter.cpp">
       <Filter>Source\Editor\Importer</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Editor\Importer\FbxStaticMeshImporter.cpp">
+    <ClCompile Include="Source\Editor\Importer\Fbx\FbxAssetImporter.cpp">
       <Filter>Source\Editor\Importer</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Editor\Importer\FbxSkeletalMeshImporter.cpp">
+    <ClCompile Include="Source\Editor\Importer\Fbx\FbxMaterialExtractor.cpp">
       <Filter>Source\Editor\Importer</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Editor\Importer\FbxSkeletalMeshExtractor.cpp">
+    <ClCompile Include="Source\Editor\Importer\Fbx\FbxSceneDocument.cpp">
+      <Filter>Source\Editor\Importer</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Editor\Importer\Fbx\FbxSceneInspector.cpp">
+      <Filter>Source\Editor\Importer</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Editor\Importer\Fbx\FbxSceneUtils.cpp">
+      <Filter>Source\Editor\Importer</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Editor\Importer\Fbx\FbxSkeletalMeshExtractor.cpp">
+      <Filter>Source\Editor\Importer</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Editor\Importer\Fbx\FbxSkeletonExtractor.cpp">
+      <Filter>Source\Editor\Importer</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Editor\Importer\Fbx\FbxStaticMeshExtractor.cpp">
       <Filter>Source\Editor\Importer</Filter>
     </ClCompile>
     <ClCompile Include="Source\Engine\Asset\ParticleAtlasLoader.cpp">
@@ -1084,13 +1099,31 @@
     <ClInclude Include="Source\Editor\Importer\ObjStaticMeshImporter.h">
       <Filter>Source\Editor\Importer</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Editor\Importer\FbxStaticMeshImporter.h">
+    <ClInclude Include="Source\Editor\Importer\Fbx\FbxAssetImporter.h">
       <Filter>Source\Editor\Importer</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Editor\Importer\FbxSkeletalMeshImporter.h">
+    <ClInclude Include="Source\Editor\Importer\Fbx\FbxImportTypes.h">
       <Filter>Source\Editor\Importer</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Editor\Importer\FbxSkeletalMeshExtractor.h">
+    <ClInclude Include="Source\Editor\Importer\Fbx\FbxMaterialExtractor.h">
+      <Filter>Source\Editor\Importer</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Editor\Importer\Fbx\FbxSceneDocument.h">
+      <Filter>Source\Editor\Importer</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Editor\Importer\Fbx\FbxSceneInspector.h">
+      <Filter>Source\Editor\Importer</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Editor\Importer\Fbx\FbxSceneUtils.h">
+      <Filter>Source\Editor\Importer</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Editor\Importer\Fbx\FbxSkeletalMeshExtractor.h">
+      <Filter>Source\Editor\Importer</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Editor\Importer\Fbx\FbxSkeletonExtractor.h">
+      <Filter>Source\Editor\Importer</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Editor\Importer\Fbx\FbxStaticMeshExtractor.h">
       <Filter>Source\Editor\Importer</Filter>
     </ClInclude>
     <ClInclude Include="Source\Editor\Importer\ObjRawTypes.h">

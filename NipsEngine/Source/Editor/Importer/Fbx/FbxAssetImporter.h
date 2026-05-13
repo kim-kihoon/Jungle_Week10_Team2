@@ -4,26 +4,29 @@
 
 class FResourceManager;
 
-enum class EFbxSkeletalMeshImportResult
+enum class EFbxAssetImportResult
 {
 	NotFbx,
+	ImportedStaticMesh,
 	ImportedSkeletalMesh,
-	SkippedNonSkeletal,
+	SkippedAnimationOnly,
+	SkippedUnsupported,
 	Failed,
 };
 
-class FFbxSkeletalMeshImporter
+class FFbxAssetImporter
 {
 public:
-	FFbxSkeletalMeshImporter() = default;
-	~FFbxSkeletalMeshImporter() = default;
+	FFbxAssetImporter() = default;
+	~FFbxAssetImporter() = default;
 
-	EFbxSkeletalMeshImportResult ImportIfSkeletalMeshNeeded(
+	EFbxAssetImportResult ImportIfNeeded(
 		FResourceManager& ResourceManager,
 		const FString& SourcePath,
 		TArray<FString>* OutMaterialPaths = nullptr);
 
 private:
+	bool IsStaticMeshAssetValid(const FString& SourcePath, const FString& AssetPath) const;
 	bool IsSkeletalMeshAssetValid(const FString& SourcePath, const FString& AssetPath) const;
 	bool IsSkeletonAssetValid(const FString& SourcePath, const FString& AssetPath) const;
 
