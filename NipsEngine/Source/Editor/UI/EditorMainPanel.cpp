@@ -426,20 +426,23 @@ void FEditorMainPanel::Render(float DeltaTime)
 		ContentDrawerWidget.SetOpen(false);
 	}
 	bShowConsole = ConsoleWidget.IsOpen();
-	if (bShowMaterialEditor)
-		MaterialWidget.Render(DeltaTime);
-	if (bShowProperty)
-		PropertyWidget.Render(DeltaTime);
-	if (bShowSceneManager)
-		SceneWidget.Render(DeltaTime);
-	if (bShowStatProfiler)
-		StatWidget.Render(DeltaTime);
-	if (bShowCameraShake)
+	auto RenderWindowMenuPanel = [DeltaTime](bool& bShowPanel, auto& Widget)
 	{
-		CameraShakeWidget.SetOpen(true);
-		CameraShakeWidget.Render(DeltaTime);
-		bShowCameraShake = CameraShakeWidget.IsOpen();
-	}
+		if (!bShowPanel)
+		{
+			return;
+		}
+
+		Widget.SetOpen(true);
+		Widget.Render(DeltaTime);
+		bShowPanel = Widget.IsOpen();
+	};
+
+	RenderWindowMenuPanel(bShowMaterialEditor, MaterialWidget);
+	RenderWindowMenuPanel(bShowProperty, PropertyWidget);
+	RenderWindowMenuPanel(bShowSceneManager, SceneWidget);
+	RenderWindowMenuPanel(bShowStatProfiler, StatWidget);
+	RenderWindowMenuPanel(bShowCameraShake, CameraShakeWidget);
 	RenderEditorDebugPanel();
 	FEditorSkeletalMeshViewerWidget* FocusedViewerThisFrame = nullptr;
 	bool bFocusedViewerStillOpen = false;

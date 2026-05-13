@@ -77,6 +77,7 @@ namespace
 	void DrawAtlasGrid(ImDrawList* DrawList, const ImVec2& Min, const ImVec2& Max, uint32 GridDimension);
 	const char* GetPointFaceLabel(uint32 FaceIndex);
 	bool DrawRoundSelectButton(const char* Id, const char* Label, bool bSelected, const ImVec4& AccentColor);
+	bool DrawShowFlagRow(const char* Label, bool* Value, int32 Depth = 0);
 
 	template <typename T>
 	void SpawnActorAt(UWorld* World, FSelectionManager& SelectionManager, const FVector& Location)
@@ -156,32 +157,36 @@ void FEditorViewportOverlayWidget::RenderViewportSettings(float DeltaTime, bool 
 	if (Section == EViewportSettingsSection::All || Section == EViewportSettingsSection::Show)
 	{
 		// Show Flags
-		ImGui::Text("Show");
-		ImGui::Checkbox("Primitives", &Settings.ShowFlags.bPrimitives);
-		ImGui::Checkbox("BillboardText", &Settings.ShowFlags.bBillboardText);
-		ImGui::Checkbox("Axis", &Settings.ShowFlags.bAxis);
-		ImGui::Checkbox("Grid", &Settings.ShowFlags.bGrid);
-		ImGui::Checkbox("Gizmo", &Settings.ShowFlags.bGizmo);
-		ImGui::Checkbox("Bounding Volume", &Settings.ShowFlags.bBoundingVolume);
-		if (Settings.ShowFlags.bBoundingVolume)
+		ImGui::Text("Show Flag");
+		if (ImGui::BeginTable("##ShowFlagsTable", 2, ImGuiTableFlags_SizingFixedFit))
 		{
-			ImGui::Indent();
-			ImGui::Checkbox("BVH Bounding Volume", &Settings.ShowFlags.bBVHBoundingVolume);
-			ImGui::Unindent();
+			ImGui::TableSetupColumn("##Check", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFrameHeight());
+			ImGui::TableSetupColumn("##Label", ImGuiTableColumnFlags_WidthStretch);
+
+			DrawShowFlagRow("Primitives", &Settings.ShowFlags.bPrimitives);
+			DrawShowFlagRow("BillboardText", &Settings.ShowFlags.bBillboardText);
+			DrawShowFlagRow("Axis", &Settings.ShowFlags.bAxis);
+			DrawShowFlagRow("Grid", &Settings.ShowFlags.bGrid);
+			DrawShowFlagRow("Gizmo", &Settings.ShowFlags.bGizmo);
+			DrawShowFlagRow("Bounding Volume", &Settings.ShowFlags.bBoundingVolume);
+			if (Settings.ShowFlags.bBoundingVolume)
+			{
+				DrawShowFlagRow("BVH Bounding Volume", &Settings.ShowFlags.bBVHBoundingVolume, 1);
+			}
+			DrawShowFlagRow("Audio Range", &Settings.ShowFlags.bAudioRange);
+			if (Settings.ShowFlags.bAudioRange)
+			{
+				DrawShowFlagRow("Audio Component Range", &Settings.ShowFlags.bAudioComponentRange, 1);
+				DrawShowFlagRow("Audio Zone Range", &Settings.ShowFlags.bAudioZoneRange, 1);
+			}
+			DrawShowFlagRow("LOD", &Settings.ShowFlags.bEnableLOD);
+			DrawShowFlagRow("Decals", &Settings.ShowFlags.bDecals);
+			DrawShowFlagRow("Fog", &Settings.ShowFlags.bFog);
+			DrawShowFlagRow("Shadow", &Settings.ShowFlags.bShadow);
+			DrawShowFlagRow("Skeletal Mesh", &Settings.ShowFlags.bSkeletalMesh);
+
+			ImGui::EndTable();
 		}
-		ImGui::Checkbox("Audio Range", &Settings.ShowFlags.bAudioRange);
-		if (Settings.ShowFlags.bAudioRange)
-		{
-			ImGui::Indent();
-			ImGui::Checkbox("Audio Component Range", &Settings.ShowFlags.bAudioComponentRange);
-			ImGui::Checkbox("Audio Zone Range", &Settings.ShowFlags.bAudioZoneRange);
-			ImGui::Unindent();
-		}
-		ImGui::Checkbox("LOD", &Settings.ShowFlags.bEnableLOD);
-		ImGui::Checkbox("Decals", &Settings.ShowFlags.bDecals);
-		ImGui::Checkbox("Fog", &Settings.ShowFlags.bFog);
-		ImGui::Checkbox("Shadow", &Settings.ShowFlags.bShadow);
-		ImGui::Checkbox("Skeletal Mesh", &Settings.ShowFlags.bSkeletalMesh);
 
 		ImGui::Separator();
 
@@ -1225,5 +1230,31 @@ namespace
 			IM_COL32(220, 230, 245, 255), Label);
 
 		return bClicked;
+	}
+
+	bool DrawShowFlagRow(const char* Label, bool* Value, int32 Depth)
+	{
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
+
+		ImGui::PushID(Label);
+		bool bChanged = ImGui::Checkbox("##Value", Value);
+
+		ImGui::TableSetColumnIndex(1);
+		const float IndentWidth = Depth * 14.0f;
+		if (IndentWidth > 0.0f)
+		{
+			ImGui::SetCursorPosX(ImGui::GetCursorPosX() + IndentWidth);
+		}
+
+		ImGui::Selectable(Label, false, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap);
+		if (ImGui::IsItemClicked())
+		{
+			*Value = !*Value;
+			bChanged = true;
+		}
+		ImGui::PopID();
+
+		return bChanged;
 	}
 }
