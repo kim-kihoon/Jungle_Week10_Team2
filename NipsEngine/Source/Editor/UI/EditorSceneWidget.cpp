@@ -323,7 +323,32 @@ void FEditorSceneWidget::Render(float DeltaTime)
 	Clipper.End();
 	ImGui::EndChild();
 
-	if (ActorToDelete)
+	const bool bDeleteSelectedActors =
+		ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
+		ImGui::IsKeyReleased(ImGuiKey_Delete) &&
+		!Selection.IsEmpty();
+
+	if (bDeleteSelectedActors)
+	{
+		const TArray<AActor*> SelectedActors = Selection.GetSelectedActors();
+		Selection.ClearSelection();
+		EditorEngine->GetMainPanel().ResetWidgetSelections();
+		LastClickedActorIndex = -1;
+
+		for (AActor* Actor : SelectedActors)
+		{
+			if (!Actor)
+			{
+				continue;
+			}
+
+			if (UWorld* ActorWorld = Actor->GetFocusedWorld())
+			{
+				ActorWorld->DestroyActor(Actor);
+			}
+		}
+	}
+	else if (ActorToDelete)
 	{
 		UWorld* ActorWorld = ActorToDelete->GetFocusedWorld();
 		Selection.Deselect(ActorToDelete);
