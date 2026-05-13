@@ -99,9 +99,7 @@ namespace
 		void (*Spawn)(UWorld*, FSelectionManager&, const FVector&);
 	};
 
-	// Place Actor에서 생성 가능한 에디터 Actor 타입 목록입니다.
-	static const FPlacementActorEntry PlacementActorTypes[] = {
-		{ "Pawn", SpawnActorAt<APawnActor> },
+	static const FPlacementActorEntry CommonPlacementActorTypes[] = {
 		{ "Scene", SpawnActorAt<ASceneActor> },
 		{ "StaticMesh", SpawnActorAt<AStaticMeshActor> },
 		{ "SkeletalMesh", SpawnActorAt<ASkeletalMeshActor> },
@@ -109,13 +107,20 @@ namespace
 		{ "SubUV", SpawnActorAt<ASubUVActor> },
 		{ "Billboard", SpawnActorAt<ABillboardActor> },
 		{ "Decal", SpawnActorAt<ADecalActor> },
+		{ "Audio Zone", SpawnActorAt<AAudioZoneActor> },
+	};
+
+	static const FPlacementActorEntry LightPlacementActorTypes[] = {
 		{ "Directional Light", SpawnActorAt<ADirectionalLightActor> },
 		{ "Ambient Light", SpawnActorAt<AAmbientLightActor> },
 		{ "Point Light", SpawnActorAt<APointLightActor> },
 		{ "Spot Light", SpawnActorAt<ASpotLightActor> },
 		{ "Sky Atmosphere", SpawnActorAt<ASkyAtmosphereActor> },
 		{ "Height Fog", SpawnActorAt<AHeightFogActor> },
-		{ "Audio Zone", SpawnActorAt<AAudioZoneActor> },
+	};
+
+	static const FPlacementActorEntry GamePlacementActorTypes[] = {
+		{ "Pawn", SpawnActorAt<APawnActor> },
 		{ "Player Start", SpawnActorAt<APlayerStartActor> },
 	};
 }
@@ -480,7 +485,7 @@ void FEditorViewportOverlayWidget::RenderActorPlacementPopup()
 		ImGui::TextColored(ColorMint, "Place Actor");
 		ImGui::Separator();
 
-		for (const FPlacementActorEntry& Entry : PlacementActorTypes)
+		auto TryPlaceActor = [this, Client](const FPlacementActorEntry& Entry) -> bool
 		{
 			if (ImGui::Selectable(Entry.Label))
 			{
@@ -488,7 +493,43 @@ void FEditorViewportOverlayWidget::RenderActorPlacementPopup()
 				Client->ClearPendingActorPlacement();
 				bActorPlacementPopupOpened = false;
 				ImGui::CloseCurrentPopup();
+				return true;
+			}
+			return false;
+		};
+
+		bool bPlacedActor = false;
+		for (const FPlacementActorEntry& Entry : CommonPlacementActorTypes)
+		{
+			if (TryPlaceActor(Entry))
+			{
+				bPlacedActor = true;
 				break;
+			}
+		}
+
+		if (!bPlacedActor)
+		{
+			ImGui::SeparatorText("Light");
+			for (const FPlacementActorEntry& Entry : LightPlacementActorTypes)
+			{
+				if (TryPlaceActor(Entry))
+				{
+					bPlacedActor = true;
+					break;
+				}
+			}
+		}
+
+		if (!bPlacedActor)
+		{
+			ImGui::SeparatorText("Game");
+			for (const FPlacementActorEntry& Entry : GamePlacementActorTypes)
+			{
+				if (TryPlaceActor(Entry))
+				{
+					break;
+				}
 			}
 		}
 

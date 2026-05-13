@@ -130,6 +130,21 @@ namespace
 		return FileName.ends_with(".skelmat.json");
 	}
 
+	bool IsHiddenAssetFolder(const FString& RelativeFolderPath)
+	{
+		const FString PathKey = ToLowerPathKey(RelativeFolderPath);
+		return PathKey == "asset/data" ||
+			PathKey.starts_with("asset/data/") ||
+			PathKey == "asset/editor" ||
+			PathKey.starts_with("asset/editor/") ||
+			PathKey == "asset/font" ||
+			PathKey.starts_with("asset/font/") ||
+			PathKey == "asset/shadercache" ||
+			PathKey.starts_with("asset/shadercache/") ||
+			PathKey == "asset/shadercash" ||
+			PathKey.starts_with("asset/shadercash/");
+	}
+
 	const char* ToAssetKindLabel(EEditorAssetKind Kind)
 	{
 		const int32 Index = static_cast<int32>(Kind);
@@ -326,14 +341,23 @@ void FEditorContentDrawerWidget::RefreshAssetTree()
 
 	try
 	{
-		for (const fs::directory_entry& Entry :
-			 fs::recursive_directory_iterator(AssetRoot, fs::directory_options::skip_permission_denied))
+		for (fs::recursive_directory_iterator It(AssetRoot, fs::directory_options::skip_permission_denied), End;
+			 It != End;
+			 ++It)
 		{
+			const fs::directory_entry& Entry = *It;
 			const fs::path& EntryPath = Entry.path();
 
 			if (Entry.is_directory())
 			{
-				FolderPaths.push_back(MakeRelativeAssetPath(EntryPath));
+				const FString RelativeFolderPath = MakeRelativeAssetPath(EntryPath);
+				if (IsHiddenAssetFolder(RelativeFolderPath))
+				{
+					It.disable_recursion_pending();
+					continue;
+				}
+
+				FolderPaths.push_back(RelativeFolderPath);
 				continue;
 			}
 
