@@ -9,9 +9,55 @@
 #include <fbxsdk.h>
 
 #include <algorithm>
+#include <functional>
 
 namespace
 {
+	size_t CombineHash(size_t Seed, size_t Value)
+	{
+		return Seed ^ (Value + 0x9e3779b9u + (Seed << 6) + (Seed >> 2));
+	}
+
+	size_t HashColor(const FColor& Color)
+	{
+		size_t Hash = std::hash<float>{}(Color.R);
+		Hash = CombineHash(Hash, std::hash<float>{}(Color.G));
+		Hash = CombineHash(Hash, std::hash<float>{}(Color.B));
+		Hash = CombineHash(Hash, std::hash<float>{}(Color.A));
+		return Hash;
+	}
+
+	struct FFbxStaticVertexKey
+	{
+		FVector Position;
+		FColor Color;
+		FVector Normal;
+		FVector2 UVs;
+
+		bool operator==(const FFbxStaticVertexKey& Other) const
+		{
+			return Position == Other.Position
+				&& Color.R == Other.Color.R
+				&& Color.G == Other.Color.G
+				&& Color.B == Other.Color.B
+				&& Color.A == Other.Color.A
+				&& Normal == Other.Normal
+				&& UVs == Other.UVs;
+		}
+	};
+
+	struct FFbxStaticVertexKeyHasher
+	{
+		size_t operator()(const FFbxStaticVertexKey& Key) const noexcept
+		{
+			size_t Hash = std::hash<FVector>{}(Key.Position);
+			Hash = CombineHash(Hash, HashColor(Key.Color));
+			Hash = CombineHash(Hash, std::hash<FVector>{}(Key.Normal));
+			Hash = CombineHash(Hash, std::hash<FVector2>{}(Key.UVs));
+			return Hash;
+		}
+	};
+
 	struct FFbxStaticMeshBuild
 	{
 		FString MeshNodeName;
@@ -20,6 +66,9 @@ namespace
 		TArray<FString> BuiltSlotNames;
 		TArray<TArray<uint32>> IndicesBySlot;
 		TArray<FFbxMaterialSlotSource> SlotSources;
+		TMap<FFbxStaticVertexKey, uint32, FFbxStaticVertexKeyHasher> VertexMap;
+		TArray<FVector> TangentSums;
+		TArray<FVector> BitangentSums;
 	};
 
 	int32 GetOrAddMaterialSlot(FFbxStaticMeshBuild& MeshBuild, const FString& SlotName, FbxSurfaceMaterial* Material)
@@ -126,6 +175,74 @@ namespace
 		V2.Bitangent = Bitangent;
 	}
 
+	FFbxStaticVertexKey MakeStaticVertexKey(const FNormalVertex& Vertex)
+	{
+		FFbxStaticVertexKey Key;
+		Key.Position = Vertex.Position;
+		Key.Color = Vertex.Color;
+		Key.Normal = Vertex.Normal;
+		Key.UVs = Vertex.UVs;
+		return Key;
+	}
+
+	uint32 GetOrCreateStaticVertexIndex(FFbxStaticMeshBuild& MeshBuild, const FNormalVertex& Vertex)
+	{
+		const FFbxStaticVertexKey Key = MakeStaticVertexKey(Vertex);
+		auto It = MeshBuild.VertexMap.find(Key);
+		if (It != MeshBuild.VertexMap.end())
+		{
+			return It->second;
+		}
+
+		const uint32 NewIndex = static_cast<uint32>(MeshBuild.Mesh.Vertices.size());
+		MeshBuild.Mesh.Vertices.push_back(Vertex);
+		MeshBuild.TangentSums.push_back(FVector::ZeroVector);
+		MeshBuild.BitangentSums.push_back(FVector::ZeroVector);
+		MeshBuild.VertexMap.emplace(Key, NewIndex);
+		return NewIndex;
+	}
+
+	void AccumulateStaticVertexBasis(FFbxStaticMeshBuild& MeshBuild, uint32 VertexIndex, const FNormalVertex& TriangleVertex)
+	{
+		if (VertexIndex >= MeshBuild.TangentSums.size() || VertexIndex >= MeshBuild.BitangentSums.size())
+		{
+			return;
+		}
+
+		MeshBuild.TangentSums[VertexIndex] += TriangleVertex.Tangent;
+		MeshBuild.BitangentSums[VertexIndex] += TriangleVertex.Bitangent;
+	}
+
+	void FinalizeStaticVertexBasis(FFbxStaticMeshBuild& MeshBuild)
+	{
+		for (uint32 VertexIndex = 0; VertexIndex < static_cast<uint32>(MeshBuild.Mesh.Vertices.size()); ++VertexIndex)
+		{
+			FNormalVertex& Vertex = MeshBuild.Mesh.Vertices[VertexIndex];
+			FVector Tangent = VertexIndex < MeshBuild.TangentSums.size()
+				? MeshBuild.TangentSums[VertexIndex]
+				: FVector::ZeroVector;
+			FVector Bitangent = VertexIndex < MeshBuild.BitangentSums.size()
+				? MeshBuild.BitangentSums[VertexIndex]
+				: FVector::ZeroVector;
+
+			if (!Tangent.Normalize())
+			{
+				BuildFallbackBasis(Vertex.Normal, Tangent, Bitangent);
+			}
+			else if (!Bitangent.Normalize())
+			{
+				Bitangent = FVector::CrossProduct(Vertex.Normal, Tangent);
+				if (!Bitangent.Normalize())
+				{
+					BuildFallbackBasis(Vertex.Normal, Tangent, Bitangent);
+				}
+			}
+
+			Vertex.Tangent = Tangent;
+			Vertex.Bitangent = Bitangent;
+		}
+	}
+
 	bool ExtractMeshNode(FFbxStaticMeshBuild& MeshBuild, FbxNode* MeshNode)
 	{
 		if (MeshNode == nullptr || MeshNode->GetMesh() == nullptr)
@@ -163,6 +280,7 @@ namespace
 
 		bool bExtractedAnyPolygon = false;
 		const int32 PolygonCount = static_cast<int32>(Mesh->GetPolygonCount());
+		MeshBuild.VertexMap.reserve(MeshBuild.VertexMap.size() + static_cast<size_t>(PolygonCount) * 3u);
 		for (int32 PolygonIndex = 0; PolygonIndex < PolygonCount; ++PolygonIndex)
 		{
 			const int32 PolygonSize = static_cast<int32>(Mesh->GetPolygonSize(PolygonIndex));
@@ -204,14 +322,16 @@ namespace
 
 			CalculateTriangleTangent(TriangleVertices[0], TriangleVertices[1], TriangleVertices[2]);
 
-			const uint32 BaseVertexIndex = static_cast<uint32>(MeshBuild.Mesh.Vertices.size());
-			MeshBuild.Mesh.Vertices.push_back(TriangleVertices[0]);
-			MeshBuild.Mesh.Vertices.push_back(TriangleVertices[1]);
-			MeshBuild.Mesh.Vertices.push_back(TriangleVertices[2]);
+			uint32 TriangleIndices[3] = { 0, 0, 0 };
+			for (int32 PolygonVertexIndex = 0; PolygonVertexIndex < 3; ++PolygonVertexIndex)
+			{
+				TriangleIndices[PolygonVertexIndex] = GetOrCreateStaticVertexIndex(MeshBuild, TriangleVertices[PolygonVertexIndex]);
+				AccumulateStaticVertexBasis(MeshBuild, TriangleIndices[PolygonVertexIndex], TriangleVertices[PolygonVertexIndex]);
+			}
 
-			MeshBuild.IndicesBySlot[SlotIndex].push_back(BaseVertexIndex + 0);
-			MeshBuild.IndicesBySlot[SlotIndex].push_back(BaseVertexIndex + 1);
-			MeshBuild.IndicesBySlot[SlotIndex].push_back(BaseVertexIndex + 2);
+			MeshBuild.IndicesBySlot[SlotIndex].push_back(TriangleIndices[0]);
+			MeshBuild.IndicesBySlot[SlotIndex].push_back(TriangleIndices[1]);
+			MeshBuild.IndicesBySlot[SlotIndex].push_back(TriangleIndices[2]);
 			bExtractedAnyPolygon = true;
 		}
 
@@ -233,6 +353,8 @@ namespace
 
 	void FinalizeStaticMeshBuild(FFbxStaticMeshBuild& MeshBuild)
 	{
+		FinalizeStaticVertexBasis(MeshBuild);
+
 		MeshBuild.Mesh.Slots.clear();
 		MeshBuild.Mesh.Sections.clear();
 		MeshBuild.Mesh.Indices.clear();

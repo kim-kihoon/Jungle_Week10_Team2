@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 
 namespace
 {
@@ -21,6 +22,82 @@ namespace
 	struct FControlPointInfluenceList
 	{
 		TArray<FBoneInfluence> Influences;
+	};
+
+	size_t CombineHash(size_t Seed, size_t Value)
+	{
+		return Seed ^ (Value + 0x9e3779b9u + (Seed << 6) + (Seed >> 2));
+	}
+
+	size_t HashColor(const FColor& Color)
+	{
+		size_t Hash = std::hash<float>{}(Color.R);
+		Hash = CombineHash(Hash, std::hash<float>{}(Color.G));
+		Hash = CombineHash(Hash, std::hash<float>{}(Color.B));
+		Hash = CombineHash(Hash, std::hash<float>{}(Color.A));
+		return Hash;
+	}
+
+	struct FFbxSkeletalVertexKey
+	{
+		FVector Position;
+		FColor Color;
+		FVector Normal;
+		FVector2 UVs;
+		int32 BoneIndices[MAX_SKELETAL_BONE_INFLUENCES] = { -1, -1, -1, -1 };
+		float BoneWeights[MAX_SKELETAL_BONE_INFLUENCES] = { 0.0f, 0.0f, 0.0f, 0.0f };
+
+		bool operator==(const FFbxSkeletalVertexKey& Other) const
+		{
+			if (Position != Other.Position
+				|| Color.R != Other.Color.R
+				|| Color.G != Other.Color.G
+				|| Color.B != Other.Color.B
+				|| Color.A != Other.Color.A
+				|| Normal != Other.Normal
+				|| UVs != Other.UVs)
+			{
+				return false;
+			}
+
+			for (int32 InfluenceIndex = 0; InfluenceIndex < MAX_SKELETAL_BONE_INFLUENCES; ++InfluenceIndex)
+			{
+				if (BoneIndices[InfluenceIndex] != Other.BoneIndices[InfluenceIndex]
+					|| BoneWeights[InfluenceIndex] != Other.BoneWeights[InfluenceIndex])
+				{
+					return false;
+				}
+			}
+
+			return true;
+		}
+	};
+
+	struct FFbxSkeletalVertexKeyHasher
+	{
+		size_t operator()(const FFbxSkeletalVertexKey& Key) const noexcept
+		{
+			size_t Hash = std::hash<FVector>{}(Key.Position);
+			Hash = CombineHash(Hash, HashColor(Key.Color));
+			Hash = CombineHash(Hash, std::hash<FVector>{}(Key.Normal));
+			Hash = CombineHash(Hash, std::hash<FVector2>{}(Key.UVs));
+
+			for (int32 InfluenceIndex = 0; InfluenceIndex < MAX_SKELETAL_BONE_INFLUENCES; ++InfluenceIndex)
+			{
+				Hash = CombineHash(Hash, std::hash<int32>{}(Key.BoneIndices[InfluenceIndex]));
+				Hash = CombineHash(Hash, std::hash<float>{}(Key.BoneWeights[InfluenceIndex]));
+			}
+
+			return Hash;
+		}
+	};
+
+	struct FFbxSkeletalNodeVertexBuild
+	{
+		uint32 BaseVertexIndex = 0;
+		TMap<FFbxSkeletalVertexKey, uint32, FFbxSkeletalVertexKeyHasher> VertexMap;
+		TArray<FVector> TangentSums;
+		TArray<FVector> BitangentSums;
 	};
 
 	void AddMaterialSlotsForNode(
@@ -211,6 +288,25 @@ namespace
 		return FbxSceneUtils::ToEngineVector(FbxNormal).GetSafeNormal();
 	}
 
+	void BuildFallbackBasis(const FVector& InNormal, FVector& OutTangent, FVector& OutBitangent)
+	{
+		FVector Normal = InNormal.GetSafeNormal();
+		if (Normal.IsNearlyZero())
+		{
+			Normal = FVector::UpVector;
+		}
+
+		const FVector FallbackTangent = FVector::CrossProduct(FVector::UpVector, Normal).GetSafeNormal();
+		OutTangent = FallbackTangent.IsNearlyZero() ? FVector::ForwardVector : FallbackTangent;
+		OutBitangent = FVector::CrossProduct(Normal, OutTangent).GetSafeNormal();
+		if (OutBitangent.IsNearlyZero())
+		{
+			Normal.FindBestAxisVectors(OutTangent, OutBitangent);
+			OutTangent = OutTangent.GetSafeNormal();
+			OutBitangent = OutBitangent.GetSafeNormal();
+		}
+	}
+
 	void CalculateTriangleTangent(FSkeletalMeshVertex& V0, FSkeletalMeshVertex& V1, FSkeletalMeshVertex& V2)
 	{
 		const FVector Edge1 = V1.Position - V0.Position;
@@ -221,9 +317,9 @@ namespace
 		const float Determinant = DeltaUV1.X * DeltaUV2.Y - DeltaUV1.Y * DeltaUV2.X;
 		if (std::fabs(Determinant) <= 1.e-8f)
 		{
-			const FVector FallbackTangent = FVector::CrossProduct(FVector::UpVector, V0.Normal).GetSafeNormal();
-			const FVector SafeTangent = FallbackTangent.IsNearlyZero() ? FVector::ForwardVector : FallbackTangent;
-			const FVector SafeBitangent = FVector::CrossProduct(V0.Normal, SafeTangent).GetSafeNormal();
+			FVector SafeTangent;
+			FVector SafeBitangent;
+			BuildFallbackBasis(V0.Normal, SafeTangent, SafeBitangent);
 
 			V0.Tangent = SafeTangent;
 			V1.Tangent = SafeTangent;
@@ -247,6 +343,97 @@ namespace
 		V0.Bitangent = SafeBitangent;
 		V1.Bitangent = SafeBitangent;
 		V2.Bitangent = SafeBitangent;
+	}
+
+	FFbxSkeletalVertexKey MakeSkeletalVertexKey(const FSkeletalMeshVertex& Vertex)
+	{
+		FFbxSkeletalVertexKey Key;
+		Key.Position = Vertex.Position;
+		Key.Color = Vertex.Color;
+		Key.Normal = Vertex.Normal;
+		Key.UVs = Vertex.UVs;
+
+		for (int32 InfluenceIndex = 0; InfluenceIndex < MAX_SKELETAL_BONE_INFLUENCES; ++InfluenceIndex)
+		{
+			Key.BoneIndices[InfluenceIndex] = Vertex.BoneIndices[InfluenceIndex];
+			Key.BoneWeights[InfluenceIndex] = Vertex.BoneWeights[InfluenceIndex];
+		}
+
+		return Key;
+	}
+
+	uint32 GetOrCreateSkeletalVertexIndex(
+		FFbxSkeletalNodeVertexBuild& VertexBuild,
+		FSkeletalMesh& MeshData,
+		const FSkeletalMeshVertex& Vertex)
+	{
+		const FFbxSkeletalVertexKey Key = MakeSkeletalVertexKey(Vertex);
+		auto It = VertexBuild.VertexMap.find(Key);
+		if (It != VertexBuild.VertexMap.end())
+		{
+			return It->second;
+		}
+
+		const uint32 NewIndex = static_cast<uint32>(MeshData.Vertices.size());
+		MeshData.Vertices.push_back(Vertex);
+		VertexBuild.TangentSums.push_back(FVector::ZeroVector);
+		VertexBuild.BitangentSums.push_back(FVector::ZeroVector);
+		VertexBuild.VertexMap.emplace(Key, NewIndex);
+		return NewIndex;
+	}
+
+	void AccumulateSkeletalVertexBasis(
+		FFbxSkeletalNodeVertexBuild& VertexBuild,
+		uint32 VertexIndex,
+		const FSkeletalMeshVertex& TriangleVertex)
+	{
+		if (VertexIndex < VertexBuild.BaseVertexIndex)
+		{
+			return;
+		}
+
+		const uint32 LocalIndex = VertexIndex - VertexBuild.BaseVertexIndex;
+		if (LocalIndex >= VertexBuild.TangentSums.size() || LocalIndex >= VertexBuild.BitangentSums.size())
+		{
+			return;
+		}
+
+		VertexBuild.TangentSums[LocalIndex] += TriangleVertex.Tangent;
+		VertexBuild.BitangentSums[LocalIndex] += TriangleVertex.Bitangent;
+	}
+
+	void FinalizeSkeletalVertexBasis(const FFbxSkeletalNodeVertexBuild& VertexBuild, FSkeletalMesh& MeshData)
+	{
+		for (uint32 LocalIndex = 0; LocalIndex < static_cast<uint32>(VertexBuild.TangentSums.size()); ++LocalIndex)
+		{
+			const uint32 VertexIndex = VertexBuild.BaseVertexIndex + LocalIndex;
+			if (VertexIndex >= MeshData.Vertices.size())
+			{
+				continue;
+			}
+
+			FSkeletalMeshVertex& Vertex = MeshData.Vertices[VertexIndex];
+			FVector Tangent = VertexBuild.TangentSums[LocalIndex];
+			FVector Bitangent = LocalIndex < VertexBuild.BitangentSums.size()
+				? VertexBuild.BitangentSums[LocalIndex]
+				: FVector::ZeroVector;
+
+			if (!Tangent.Normalize())
+			{
+				BuildFallbackBasis(Vertex.Normal, Tangent, Bitangent);
+			}
+			else if (!Bitangent.Normalize())
+			{
+				Bitangent = FVector::CrossProduct(Vertex.Normal, Tangent);
+				if (!Bitangent.Normalize())
+				{
+					BuildFallbackBasis(Vertex.Normal, Tangent, Bitangent);
+				}
+			}
+
+			Vertex.Tangent = Tangent;
+			Vertex.Bitangent = Bitangent;
+		}
 	}
 
 	bool ExtractMeshNode(
@@ -287,7 +474,11 @@ namespace
 		const char* UVSetName = UVSetNames.GetCount() > 0 ? UVSetNames.GetStringAt(0) : nullptr;
 		const bool bHasSkeleton = !SkeletonResult.Skeleton.Bones.empty();
 
+		FFbxSkeletalNodeVertexBuild VertexBuild;
+		VertexBuild.BaseVertexIndex = static_cast<uint32>(MeshData.Vertices.size());
+
 		const int32 PolygonCount = static_cast<int32>(Mesh->GetPolygonCount());
+		VertexBuild.VertexMap.reserve(static_cast<size_t>(PolygonCount) * 3u);
 		for (int32 PolygonIndex = 0; PolygonIndex < PolygonCount; ++PolygonIndex)
 		{
 			const int32 PolygonSize = static_cast<int32>(Mesh->GetPolygonSize(PolygonIndex));
@@ -298,7 +489,7 @@ namespace
 
 			const int32 MaterialIndex = FbxSceneUtils::GetPolygonMaterialIndex(Mesh, PolygonIndex, MaterialCount);
 
-			uint32 TriangleIndices[3] = { 0, 0, 0 };
+			FSkeletalMeshVertex TriangleVertices[3] = {};
 			bool bTriangleValid = true;
 			for (int32 PolygonVertexIndex = 0; PolygonVertexIndex < 3; ++PolygonVertexIndex)
 			{
@@ -309,7 +500,7 @@ namespace
 					break;
 				}
 
-				FSkeletalMeshVertex Vertex;
+				FSkeletalMeshVertex& Vertex = TriangleVertices[PolygonVertexIndex];
 				Vertex.Position = FbxSceneUtils::ToEngineVector(Mesh->GetControlPointAt(ControlPointIndex));
 				Vertex.Normal = GetPolygonVertexNormal(Mesh, PolygonIndex, PolygonVertexIndex);
 				Vertex.UVs = FbxSceneUtils::GetPolygonVertexUV(Mesh, PolygonIndex, PolygonVertexIndex, UVSetName);
@@ -322,9 +513,6 @@ namespace
 				{
 					AssignBoneInfluencesToVertex(TArray<FBoneInfluence>(), bHasSkeleton, Vertex);
 				}
-
-				TriangleIndices[PolygonVertexIndex] = static_cast<uint32>(MeshData.Vertices.size());
-				MeshData.Vertices.push_back(Vertex);
 			}
 
 			if (!bTriangleValid)
@@ -333,14 +521,23 @@ namespace
 			}
 
 			CalculateTriangleTangent(
-				MeshData.Vertices[TriangleIndices[0]],
-				MeshData.Vertices[TriangleIndices[1]],
-				MeshData.Vertices[TriangleIndices[2]]);
+				TriangleVertices[0],
+				TriangleVertices[1],
+				TriangleVertices[2]);
+
+			uint32 TriangleIndices[3] = { 0, 0, 0 };
+			for (int32 PolygonVertexIndex = 0; PolygonVertexIndex < 3; ++PolygonVertexIndex)
+			{
+				TriangleIndices[PolygonVertexIndex] = GetOrCreateSkeletalVertexIndex(VertexBuild, MeshData, TriangleVertices[PolygonVertexIndex]);
+				AccumulateSkeletalVertexBasis(VertexBuild, TriangleIndices[PolygonVertexIndex], TriangleVertices[PolygonVertexIndex]);
+			}
 
 			IndicesByMaterial[MaterialIndex].push_back(TriangleIndices[0]);
 			IndicesByMaterial[MaterialIndex].push_back(TriangleIndices[1]);
 			IndicesByMaterial[MaterialIndex].push_back(TriangleIndices[2]);
 		}
+
+		FinalizeSkeletalVertexBasis(VertexBuild, MeshData);
 
 		for (int32 MaterialIndex = 0; MaterialIndex < MaterialCount; ++MaterialIndex)
 		{
