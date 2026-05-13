@@ -86,6 +86,22 @@ bool FEditorConsoleWidget::ShouldRender() const
 	return bOpen || DrawerAnimationAlpha > 0.0f;
 }
 
+float FEditorConsoleWidget::GetReservedBottomHeight() const
+{
+	float ReservedDrawerHeight = DrawerHeight;
+	if (ReservedDrawerHeight <= 0.0f)
+	{
+		if (const ImGuiViewport* Viewport = ImGui::GetMainViewport())
+		{
+			const float AvailableHeight = std::max(120.0f, Viewport->WorkSize.y - EditorBottomBarHeight);
+			ReservedDrawerHeight = AvailableHeight * 0.35f;
+		}
+	}
+
+	const float EasedAlpha = EaseOutCubic(DrawerAnimationAlpha);
+	return EditorBottomBarHeight + ReservedDrawerHeight * EasedAlpha;
+}
+
 void FEditorConsoleWidget::CloseImmediately()
 {
 	bOpen = false;

@@ -273,8 +273,13 @@ void FEditorMainPanel::Render(float DeltaTime)
 	const ImGuiID DockspaceId = ImGui::GetID("EditorDockSpaceV3");
 	const ImGuiViewport* MainViewport = ImGui::GetMainViewport();
 	const float ReservedTopHeight = ToolbarWidget.GetReservedTopHeight();
+	const float ReservedBottomHeight = std::max(
+		ContentDrawerWidget.GetReservedBottomHeight(),
+		ConsoleWidget.GetReservedBottomHeight());
 	ImGui::SetNextWindowPos(ImVec2(MainViewport->Pos.x, MainViewport->Pos.y + ReservedTopHeight));
-	ImGui::SetNextWindowSize(ImVec2(MainViewport->Size.x, std::max(1.0f, MainViewport->Size.y - ReservedTopHeight)));
+	ImGui::SetNextWindowSize(ImVec2(
+		MainViewport->Size.x,
+		std::max(1.0f, MainViewport->Size.y - ReservedTopHeight - ReservedBottomHeight)));
 	ImGui::SetNextWindowViewport(MainViewport->ID);
 
 	constexpr ImGuiWindowFlags DockspaceWindowFlags =
@@ -489,6 +494,9 @@ void FEditorMainPanel::EnsureDefaultDockLayout(ImGuiID DockspaceId)
 
 	const ImGuiViewport* Viewport = ImGui::GetMainViewport();
 	const float ReservedTopHeight = ToolbarWidget.GetReservedTopHeight();
+	const float ReservedBottomHeight = std::max(
+		ContentDrawerWidget.GetReservedBottomHeight(),
+		ConsoleWidget.GetReservedBottomHeight());
 	ImGui::DockBuilderRemoveNode(DockspaceId);
 	if (ImGuiWindowSettings* ConsoleSettings = ImGui::FindWindowSettingsByID(ImHashStr("Console")))
 	{
@@ -498,7 +506,7 @@ void FEditorMainPanel::EnsureDefaultDockLayout(ImGuiID DockspaceId)
 	ImGui::DockBuilderSetNodePos(DockspaceId, ImVec2(Viewport->Pos.x, Viewport->Pos.y + ReservedTopHeight));
 	ImGui::DockBuilderSetNodeSize(
 		DockspaceId,
-		ImVec2(Viewport->Size.x, std::max(1.0f, Viewport->Size.y - ReservedTopHeight)));
+		ImVec2(Viewport->Size.x, std::max(1.0f, Viewport->Size.y - ReservedTopHeight - ReservedBottomHeight)));
 
 	ImGuiID MainNode = DockspaceId;
 	ImGuiID RightNode = 0;

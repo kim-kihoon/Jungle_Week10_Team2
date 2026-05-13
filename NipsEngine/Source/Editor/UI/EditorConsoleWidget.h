@@ -35,6 +35,7 @@ public:
 	bool ShouldRender() const;
 	void CloseImmediately();
 	void OpenFromDrawerTakeover(float InDrawerHeight);
+	float GetReservedBottomHeight() const;
 
 	void Clear()
 	{
