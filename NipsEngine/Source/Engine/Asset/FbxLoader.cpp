@@ -57,14 +57,12 @@ namespace
 	{
 		size_t operator()(const FSkeletalMeshVertex& Vertex) const
 		{
-			// Import 결과를 보존하기 위해 렌더링/스키닝에 쓰이는 모든 속성을 exact match 기준으로 묶는다.
+			// Tangent/bitangent는 dedupe 이후 index buffer 기준으로 재계산되는 파생 데이터다.
 			size_t Seed = 0;
 			HashCombineVector(Seed, Vertex.Position);
 			HashCombineColor(Seed, Vertex.Color);
 			HashCombineVector(Seed, Vertex.Normal);
 			HashCombineVector2(Seed, Vertex.UVs);
-			HashCombineVector(Seed, Vertex.Tangent);
-			HashCombineVector(Seed, Vertex.Bitangent);
 
 			for (int32 InfluenceIndex = 0; InfluenceIndex < MAX_SKELETAL_BONE_INFLUENCES; ++InfluenceIndex)
 			{
@@ -87,9 +85,7 @@ namespace
 				Left.Color.B != Right.Color.B ||
 				Left.Color.A != Right.Color.A ||
 				Left.Normal != Right.Normal ||
-				Left.UVs != Right.UVs ||
-				Left.Tangent != Right.Tangent ||
-				Left.Bitangent != Right.Bitangent)
+				Left.UVs != Right.UVs)
 			{
 				return false;
 			}
@@ -268,9 +264,6 @@ namespace
 			// ConvertScene() cannot fully represent handedness changes. DeepConvertScene()
 			// converts transforms, vertices and animation curves for RH -> LH assets.
 			EngineAxisSystem.DeepConvertScene(Context.Scene);
-
-			UE_LOG("FBX axis system converted to engine axis system. Path: %s",
-				   Context.SourcePath.c_str());
 		}
 
 		/*
@@ -284,10 +277,6 @@ namespace
 		if (CurrentUnitSystem != EngineUnitSystem)
 		{
 			EngineUnitSystem.ConvertScene(Context.Scene);
-
-			UE_LOG(
-				"FBX unit system converted to meter. Path: %s",
-				Context.SourcePath.c_str());
 		}
 	}
 
@@ -752,9 +741,6 @@ namespace
 			Context.LoadedMesh.InverseBindPoseMatrices[BoneIndex] = ComponentSpaceRefPose[BoneIndex].ToMatrixWithScale().GetInverse();
 		}
 
-		UE_LOG("FBX skeleton collected. BoneCount: %d, Path: %s",
-			BoneCount,
-			Context.SourcePath.c_str());
 	}
 
 	void AddMaterialSlotsForNode(FFbxLoadContext& Context, FbxNode* MeshNode, int32& OutMaterialBaseIndex, int32& OutMaterialCount)
@@ -920,7 +906,45 @@ namespace
 		}
 	}
 
-	void AssignBoneInfluencesToVertex(const TArray<FBoneInfluence>& SourceInfluences, bool bHasSkeleton, FSkeletalMeshVertex& OutVertex)
+	void NormalizeControlPointInfluences(TArray<FControlPointInfluenceList>& Influences, bool bHasSkeleton)
+	{
+		for (FControlPointInfluenceList& InfluenceList : Influences)
+		{
+			std::sort(InfluenceList.Influences.begin(), InfluenceList.Influences.end(), [](const FBoneInfluence& Left, const FBoneInfluence& Right)
+			{
+				return Left.Weight > Right.Weight;
+			});
+
+			if (InfluenceList.Influences.size() > MAX_SKELETAL_BONE_INFLUENCES)
+			{
+				InfluenceList.Influences.resize(MAX_SKELETAL_BONE_INFLUENCES);
+			}
+
+			float WeightSum = 0.0f;
+			for (const FBoneInfluence& Influence : InfluenceList.Influences)
+			{
+				WeightSum += Influence.Weight;
+			}
+
+			if (WeightSum > 0.0f)
+			{
+				const float InvWeightSum = 1.0f / WeightSum;
+				for (FBoneInfluence& Influence : InfluenceList.Influences)
+				{
+					Influence.Weight *= InvWeightSum;
+				}
+				continue;
+			}
+
+			InfluenceList.Influences.clear();
+			if (bHasSkeleton)
+			{
+				InfluenceList.Influences.push_back({ 0, 1.0f });
+			}
+		}
+	}
+
+	void AssignPreparedBoneInfluencesToVertex(const TArray<FBoneInfluence>& Influences, bool bHasSkeleton, FSkeletalMeshVertex& OutVertex)
 	{
 		for (int32 InfluenceIndex = 0; InfluenceIndex < MAX_SKELETAL_BONE_INFLUENCES; ++InfluenceIndex)
 		{
@@ -928,20 +952,8 @@ namespace
 			OutVertex.BoneWeights[InfluenceIndex] = 0.0f;
 		}
 
-		TArray<FBoneInfluence> Influences = SourceInfluences;
-		std::sort(Influences.begin(), Influences.end(), [](const FBoneInfluence& Left, const FBoneInfluence& Right)
-		{
-			return Left.Weight > Right.Weight;
-		});
-
 		const int32 UsedInfluenceCount = static_cast<int32>(std::min<size_t>(Influences.size(), MAX_SKELETAL_BONE_INFLUENCES));
-		float WeightSum = 0.0f;
-		for (int32 InfluenceIndex = 0; InfluenceIndex < UsedInfluenceCount; ++InfluenceIndex)
-		{
-			WeightSum += Influences[InfluenceIndex].Weight;
-		}
-
-		if (WeightSum <= 0.0f)
+		if (UsedInfluenceCount <= 0)
 		{
 			if (bHasSkeleton)
 			{
@@ -951,11 +963,10 @@ namespace
 			return;
 		}
 
-		const float InvWeightSum = 1.0f / WeightSum;
 		for (int32 InfluenceIndex = 0; InfluenceIndex < UsedInfluenceCount; ++InfluenceIndex)
 		{
 			OutVertex.BoneIndices[InfluenceIndex] = Influences[InfluenceIndex].BoneIndex;
-			OutVertex.BoneWeights[InfluenceIndex] = Influences[InfluenceIndex].Weight * InvWeightSum;
+			OutVertex.BoneWeights[InfluenceIndex] = Influences[InfluenceIndex].Weight;
 		}
 	}
 
@@ -990,7 +1001,12 @@ namespace
 		return UV;
 	}
 
-	void CalculateTriangleTangent(FSkeletalMeshVertex& V0, FSkeletalMeshVertex& V1, FSkeletalMeshVertex& V2)
+	bool CalculateTriangleTangentBasis(
+		const FSkeletalMeshVertex& V0,
+		const FSkeletalMeshVertex& V1,
+		const FSkeletalMeshVertex& V2,
+		FVector& OutTangent,
+		FVector& OutBitangent)
 	{
 		const FVector Edge1 = V1.Position - V0.Position;
 		const FVector Edge2 = V2.Position - V0.Position;
@@ -1000,32 +1016,106 @@ namespace
 		const float Determinant = DeltaUV1.X * DeltaUV2.Y - DeltaUV1.Y * DeltaUV2.X;
 		if (std::fabs(Determinant) <= 1.e-8f)
 		{
-			const FVector FallbackTangent = FVector::CrossProduct(FVector::UpVector, V0.Normal).GetSafeNormal();
-			const FVector SafeTangent = FallbackTangent.IsNearlyZero() ? FVector::ForwardVector : FallbackTangent;
-			const FVector SafeBitangent = FVector::CrossProduct(V0.Normal, SafeTangent).GetSafeNormal();
-
-			V0.Tangent = SafeTangent;
-			V1.Tangent = SafeTangent;
-			V2.Tangent = SafeTangent;
-			V0.Bitangent = SafeBitangent;
-			V1.Bitangent = SafeBitangent;
-			V2.Bitangent = SafeBitangent;
-			return;
+			OutTangent = FVector::ZeroVector;
+			OutBitangent = FVector::ZeroVector;
+			return false;
 		}
 
 		const float InvDeterminant = 1.0f / Determinant;
-		const FVector Tangent = ((Edge1 * DeltaUV2.Y) - (Edge2 * DeltaUV1.Y)) * InvDeterminant;
-		const FVector Bitangent = ((Edge2 * DeltaUV1.X) - (Edge1 * DeltaUV2.X)) * InvDeterminant;
+		OutTangent = ((Edge1 * DeltaUV2.Y) - (Edge2 * DeltaUV1.Y)) * InvDeterminant;
+		OutBitangent = ((Edge2 * DeltaUV1.X) - (Edge1 * DeltaUV2.X)) * InvDeterminant;
 
-		const FVector SafeTangent = Tangent.GetSafeNormal();
-		const FVector SafeBitangent = Bitangent.GetSafeNormal();
+		return !OutTangent.IsNearlyZero() && !OutBitangent.IsNearlyZero();
+	}
 
-		V0.Tangent = SafeTangent;
-		V1.Tangent = SafeTangent;
-		V2.Tangent = SafeTangent;
-		V0.Bitangent = SafeBitangent;
-		V1.Bitangent = SafeBitangent;
-		V2.Bitangent = SafeBitangent;
+	FVector MakeFallbackTangent(const FVector& Normal)
+	{
+		FVector Tangent = FVector::CrossProduct(FVector::UpVector, Normal).GetSafeNormal();
+		if (!Tangent.IsNearlyZero())
+		{
+			return Tangent;
+		}
+
+		Tangent = FVector::CrossProduct(FVector::ForwardVector, Normal).GetSafeNormal();
+		if (!Tangent.IsNearlyZero())
+		{
+			return Tangent;
+		}
+
+		return FVector::RightVector;
+	}
+
+	void RecalculateSkeletalMeshTangents(FSkeletalMesh& Mesh)
+	{
+		TArray<FVector> TangentAccum;
+		TArray<FVector> BitangentAccum;
+
+		TangentAccum.resize(Mesh.Vertices.size(), FVector::ZeroVector);
+		BitangentAccum.resize(Mesh.Vertices.size(), FVector::ZeroVector);
+
+		for (size_t IndexOffset = 0; IndexOffset + 2 < Mesh.Indices.size(); IndexOffset += 3)
+		{
+			const uint32 Index0 = Mesh.Indices[IndexOffset + 0];
+			const uint32 Index1 = Mesh.Indices[IndexOffset + 1];
+			const uint32 Index2 = Mesh.Indices[IndexOffset + 2];
+
+			if (Index0 >= Mesh.Vertices.size() || Index1 >= Mesh.Vertices.size() || Index2 >= Mesh.Vertices.size())
+			{
+				continue;
+			}
+
+			FVector TriangleTangent = FVector::ZeroVector;
+			FVector TriangleBitangent = FVector::ZeroVector;
+			if (!CalculateTriangleTangentBasis(
+				Mesh.Vertices[Index0],
+				Mesh.Vertices[Index1],
+				Mesh.Vertices[Index2],
+				TriangleTangent,
+				TriangleBitangent))
+			{
+				continue;
+			}
+
+			TangentAccum[Index0] += TriangleTangent;
+			TangentAccum[Index1] += TriangleTangent;
+			TangentAccum[Index2] += TriangleTangent;
+
+			BitangentAccum[Index0] += TriangleBitangent;
+			BitangentAccum[Index1] += TriangleBitangent;
+			BitangentAccum[Index2] += TriangleBitangent;
+		}
+
+		for (size_t VertexIndex = 0; VertexIndex < Mesh.Vertices.size(); ++VertexIndex)
+		{
+			FSkeletalMeshVertex& Vertex = Mesh.Vertices[VertexIndex];
+			FVector Normal = Vertex.Normal.GetSafeNormal();
+			if (Normal.IsNearlyZero())
+			{
+				Normal = FVector::UpVector;
+			}
+
+			FVector Tangent = TangentAccum[VertexIndex];
+			Tangent = Tangent - (Normal * FVector::DotProduct(Normal, Tangent));
+			Tangent = Tangent.GetSafeNormal();
+			if (Tangent.IsNearlyZero())
+			{
+				Tangent = MakeFallbackTangent(Normal);
+			}
+
+			FVector Bitangent = BitangentAccum[VertexIndex].GetSafeNormal();
+			if (Bitangent.IsNearlyZero())
+			{
+				Bitangent = FVector::CrossProduct(Normal, Tangent).GetSafeNormal();
+			}
+
+			if (Bitangent.IsNearlyZero())
+			{
+				Bitangent = FVector::RightVector;
+			}
+
+			Vertex.Tangent = Tangent;
+			Vertex.Bitangent = Bitangent;
+		}
 	}
 
 	bool ExtractMeshNode(FFbxLoadContext& Context, FbxNode* MeshNode)
@@ -1053,15 +1143,15 @@ namespace
 		TArray<TArray<uint32>> IndicesByMaterial;
 		IndicesByMaterial.resize(MaterialCount);
 
+		const bool bHasSkeleton = !Context.LoadedMesh.Bones.empty();
+
 		TArray<FControlPointInfluenceList> ControlPointInfluences;
 		BuildControlPointInfluences(Context, Mesh, ControlPointInfluences);
+		NormalizeControlPointInfluences(ControlPointInfluences, bHasSkeleton);
 
 		FbxStringList UVSetNames;
 		Mesh->GetUVSetNames(UVSetNames);
 		const char* UVSetName = UVSetNames.GetCount() > 0 ? UVSetNames.GetStringAt(0) : nullptr;
-
-		const FMatrix MeshGlobalMatrix = ToEngineMatrix(MeshNode->EvaluateGlobalTransform());
-		const bool bHasSkeleton = !Context.LoadedMesh.Bones.empty();
 
 		const int32 PolygonCount = static_cast<int32>(Mesh->GetPolygonCount());
 		const size_t MaxAdditionalVertexCount = static_cast<size_t>(PolygonCount) * 3;
@@ -1078,7 +1168,7 @@ namespace
 
 			const int32 MaterialIndex = GetPolygonMaterialIndex(Mesh, PolygonIndex, MaterialCount);
 
-			FSkeletalMeshVertex TriangleVertices[3];
+			FSkeletalMeshVertex TriangleVertices[3] = {};
 			bool bTriangleValid = true;
 			for (int32 PolygonVertexIndex = 0; PolygonVertexIndex < 3; ++PolygonVertexIndex)
 			{
@@ -1097,11 +1187,11 @@ namespace
 
 				if (ControlPointIndex < static_cast<int32>(ControlPointInfluences.size()))
 				{
-					AssignBoneInfluencesToVertex(ControlPointInfluences[ControlPointIndex].Influences, bHasSkeleton, Vertex);
+					AssignPreparedBoneInfluencesToVertex(ControlPointInfluences[ControlPointIndex].Influences, bHasSkeleton, Vertex);
 				}
 				else
 				{
-					AssignBoneInfluencesToVertex(TArray<FBoneInfluence>(), bHasSkeleton, Vertex);
+					AssignPreparedBoneInfluencesToVertex(TArray<FBoneInfluence>(), bHasSkeleton, Vertex);
 				}
 			}
 
@@ -1110,8 +1200,6 @@ namespace
 				continue;
 			}
 
-			// Tangent/bitangent까지 최종화한 뒤 dedupe해야 같은 위치라도 다른 shading seam을 유지할 수 있다.
-			CalculateTriangleTangent(TriangleVertices[0], TriangleVertices[1], TriangleVertices[2]);
 			Context.RawVertexCount += 3;
 
 			for (int32 TriangleVertexIndex = 0; TriangleVertexIndex < 3; ++TriangleVertexIndex)
@@ -1166,20 +1254,13 @@ namespace
 			}
 		});
 
-		const uint32 UniqueVertexCount = static_cast<uint32>(Context.LoadedMesh.Vertices.size());
-		const uint32 RemovedVertexCount = Context.RawVertexCount > UniqueVertexCount ? Context.RawVertexCount - UniqueVertexCount : 0;
-		const float ReductionPercent = CalculateReductionPercent(Context.RawVertexCount, UniqueVertexCount);
+		if (!bExtractedAnyMesh || Context.LoadedMesh.Vertices.empty() || Context.LoadedMesh.Indices.empty())
+		{
+			return false;
+		}
 
-		UE_LOG("FBX skeletal mesh extracted. RawVertices: %d, UniqueVertices: %d, RemovedDuplicates: %d, Reduction: %.2f%%, Indices: %d, Sections: %d, Path: %s",
-			static_cast<int32>(Context.RawVertexCount),
-			static_cast<int32>(Context.LoadedMesh.Vertices.size()),
-			static_cast<int32>(RemovedVertexCount),
-			ReductionPercent,
-			static_cast<int32>(Context.LoadedMesh.Indices.size()),
-			static_cast<int32>(Context.LoadedMesh.Sections.size()),
-			Context.SourcePath.c_str());
-
-		return bExtractedAnyMesh && !Context.LoadedMesh.Vertices.empty() && !Context.LoadedMesh.Indices.empty();
+		RecalculateSkeletalMeshTangents(Context.LoadedMesh);
+		return true;
 	}
 } //또 졸라 커지는 네임스페이스..., 줴줴이야
 
@@ -1245,6 +1326,21 @@ USkeletalMesh* FFbxLoader::Load(const FString& Path)
 	//7. USkeletalMesh 생성
 	USkeletalMesh* SkeletalMesh = new USkeletalMesh();
 	SkeletalMesh->SetMeshData(new FSkeletalMesh(Context.LoadedMesh));
+
+	const uint32 UniqueVertexCount = static_cast<uint32>(Context.LoadedMesh.Vertices.size());
+	const uint32 RemovedVertexCount = Context.RawVertexCount > UniqueVertexCount ? Context.RawVertexCount - UniqueVertexCount : 0;
+	const float ReductionPercent = CalculateReductionPercent(Context.RawVertexCount, UniqueVertexCount);
+
+	UE_LOG("FBX skeletal mesh loaded. Bones: %d, RawVertices: %d, UniqueVertices: %d, RemovedDuplicates: %d, Reduction: %.2f%%, Indices: %d, Sections: %d, Materials: %d, Path: %s",
+		static_cast<int32>(Context.LoadedMesh.Bones.size()),
+		static_cast<int32>(Context.RawVertexCount),
+		static_cast<int32>(UniqueVertexCount),
+		static_cast<int32>(RemovedVertexCount),
+		ReductionPercent,
+		static_cast<int32>(Context.LoadedMesh.Indices.size()),
+		static_cast<int32>(Context.LoadedMesh.Sections.size()),
+		static_cast<int32>(Context.LoadedMesh.MaterialSlots.size()),
+		Context.SourcePath.c_str());
 	
 	//더는 사용하지 않은 친구 손절
 	DestroyFbxSdkContext(Context);
