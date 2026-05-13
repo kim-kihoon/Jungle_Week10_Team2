@@ -1122,8 +1122,3 @@ bool FFbxLoader::SupportsExtension(const FString& Extension) const
 {
     return ToLowerAscii(Extension) == "fbx";
 }
-
-FString FFbxLoader::GetLoaderName() const
-{
-	return FString("FFbxLoader");
-}
